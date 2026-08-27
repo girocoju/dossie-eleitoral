@@ -33,7 +33,10 @@ datasets:
     pacote: "consulta_cand/consulta_cand_{ano}.zip"
     arquivo_regex: '^consulta_cand_{ano}_(?P<ue>[A-Z]{2})\.csv$'
     leiame: "consulta_cand/leiame-consulta_cand.pdf"
-    chave: ["sq_candidato", "ano_eleicao", "nr_turno"]
+    # `sq_candidato` NAO e' global antes de 2010: em 2002 e 2006 e' um contador por
+    # unidade eleitoral e repete ate' 27 vezes (uma por UE). Conferido em 27/08/2026
+    # nos oito anos. So' com sg_ue + cd_eleicao a chave e' unica em todos eles.
+    chave: ["ano_eleicao", "cd_eleicao", "sg_ue", "sq_candidato", "nr_turno"]
     obrigatorios:
       - ano_eleicao
       - nr_turno
@@ -104,7 +107,7 @@ datasets:
     pacote: "bem_candidato/bem_candidato_{ano}.zip"
     arquivo_regex: '^bem_candidato_{ano}_(?P<ue>[A-Z]{2})\.csv$'
     leiame: "bem_candidato/leiame-bem_candidato.pdf"
-    chave: ["sq_candidato", "ano_eleicao", "nr_ordem_bem"]
+    chave: ["ano_eleicao", "sg_ue", "sq_candidato", "nr_ordem_bem"]
     obrigatorios:
       - ano_eleicao
       - sq_candidato
@@ -129,7 +132,10 @@ datasets:
     pacote: "consulta_vagas/consulta_vagas_{ano}.zip"
     arquivo_regex: '^consulta_vagas_{ano}_(?P<ue>[A-Z]{2})\.csv$'
     leiame: "consulta_vagas/leiame-consulta_vagas.pdf"
-    chave: ["ano_eleicao", "sg_ue", "cod_cargo"]
+    # `cd_eleicao` e' obrigatorio na chave: o pacote de um ano pode conter mais de
+    # uma eleicao. O de 2022, por exemplo, traz linhas da "Eleicao Suplementar
+    # Governador 2026"; o de 1998 traz 1o e 2o turno como eleicoes distintas.
+    chave: ["ano_eleicao", "cd_eleicao", "sg_ue", "cod_cargo"]
     obrigatorios:
       - ano_eleicao
       - cod_cargo
@@ -155,7 +161,9 @@ datasets:
     # Grao conferido em 27/08/2026: uma linha por PARTIDO dentro da coligacao,
     # por cargo. `sq_coligacao` sozinho repete ate' 18 vezes (uma federacao com
     # muitos partidos), entao nao e' chave.
-    chave: ["ano_eleicao", "sq_coligacao", "sigla_partido", "cod_cargo"]
+    # `sq_coligacao` tambem nao e' global antes de 2010 — o valor `1000` aparece
+    # em varias UFs no mesmo ano.
+    chave: ["ano_eleicao", "cd_eleicao", "sg_ue", "sq_coligacao", "sigla_partido", "cod_cargo"]
     obrigatorios:
       - ano_eleicao
       - sq_coligacao

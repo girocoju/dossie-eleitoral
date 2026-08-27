@@ -4,12 +4,14 @@
     partition_by  = {'field': 'ano_eleicao', 'data_type': 'int64',
                      'range': {'start': 1998, 'end': 2032, 'interval': 4}},
     cluster_by    = ['cod_cargo', 'sg_uf', 'sigla_partido'],
-    description   = 'Uma candidatura por linha (SPEC 5). Grao: sq_candidato.'
+    description   = 'Uma candidatura por linha (SPEC 5). Grao: sk_candidatura.'
   )
 }}
 
 /*
-  Grao: uma candidatura = candidato x cargo x UF x ano, ou seja, `sq_candidato`.
+  Grao: uma candidatura = candidato x cargo x UF x ano, identificada por
+  `sk_candidatura` (ano_eleicao + sg_ue + sq_candidato). `sq_candidato` sozinho nao
+  serve: so' e' global a partir de 2010.
   A fonte tem uma linha por turno; aqui elas viram uma, guardando:
     - os atributos do 1o turno (partido, coligacao, situacao do registro);
     - o desfecho do ULTIMO turno disputado (`situacao_turno`), que e' o que diz
@@ -35,7 +37,8 @@ with candidaturas as (
 por_candidatura as (
 
     select
-        sq_candidato,
+        sk_candidatura,
+        any_value(sq_candidato)                                   as sq_candidato,
         any_value(ano_eleicao)                                    as ano_eleicao,
         max(nr_turno)                                             as turnos_disputados,
 
@@ -62,24 +65,24 @@ por_candidatura as (
 
         any_value(_extracted_at having max nr_turno)              as _extracted_at
     from candidaturas
-    group by sq_candidato
+    group by sk_candidatura
 
 ),
 
 bens as (
 
     select
-        sq_candidato,
+        sk_candidatura,
         sum(valor_bem)   as total_bens_declarados,
         count(*)         as n_bens
     from {{ ref('stg_tse__bens') }}
-    group by sq_candidato
+    group by sk_candidatura
 
 ),
 
 pessoas as (
 
-    select sq_candidato, id_pessoa, link_confiavel
+    select sk_candidatura, id_pessoa, link_confiavel
     from {{ ref('dim_candidato') }}
 
 ),
@@ -99,6 +102,7 @@ mandatos_vigentes as (
 )
 
 select
+    c.sk_candidatura,
     c.sq_candidato,
     c.ano_eleicao,
     p.id_pessoa,
@@ -126,7 +130,7 @@ select
 
     coalesce(b.total_bens_declarados, 0)                  as total_bens_declarados,
     coalesce(b.n_bens, 0)                                 as n_bens,
-    b.sq_candidato is not null                            as declarou_algum_bem,
+    b.sk_candidatura is not null                          as declarou_algum_bem,
     c.despesa_max_campanha,
 
     cast(null as int64)                                   as votos_nominais,
@@ -134,8 +138,8 @@ select
     c._extracted_at
 
 from por_candidatura as c
-left join bens     as b using (sq_candidato)
-left join pessoas  as p using (sq_candidato)
+left join bens     as b using (sk_candidatura)
+left join pessoas  as p using (sk_candidatura)
 left join mandatos_vigentes as m
   on  m.id_pessoa  = p.id_pessoa
   and m.cod_cargo  = c.cod_cargo

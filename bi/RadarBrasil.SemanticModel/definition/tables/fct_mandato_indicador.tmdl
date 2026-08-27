@@ -38,6 +38,15 @@ table fct_mandato_indicador
 
 		annotation SummarizationSetBy = Automatic
 
+	column sk_candidatura
+		dataType: string
+		isHidden
+		lineageTag: 4fe40693-e35d-5d25-2e2e-e13c93843d1f
+		summarizeBy: none
+		sourceColumn: sk_candidatura
+
+		annotation SummarizationSetBy = Automatic
+
 	column cod_indicador
 		dataType: string
 		isHidden

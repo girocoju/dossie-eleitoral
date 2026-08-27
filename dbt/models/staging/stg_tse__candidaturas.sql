@@ -14,7 +14,12 @@
      turno, como na fonte. O achatamento para "uma candidatura" acontece so' em
      `fct_candidatura`, porque quem quiser olhar 2o turno precisa das duas linhas.
 
-  2. Em 2026 o TSE moveu situacao de julgamento, reeleicao e despesa maxima para o
+  2. `sq_candidato` NAO e' chave: so' e' global a partir de 2010 (ver o macro
+     `sk_candidatura`). O join com o complementar abaixo usa `sq_candidato` porque
+     esse arquivo so' existe em 2026, ano em que a numeracao ja' e' global — e ele
+     nao traz `sg_ue` para compor a chave completa.
+
+  3. Em 2026 o TSE moveu situacao de julgamento, reeleicao e despesa maxima para o
      arquivo complementar. O LEFT JOIN abaixo recompoe o registro completo; para os
      anos em que essas colunas estavam no arquivo principal, o COALESCE mantem o
      valor de la'. Nenhum dos dois lados e' obrigatorio.
@@ -102,7 +107,15 @@ junto as (
 )
 
 select
+    {{ sk_candidatura() }} as sk_candidatura,
     *,
+    -- O pacote de um ano contem eleicoes SUPLEMENTARES realizadas depois: o de
+    -- 2014 traz a suplementar do AM (27/08/2017) e a do TO (24/06/2018), ambas
+    -- com ANO_ELEICAO=2014. Quem ganha uma suplementar assume no ano da eleicao,
+    -- nao em `ano_eleicao + 1` — por isso a flag existe.
+    coalesce(regexp_contains({{ sem_acento('ds_eleicao') }}, r'SUPLEMENTAR'), false)
+        as is_eleicao_suplementar,
+    coalesce(extract(year from data_eleicao), ano_eleicao) as ano_eleicao_efetivo,
     -- eleito e' derivado uma unica vez, aqui, e reaproveitado por todo o resto
     {{ foi_eleito('situacao_turno') }} as foi_eleito
 from junto

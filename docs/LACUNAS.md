@@ -194,3 +194,43 @@ tem de comecar em 2006.
 
 **Como fechar:** nao fecha. O dataset nao foi publicado. Os layouts de 1998 e 2002
 declaram `indisponivel` para `bens`, e a ingestao pula com aviso em vez de falhar.
+
+---
+
+## L-15 · Datas de nascimento erradas no cadastro do TSE
+
+**O que falta:** nada a obter — sao erros de digitacao na fonte.
+
+**Impacto:** 21 candidaturas em 180.718 (0,01%) tem data de nascimento que produz
+idade impossivel, conferido em 27/08/2026:
+
+- uma com `7953-09-05` (ano 7953), que da' idade de -5.946 anos;
+- quinze de 1998 com nascimento no proprio ano da eleicao, oito delas no DF com a
+  mesma data (18/08/1998) — a data de registro vazou para o campo de nascimento;
+- uma de 2002 nascida em 1996 (7 anos na posse) e uma de 2010 nascida em 2003 (8).
+
+Nenhuma e' possivel: a idade minima constitucional e' 18 anos.
+
+**Como o projeto trata:** nao corrige e nao descarta a candidatura.
+`idade_na_posse` guarda o valor como a fonte publica, `idade_plausivel` marca o
+caso, e `idade_na_posse_valida` (NULL quando implausivel) e' o que alimenta as
+medidas de perfil. O teste `assert_idade_implausivel_e_rara` falha se a proporcao
+passar de 0,5% — patamar que so' um bug de parsing alcanca.
+
+**Como fechar:** nao fecha. Corrigir exigiria inventar a data certa.
+
+---
+
+## L-16 · Resultado da eleicao presidencial de 2006 nao esta no `consulta_cand`
+
+**O que falta:** `DS_SIT_TOT_TURNO` das oito candidaturas a Presidente de 2006 vem
+vazio, e o pacote nao traz linhas de 2o turno para o cargo 1 — embora traga os 27
+governadores eleitos naquele mesmo ano. Conferido em 27/08/2026.
+
+**Impacto:** o mandato presidencial de 2007–2010 **nao existe** em `fct_mandato`.
+E' o unico ciclo presidencial ausente entre 1998 e 2022. O modulo
+"Durante o mandato" nao tem esse periodo no nivel Brasil.
+
+**Como fechar:** cruzar com `votacao_candidato_munzona_2006` (S4, ver L-02), que
+traz a votacao apurada, ou com a serie de resultados do proprio TSE. Ate' la', a
+ausencia fica visivel na tela em vez de ser preenchida.

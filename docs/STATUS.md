@@ -59,9 +59,9 @@ Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 
 | Task | Estado | Nota |
 |---|---|---|
 | T-201 ADR: Base dos Dados vs. CSV bruto | ✅ | [ADR-004](adr/ADR-004-fonte-do-historico.md): CSV do TSE; BdD so' para conferencia |
-| T-202 Ingestao do historico + resultados por UF | 🟡 | Ingestao roda para qualquer ano; layouts 1998–2022 nao conferidos ([L-01](LACUNAS.md)); votos nao ingeridos ([L-02](LACUNAS.md)) |
+| T-202 Ingestao do historico + resultados por UF | ✅ | 8 anos carregados: 180.718 candidaturas, 509.136 bens. Votos (S4) seguem fora ([L-02](LACUNAS.md)) |
 | T-203 Mapa de colunas por ano em `layouts/tse_{ano}.yml` | ✅ | **8 anos conferidos** contra os arquivos reais (L-01 fechada) |
-| T-204 `fct_mandato` + teste de cobertura | 🟡 | Materializado com **0 linhas** — correto: em 2026 ninguem foi eleito ainda e o historico 1998–2022 nao entrou ([L-01](LACUNAS.md)) |
+| T-204 `fct_mandato` + teste de cobertura | ✅ | 11.777 mandatos, 1999–2026. 7 por eleicao suplementar, 7 interrompidos |
 | T-205 Vinculacao de pessoa + relatorio de taxa de match | 🟡 | `analyses/relatorio_vinculacao_pessoa.sql` escrito; medicao pendente ([L-10](LACUNAS.md)) |
 
 ## Fase 3 — Socioeconomico e "Durante o mandato"
@@ -70,7 +70,7 @@ Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 
 |---|---|---|
 | T-301 `ingest/ibge_sidra.py`, `ingest/ipeadata.py` | ✅ | 4 series conferidas contra a API real; S8–S10 em [LACUNAS](LACUNAS.md) |
 | T-302 `fct_indicador_uf_ano` + `dim_indicador` | ✅ | 3.360 linhas, 5 indicadores, **0 sem comparador nacional** |
-| T-303 `fct_mandato_indicador` com comparadores | 🟡 | Modelo constroi sem erro, mas sai **vazio**: depende de `fct_mandato`, que depende do historico ([L-01](LACUNAS.md)) |
+| T-303 `fct_mandato_indicador` com comparadores | ✅ | 818 linhas: 197 mandatos de Presidente/Governador x 5 indicadores |
 | T-304 Paginas "Durante o Mandato" e "Contexto Socioeconomico" | 🟡 | Tabelas e medidas no modelo; visuais faltam |
 
 **Dados socioeconomicos ja' extraidos** (`data/staging/indicadores/`): 1.596 observacoes
@@ -99,20 +99,20 @@ F-11 (financiamento) e F-12 (resultados 2026): ⬜ fase 2 do produto, apos 25/10
 
 | Tabela | Linhas |
 |---|---:|
-| `raw_tse.candidatos` | 20.765 |
-| `raw_tse.bens` | 76.410 |
-| `stg.stg_tse__candidaturas` | 20.765 |
+| `raw_tse.candidatos` | 180.718 |
+| `raw_tse.bens` | 509.136 |
+| `stg.stg_tse__candidaturas` | 180.718 |
 | `stg.stg_indicadores` | 2.856 |
-| `marts.dim_candidato` | 20.765 |
-| `marts.dim_partido` | 30 |
-| `marts.fct_candidatura` | 20.765 |
+| `marts.dim_candidato` | 180.346 |
+| `marts.dim_partido` | 250 |
+| `marts.fct_candidatura` | 180.346 |
 | `marts.fct_indicador_uf_ano` | 3.360 |
-| `marts.fct_mandato` | **0** |
-| `marts.fct_mandato_indicador` | **0** |
+| `marts.fct_mandato` | 11.777 |
+| `marts.fct_mandato_indicador` | 818 |
 
-Os dois zeros sao o estado correto, nao uma falha: `fct_mandato` nasce de quem foi
-eleito, e o unico ano carregado e' 2026, cuja eleicao ainda nao ocorreu. O modulo
-"Durante o mandato" so' ganha conteudo quando o historico 1998–2022 entrar.
+`dbt build`: **129 de 129**, `Completed successfully`. Oito eleicoes gerais
+(1998–2026) e o modulo "Durante o mandato" com 197 mandatos de Presidente e
+Governador cruzados com 5 indicadores.
 
 `fct_indicador_uf_ano` tem **0 linhas sem comparador nacional** — a regra da
 Constituicao secao 2 esta' satisfeita no dado, nao so' no visual.

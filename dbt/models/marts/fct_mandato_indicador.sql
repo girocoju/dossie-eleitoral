@@ -42,7 +42,7 @@ with mandatos as (
     select
         sk_mandato,
         id_pessoa,
-        sq_candidato,
+        sk_candidatura,
         nome_urna,
         nome_completo,
         cod_cargo,
@@ -132,7 +132,7 @@ calculado as (
     select
         m.sk_mandato,
         m.id_pessoa,
-        m.sq_candidato,
+        m.sk_candidatura,
         m.nome_urna,
         m.nome_completo,
         m.cod_cargo,

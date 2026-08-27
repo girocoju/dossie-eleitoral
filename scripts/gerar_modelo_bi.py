@@ -156,8 +156,16 @@ TABELAS: list[Tabela] = [
     ),
     Tabela(
         "dim_candidato",
-        "Retrato da pessoa na eleicao em que concorreu. Chave: sq_candidato.",
+        "Retrato da pessoa na eleicao em que concorreu. Chave: sk_candidatura.",
         [
+            Coluna(
+                "sk_candidatura",
+                oculta=True,
+                descricao=(
+                    "(ano_eleicao, sg_ue, sq_candidato). `sq_candidato` sozinho nao "
+                    "serve: so' e' global a partir de 2010."
+                ),
+            ),
             Coluna("sq_candidato", oculta=True),
             Coluna("ano_eleicao", "int64", oculta=True),
             Coluna("id_pessoa", oculta=True),
@@ -169,7 +177,15 @@ TABELAS: list[Tabela] = [
             Coluna("nome_urna"),
             Coluna("nome_completo"),
             Coluna("nome_social"),
-            Coluna("idade_na_posse", "int64", resumo="none"),
+            Coluna(
+                "idade_na_posse",
+                "int64",
+                resumo="none",
+                descricao="Como a fonte publica — pode ser impossivel. Ver idade_na_posse_valida.",
+                oculta=True,
+            ),
+            Coluna("idade_na_posse_valida", "int64", resumo="none"),
+            Coluna("idade_plausivel", "boolean", oculta=True),
             Coluna("genero"),
             Coluna("cor_raca"),
             Coluna("grau_instrucao"),
@@ -182,7 +198,7 @@ TABELAS: list[Tabela] = [
         [
             Medida(
                 "Idade mediana",
-                "MEDIAN(dim_candidato[idade_na_posse])",
+                "MEDIAN(dim_candidato[idade_na_posse_valida])",
                 "#,0",
                 "Mediana, nao media: a distribuicao de idade e' assimetrica.",
                 "Perfil",
@@ -199,8 +215,9 @@ TABELAS: list[Tabela] = [
     ),
     Tabela(
         "fct_candidatura",
-        "Uma candidatura por linha. Grao: sq_candidato.",
+        "Uma candidatura por linha. Grao: sk_candidatura.",
         [
+            Coluna("sk_candidatura", oculta=True),
             Coluna("sq_candidato", oculta=True),
             Coluna("ano_eleicao", "int64"),
             Coluna("id_pessoa", oculta=True),
@@ -284,6 +301,7 @@ TABELAS: list[Tabela] = [
         [
             Coluna("sk_mandato", oculta=True),
             Coluna("id_pessoa", oculta=True),
+            Coluna("sk_candidatura", oculta=True),
             Coluna("sq_candidato", oculta=True),
             Coluna("nome_urna"),
             Coluna("cod_cargo", "int64", oculta=True),
@@ -345,6 +363,7 @@ TABELAS: list[Tabela] = [
         ),
         [
             Coluna("sk_mandato", oculta=True),
+            Coluna("sk_candidatura", oculta=True),
             Coluna("cod_indicador", oculta=True),
             Coluna("nome_urna"),
             Coluna("sigla_partido"),
@@ -422,7 +441,7 @@ TABELAS: list[Tabela] = [
 ]
 
 RELACIONAMENTOS = [
-    ("fct_candidatura", "sq_candidato", "dim_candidato", "sq_candidato", "oneToOne"),
+    ("fct_candidatura", "sk_candidatura", "dim_candidato", "sk_candidatura", "oneToOne"),
     ("fct_candidatura", "cod_cargo", "dim_cargo", "cod_cargo", "manyToOne"),
     ("fct_candidatura", "sg_uf", "dim_uf", "sg_uf", "manyToOne"),
     ("fct_candidatura", "ano_eleicao", "dim_tempo", "ano", "manyToOne"),

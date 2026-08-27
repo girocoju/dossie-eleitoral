@@ -29,10 +29,17 @@ models:
         description: "Somatorio de `consulta_vagas` de 2026. NULL para cargo fora da disputa."
 
   - name: dim_candidato
-    description: "Uma linha por candidatura-pessoa. Chave: sq_candidato."
+    description: "Uma linha por candidatura-pessoa. Chave: sk_candidatura."
     columns:
-      - name: sq_candidato
+      - name: sk_candidatura
+        description: >
+          (ano_eleicao, sg_ue, sq_candidato) concatenados. `sq_candidato` sozinho
+          nao serve como chave: so' e' globalmente unico a partir de 2010 — em 2002
+          e 2006 o mesmo numero aparece em ate' 27 UFs.
         tests: [not_null, unique]
+      - name: sq_candidato
+        description: "Numero do TSE. Unico dentro da UE; global so' a partir de 2010."
+        tests: [not_null]
       - name: id_pessoa
         description: >
           Chave que liga a mesma pessoa entre eleicoes: cpf_hash quando ha' CPF,
@@ -41,7 +48,20 @@ models:
         description: "FALSE quando `id_pessoa` veio do fallback nome+nascimento."
         tests: [not_null]
       - name: idade_na_posse
-        description: "Idade em 1o de janeiro do ano seguinte a eleicao."
+        description: >
+          Idade em 1o de janeiro do ano seguinte a eleicao, calculada sobre a data
+          de nascimento COMO A FONTE PUBLICA. Pode ser impossivel: o cadastro do
+          TSE tem erros de digitacao (21 casos em 180.718). Nao e' corrigida aqui.
+      - name: idade_plausivel
+        description: >
+          FALSE quando a idade calculada cai fora de [17, 110]. **NULL quando nao ha'
+          data de nascimento na fonte** (457 candidaturas em 180.718) — ausencia de
+          dado nao e' o mesmo que dado impossivel, e o modelo nao mistura os dois.
+      - name: idade_na_posse_valida
+        description: >
+          Igual a `idade_na_posse` quando plausivel, NULL quando nao. E' esta que
+          as medidas de perfil usam, para que uma data errada na fonte nao entre
+          na mediana.
         tests:
           - dbt_utils.accepted_range:
               arguments:
@@ -74,10 +94,12 @@ models:
         tests: [not_null, unique]
 
   - name: fct_candidatura
-    description: "F-05 — uma candidatura por linha. Grao: sq_candidato."
+    description: "F-05 — uma candidatura por linha. Grao: sk_candidatura."
     columns:
-      - name: sq_candidato
+      - name: sk_candidatura
         tests: [not_null, unique]
+      - name: sq_candidato
+        tests: [not_null]
       - name: ano_eleicao
         tests: [not_null]
       - name: cod_cargo
@@ -132,10 +154,23 @@ models:
                 to: ref('dim_cargo')
                 field: cod_cargo
       - name: motivo_fim
+        description: >
+          `interrompido` = houve eleicao suplementar para o mesmo cargo e UE dentro
+          da janela, entao o mandato original terminou antes. `nao informado` nao
+          significa "fim regular": renuncia e morte no exercicio nao estao na fonte.
         tests:
           - accepted_values:
               arguments:
-                values: ["cassacao", "nao informado"]
+                values: ["cassacao", "interrompido", "nao informado"]
+      - name: is_eleicao_suplementar
+        description: >
+          Mandato conquistado em eleicao suplementar — o titular assume no proprio
+          ano da eleicao, nao no seguinte. O pacote de 2014 traz duas (AM 2017 e
+          TO 2018), ambas rotuladas com ANO_ELEICAO=2014 pela fonte.
+        tests: [not_null]
+      - name: anos_de_mandato
+        description: "Duracao efetiva da janela. Menor que `duracao_mandato_anos` quando interrompido ou suplementar."
+        tests: [not_null]
 
   - name: fct_indicador_uf_ano
     description: "F-04/F-05 — indicador x UF x ano com comparador nacional e regional na mesma linha."

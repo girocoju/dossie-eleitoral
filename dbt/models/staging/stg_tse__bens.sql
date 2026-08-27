@@ -9,6 +9,7 @@
 */
 
 select
+    {{ sk_candidatura() }} as sk_candidatura,
     ano_eleicao,
     sq_candidato,
     {{ inteiro('nr_ordem_bem') }}        as nr_ordem_bem,

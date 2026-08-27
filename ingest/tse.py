@@ -103,8 +103,12 @@ def _leitor(zf: zipfile.ZipFile, membro: str, ds: DatasetLayout):
 
 def _linhas(
     zip_file: Path, ds: DatasetLayout, art: Artifact, *, limite: int | None = None
-) -> Iterator[tuple[dict[str, Any], Resolucao, str]]:
-    """Gera as linhas de todos os CSVs do pacote, ja' no formato da tabela raw."""
+) -> Iterator[tuple[dict[str, Any] | None, Resolucao, str]]:
+    """Gera as linhas de todos os CSVs do pacote, ja' no formato da tabela raw.
+
+    Devolve `(linha, resolucao, ano_fonte)`. `linha` vem None quando a linha
+    pertence a outra eleicao e deve ser descartada pelo chamador.
+    """
     extraido_em = art.extracted_at or utc_now()
     emitidas = 0
 
@@ -154,6 +158,13 @@ def _linhas(
 
                 idx_ano = resolucao.indices.get("ano_eleicao")
                 ano_fonte = valores[idx_ano].strip() if idx_ano is not None else ""
+                # O pacote de um ano pode conter linhas de OUTRA eleicao — o de
+                # 2022 traz a "Eleicao Suplementar Governador 2026". Elas nao
+                # podem entrar como se fossem do ano pedido; sao contadas e
+                # descartadas, e o numero vai para o relatorio de QA.
+                if ano_fonte and ano_fonte != str(ds.ano):
+                    yield None, resolucao, ano_fonte
+                    continue
                 yield linha, resolucao, ano_fonte
 
                 emitidas += 1
@@ -197,7 +208,10 @@ def processar(
     duplicadas = 0
 
     with NdjsonWriter(destino) as writer:
-        for linha, resolucao, ano_fonte in _linhas(_zip_path(ano, ds), ds, art, limite=limite):
+        for linha, resolucao, _ in _linhas(_zip_path(ano, ds), ds, art, limite=limite):
+            if linha is None:
+                divergente += 1
+                continue
             writer.write(linha)
             arquivos.add(str(linha["_source_file"]))
             ausentes.update(resolucao.faltando_opcionais)
@@ -206,8 +220,6 @@ def processar(
                 por_uf[str(linha["sg_uf"])] += 1
             if linha.get("cod_cargo"):
                 por_cargo[str(linha["cod_cargo"])] += 1
-            if ano_fonte and ano_fonte != str(ano):
-                divergente += 1
             if ds.chave:
                 chave = tuple(str(linha.get(c)) for c in ds.chave)
                 if chave in vistas:
@@ -218,7 +230,7 @@ def processar(
 
     if divergente:
         log.warning(
-            "%d linhas com ANO_ELEICAO diferente de %d — conferir o pacote da fonte",
+            "%d linhas descartadas por pertencerem a outra eleicao (ANO_ELEICAO != %d)",
             divergente,
             ano,
         )

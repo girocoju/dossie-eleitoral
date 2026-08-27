@@ -25,6 +25,15 @@ table fct_mandato
 
 		annotation SummarizationSetBy = Automatic
 
+	column sk_candidatura
+		dataType: string
+		isHidden
+		lineageTag: 46a6090d-91c2-e6f2-34a9-b07f622d89bf
+		summarizeBy: none
+		sourceColumn: sk_candidatura
+
+		annotation SummarizationSetBy = Automatic
+
 	column sq_candidato
 		dataType: string
 		isHidden

@@ -1,7 +1,7 @@
-relationship 1e01d1df-42dc-0912-d90c-86baebf1a662
+relationship ccd897e6-f374-6a4f-812d-f7fc7f521072
 	cardinality: oneToOne
-	fromColumn: fct_candidatura.sq_candidato
-	toColumn: dim_candidato.sq_candidato
+	fromColumn: fct_candidatura.sk_candidatura
+	toColumn: dim_candidato.sk_candidatura
 
 relationship 19e1ab52-6741-828f-2248-1522a3ddbfdc
 	fromColumn: fct_candidatura.cod_cargo

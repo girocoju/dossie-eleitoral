@@ -1,9 +1,9 @@
 table dim_candidato
-	/// Retrato da pessoa na eleicao em que concorreu. Chave: sq_candidato.
+	/// Retrato da pessoa na eleicao em que concorreu. Chave: sk_candidatura.
 	lineageTag: d1ffedf0-6f90-a453-34a9-c829b710e6d7
 
 	/// Mediana, nao media: a distribuicao de idade e' assimetrica.
-	measure 'Idade mediana' = MEDIAN(dim_candidato[idade_na_posse])
+	measure 'Idade mediana' = MEDIAN(dim_candidato[idade_na_posse_valida])
 		formatString: #,0
 		lineageTag: 97ff8462-a150-ae1e-7cf0-27cd89b06688
 		displayFolder: Perfil
@@ -13,6 +13,16 @@ table dim_candidato
 		formatString: 0.0%
 		lineageTag: fe674ba9-56dc-ec64-8f95-419f7a3fbcac
 		displayFolder: Qualidade
+
+	/// (ano_eleicao, sg_ue, sq_candidato). `sq_candidato` sozinho nao serve: so' e' global a partir de 2010.
+	column sk_candidatura
+		dataType: string
+		isHidden
+		lineageTag: 0853943a-6c29-1ab4-a2da-4b2319a48793
+		summarizeBy: none
+		sourceColumn: sk_candidatura
+
+		annotation SummarizationSetBy = Automatic
 
 	column sq_candidato
 		dataType: string
@@ -74,11 +84,30 @@ table dim_candidato
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Como a fonte publica — pode ser impossivel. Ver idade_na_posse_valida.
 	column idade_na_posse
 		dataType: int64
+		isHidden
 		lineageTag: e0207a8d-f141-0982-8fd9-8ec3e3c4ab0a
 		summarizeBy: none
 		sourceColumn: idade_na_posse
+
+		annotation SummarizationSetBy = Automatic
+
+	column idade_na_posse_valida
+		dataType: int64
+		lineageTag: 28b459d6-879e-10a6-224b-38244e0a096f
+		summarizeBy: none
+		sourceColumn: idade_na_posse_valida
+
+		annotation SummarizationSetBy = Automatic
+
+	column idade_plausivel
+		dataType: boolean
+		isHidden
+		lineageTag: 18c90d40-f838-de82-3528-3c102185f583
+		summarizeBy: none
+		sourceColumn: idade_plausivel
 
 		annotation SummarizationSetBy = Automatic
 

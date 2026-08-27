@@ -9,10 +9,15 @@ models:
     tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
-            combination_of_columns: [sq_candidato, ano_eleicao, nr_turno]
+            combination_of_columns: [sk_candidatura, nr_turno]
     columns:
+      - name: sk_candidatura
+        description: >
+          Chave da candidatura: (ano_eleicao, sg_ue, sq_candidato). Ver o macro
+          `sk_candidatura` — `sq_candidato` sozinho so' e' unico a partir de 2010.
+        tests: [not_null]
       - name: sq_candidato
-        description: "Chave TSE da candidatura dentro de uma eleicao (nao e' chave de pessoa)."
+        description: "Numero do TSE. Nao e' chave de pessoa nem chave global."
         tests: [not_null]
       - name: ano_eleicao
         tests:
@@ -63,7 +68,7 @@ models:
     tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
-            combination_of_columns: [sq_candidato, ano_eleicao, nr_ordem_bem]
+            combination_of_columns: [sk_candidatura, nr_ordem_bem]
     columns:
       - name: sq_candidato
         tests: [not_null]

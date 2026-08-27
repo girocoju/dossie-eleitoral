@@ -2,12 +2,14 @@
   config(
     materialized = 'table',
     cluster_by   = ['sg_uf', 'cod_cargo'],
-    description  = 'Uma linha por candidatura-pessoa (chave sq_candidato), com a chave de pessoa que liga os anos.'
+    description  = 'Uma linha por candidatura-pessoa (chave sk_candidatura), com a chave de pessoa que liga os anos.'
   )
 }}
 
 /*
-  Grao: `sq_candidato` — a chave do TSE, que ja' e' unica entre anos.
+  Grao: `sk_candidatura` = (ano_eleicao, sg_ue, sq_candidato). NAO e' `sq_candidato`
+  sozinho: ele so' e' globalmente unico a partir de 2010 — em 2002 e 2006 o mesmo
+  numero aparece em ate' 27 UFs. Ver o macro `sk_candidatura`.
   A dimensao guarda o retrato da pessoa NAQUELA eleicao (idade, instrucao e
   ocupacao mudam entre pleitos), e nao um "estado atual".
 
@@ -28,7 +30,7 @@ with candidaturas as (
     select *
     from {{ ref('stg_tse__candidaturas') }}
     -- o retrato da pessoa vem do 1o turno; o 2o turno repete os mesmos dados
-    qualify row_number() over (partition by sq_candidato order by nr_turno) = 1
+    qualify row_number() over (partition by sk_candidatura order by nr_turno) = 1
 
 ),
 
@@ -49,6 +51,7 @@ com_chave as (
 )
 
 select
+    sk_candidatura,
     sq_candidato,
     ano_eleicao,
     id_pessoa,
@@ -59,9 +62,30 @@ select
     nome_social,
     data_nascimento,
     sg_uf_nascimento,
-    -- idade na posse (1o de janeiro do ano seguinte a eleicao), nao idade "hoje":
-    -- e' o numero comparavel entre eleicoes
+    /*
+      Idade na posse (1o de janeiro do ano seguinte a eleicao), e nao idade "hoje":
+      e' o numero comparavel entre eleicoes.
+
+      O cadastro do TSE tem erros de digitacao no campo de nascimento — conferido
+      em 27/08/2026: 21 candidaturas em 180.718 (0,01%) resultam em idade
+      impossivel. Ha' `7953-09-05` (ano 7953) e, em 1998, quinze pessoas com
+      nascimento no proprio ano da eleicao, oito delas no DF com a mesma data
+      (18/08/1998) — a data de registro vazou para o campo de nascimento.
+
+      O projeto NAO corrige o dado (SPEC 9: nao preencher). Guarda o valor bruto em
+      `idade_na_posse` e marca `idade_plausivel = false`; quem calcula estatistica
+      usa `idade_na_posse_valida`, que e' NULL nesses casos. Assim a mediana nao e'
+      contaminada por uma idade de -5.946 anos e o erro da fonte continua visivel.
+      Ver docs/LACUNAS.md, L-15.
+    */
     date_diff(date(ano_eleicao + 1, 1, 1), data_nascimento, year) as idade_na_posse,
+    date_diff(date(ano_eleicao + 1, 1, 1), data_nascimento, year)
+        between 17 and 110                                       as idade_plausivel,
+    if(
+        date_diff(date(ano_eleicao + 1, 1, 1), data_nascimento, year) between 17 and 110,
+        date_diff(date(ano_eleicao + 1, 1, 1), data_nascimento, year),
+        null
+    )                                                            as idade_na_posse_valida,
     genero,
     cor_raca,
     grau_instrucao,

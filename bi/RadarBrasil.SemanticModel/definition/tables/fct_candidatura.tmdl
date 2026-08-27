@@ -1,5 +1,5 @@
 table fct_candidatura
-	/// Uma candidatura por linha. Grao: sq_candidato.
+	/// Uma candidatura por linha. Grao: sk_candidatura.
 	lineageTag: 3ca76d79-7922-f5a3-a70c-68c73b7fb60c
 
 	measure 'Candidaturas' = COUNTROWS(fct_candidatura)
@@ -39,6 +39,15 @@ table fct_candidatura
 	measure 'Extraido em' = FORMAT(MAX(fct_candidatura[_extracted_at]), "dd/MM/yyyy HH:mm") & " UTC"
 		lineageTag: 61cd243f-cec8-3b7e-30f6-a0ea813b2ef6
 		displayFolder: Rodape
+
+	column sk_candidatura
+		dataType: string
+		isHidden
+		lineageTag: 57b2ebdf-3147-60b1-b460-91390b7ee426
+		summarizeBy: none
+		sourceColumn: sk_candidatura
+
+		annotation SummarizationSetBy = Automatic
 
 	column sq_candidato
 		dataType: string
