@@ -1,0 +1,162 @@
+table dim_candidato
+	/// Retrato da pessoa na eleicao em que concorreu. Chave: sq_candidato.
+	lineageTag: d1ffedf0-6f90-a453-34a9-c829b710e6d7
+
+	/// Mediana, nao media: a distribuicao de idade e' assimetrica.
+	measure 'Idade mediana' = MEDIAN(dim_candidato[idade_na_posse])
+		formatString: #,0
+		lineageTag: 97ff8462-a150-ae1e-7cf0-27cd89b06688
+		displayFolder: Perfil
+
+	/// Quanto da trajetoria exibida nao depende do fallback nome+nascimento.
+	measure '% com identidade confirmada por CPF' = DIVIDE(CALCULATE(COUNTROWS(dim_candidato), dim_candidato[link_confiavel] = TRUE), COUNTROWS(dim_candidato))
+		formatString: 0.0%
+		lineageTag: fe674ba9-56dc-ec64-8f95-419f7a3fbcac
+		displayFolder: Qualidade
+
+	column sq_candidato
+		dataType: string
+		isHidden
+		lineageTag: 716e120e-8b7f-f8f0-4c8e-a3fc9d116f79
+		summarizeBy: none
+		sourceColumn: sq_candidato
+
+		annotation SummarizationSetBy = Automatic
+
+	column ano_eleicao
+		dataType: int64
+		isHidden
+		lineageTag: f1838d88-be0f-7cdf-83f8-6c043b618aee
+		summarizeBy: none
+		sourceColumn: ano_eleicao
+
+		annotation SummarizationSetBy = Automatic
+
+	column id_pessoa
+		dataType: string
+		isHidden
+		lineageTag: e1c0f770-d619-3891-1fe2-2173f1d0d121
+		summarizeBy: none
+		sourceColumn: id_pessoa
+
+		annotation SummarizationSetBy = Automatic
+
+	/// FALSE quando a identidade veio do fallback nome+nascimento.
+	column link_confiavel
+		dataType: boolean
+		lineageTag: 4dbc8f5c-8b4d-63aa-5a02-d12161852543
+		summarizeBy: none
+		sourceColumn: link_confiavel
+
+		annotation SummarizationSetBy = Automatic
+
+	column nome_urna
+		dataType: string
+		lineageTag: a26cac7d-0ce3-886e-0e4f-76fde61b9343
+		summarizeBy: none
+		sourceColumn: nome_urna
+
+		annotation SummarizationSetBy = Automatic
+
+	column nome_completo
+		dataType: string
+		lineageTag: 4bba9daa-5ce2-a732-2f25-f34185ac2367
+		summarizeBy: none
+		sourceColumn: nome_completo
+
+		annotation SummarizationSetBy = Automatic
+
+	column nome_social
+		dataType: string
+		lineageTag: be5b9117-8a48-d170-cbfc-e8719216ba6f
+		summarizeBy: none
+		sourceColumn: nome_social
+
+		annotation SummarizationSetBy = Automatic
+
+	column idade_na_posse
+		dataType: int64
+		lineageTag: e0207a8d-f141-0982-8fd9-8ec3e3c4ab0a
+		summarizeBy: none
+		sourceColumn: idade_na_posse
+
+		annotation SummarizationSetBy = Automatic
+
+	column genero
+		dataType: string
+		lineageTag: aed14da5-ba0a-b712-71f1-dab892df594b
+		summarizeBy: none
+		sourceColumn: genero
+
+		annotation SummarizationSetBy = Automatic
+
+	column cor_raca
+		dataType: string
+		lineageTag: f113a4cb-0443-3f5f-ca09-1b9d7323c807
+		summarizeBy: none
+		sourceColumn: cor_raca
+
+		annotation SummarizationSetBy = Automatic
+
+	column grau_instrucao
+		dataType: string
+		lineageTag: b803506f-f0bf-c572-cb2a-ee4bf0adb45d
+		summarizeBy: none
+		sourceColumn: grau_instrucao
+
+		annotation SummarizationSetBy = Automatic
+
+	column estado_civil
+		dataType: string
+		lineageTag: a1d48d9d-4f03-8635-bfbc-82da30d04618
+		summarizeBy: none
+		sourceColumn: estado_civil
+
+		annotation SummarizationSetBy = Automatic
+
+	column ocupacao
+		dataType: string
+		lineageTag: e2ef1d0f-2ff8-ec3e-5b10-6944d459b827
+		summarizeBy: none
+		sourceColumn: ocupacao
+
+		annotation SummarizationSetBy = Automatic
+
+	column sg_uf_nascimento
+		dataType: string
+		lineageTag: 83e8a18e-60b8-0265-2c7d-37a7f2c6acd9
+		summarizeBy: none
+		sourceColumn: sg_uf_nascimento
+
+		annotation SummarizationSetBy = Automatic
+
+	column cod_cargo
+		dataType: int64
+		isHidden
+		lineageTag: 540d22e7-9a05-f809-0af3-b317a621a005
+		summarizeBy: none
+		sourceColumn: cod_cargo
+
+		annotation SummarizationSetBy = Automatic
+
+	column sg_uf
+		dataType: string
+		isHidden
+		lineageTag: 8b512b16-a59a-a600-8a8f-a4c060f90a1d
+		summarizeBy: none
+		sourceColumn: sg_uf
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_candidato = m
+		mode: import
+		source =
+				let
+				    Fonte = GoogleBigQuery.Database([BillingProject = ProjetoGCP]),
+				    Projeto = Fonte{[Name = ProjetoGCP]}[Data],
+				    Dataset = Projeto{[Name = DatasetMarts]}[Data],
+				    Tabela = Dataset{[Name = "dim_candidato"]}[Data]
+				in
+				    Tabela
+
+	annotation PBI_ResultType = Table

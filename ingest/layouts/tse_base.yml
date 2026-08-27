@@ -1,0 +1,168 @@
+# Layout canonico do TSE — base herdada por todos os anos.
+# Cada campo lista os nomes de coluna aceitos, na ordem de preferencia.
+# Fonte do mapeamento: leiame.pdf que acompanha cada pacote em
+# https://dadosabertos.tse.jus.br/dataset/candidatos-<ano>
+versao: 1
+fonte: "TSE Dados Abertos"
+base_url: "https://cdn.tse.jus.br/estatistica/sead/odsele"
+encoding: "latin-1"
+delimitador: ";"
+
+# Constituicao 0.7 — dado pessoal que o projeto se recusa a persistir.
+# `descartar` some antes do NDJSON (nem em `_extras` sobra).
+# `hash` troca a coluna pelo HMAC-SHA256 do valor (ver ADR-006/ADR-007).
+privacidade:
+  descartar:
+    - ds_email
+    - nm_email
+    - nr_titulo_eleitoral_candidato
+    - nr_titulo_eleitoral
+  hash:
+    nr_cpf: cpf_hash
+
+datasets:
+
+  candidatos:
+    pacote: "consulta_cand/consulta_cand_{ano}.zip"
+    arquivo_regex: '^consulta_cand_{ano}_(?P<ue>[A-Z]{2}|BRASIL)\.csv$'
+    leiame: "consulta_cand/leiame-consulta_cand.pdf"
+    chave: ["sq_candidato", "ano_eleicao", "nr_turno"]
+    obrigatorios:
+      - ano_eleicao
+      - nr_turno
+      - sg_uf
+      - cod_cargo
+      - sq_candidato
+      - nome_completo
+      - sigla_partido
+    campos:
+      ano_eleicao:            [ANO_ELEICAO]
+      cd_tipo_eleicao:        [CD_TIPO_ELEICAO]
+      nm_tipo_eleicao:        [NM_TIPO_ELEICAO]
+      nr_turno:               [NR_TURNO]
+      cd_eleicao:             [CD_ELEICAO]
+      ds_eleicao:             [DS_ELEICAO]
+      dt_eleicao:             [DT_ELEICAO]
+      tp_abrangencia:         [TP_ABRANGENCIA]
+      sg_uf:                  [SG_UF]
+      sg_ue:                  [SG_UE]
+      nm_ue:                  [NM_UE]
+      cod_cargo:              [CD_CARGO]
+      ds_cargo:               [DS_CARGO]
+      sq_candidato:           [SQ_CANDIDATO]
+      nr_candidato:           [NR_CANDIDATO]
+      nome_completo:          [NM_CANDIDATO]
+      nome_urna:              [NM_URNA_CANDIDATO]
+      nome_social:            [NM_SOCIAL_CANDIDATO]
+      nr_cpf:                 [NR_CPF_CANDIDATO]          # descartado apos o hash (§0.7)
+      cd_situacao_candidatura: [CD_SITUACAO_CANDIDATURA]
+      situacao_candidatura:   [DS_SITUACAO_CANDIDATURA]
+      cd_detalhe_situacao:    [CD_DETALHE_SITUACAO_CAND]
+      ds_detalhe_situacao:    [DS_DETALHE_SITUACAO_CAND]
+      tp_agremiacao:          [TP_AGREMIACAO]
+      nr_partido:             [NR_PARTIDO]
+      sigla_partido:          [SG_PARTIDO]
+      nome_partido:           [NM_PARTIDO]
+      sq_coligacao:           [SQ_COLIGACAO]
+      nome_coligacao:         [NM_COLIGACAO]
+      composicao_coligacao:   [DS_COMPOSICAO_COLIGACAO]
+      nr_federacao:           [NR_FEDERACAO]
+      sg_federacao:           [SG_FEDERACAO]
+      nome_federacao:         [NM_FEDERACAO]
+      composicao_federacao:   [DS_COMPOSICAO_FEDERACAO]
+      cd_nacionalidade:       [CD_NACIONALIDADE]
+      ds_nacionalidade:       [DS_NACIONALIDADE]
+      sg_uf_nascimento:       [SG_UF_NASCIMENTO]
+      nm_municipio_nascimento: [NM_MUNICIPIO_NASCIMENTO]
+      data_nascimento:        [DT_NASCIMENTO]
+      idade_data_posse:       [NR_IDADE_DATA_POSSE]
+      cd_genero:              [CD_GENERO]
+      genero:                 [DS_GENERO]
+      cd_grau_instrucao:      [CD_GRAU_INSTRUCAO]
+      grau_instrucao:         [DS_GRAU_INSTRUCAO]
+      cd_estado_civil:        [CD_ESTADO_CIVIL]
+      estado_civil:           [DS_ESTADO_CIVIL]
+      cd_cor_raca:            [CD_COR_RACA]               # so' existe a partir de 2014
+      cor_raca:               [DS_COR_RACA]
+      cd_ocupacao:            [CD_OCUPACAO]
+      ocupacao:               [DS_OCUPACAO]
+      vr_despesa_max_campanha: [VR_DESPESA_MAX_CAMPANHA]
+      cd_situacao_turno:      [CD_SIT_TOT_TURNO, CD_SITUACAO_CANDIDATO_TOT]
+      situacao_turno:         [DS_SIT_TOT_TURNO, DS_SITUACAO_CANDIDATO_TOT]
+      st_reeleicao:           [ST_REELEICAO]
+      st_declarar_bens:       [ST_DECLARAR_BENS]
+      nr_processo:            [NR_PROCESSO]
+
+  bens:
+    pacote: "bem_candidato/bem_candidato_{ano}.zip"
+    arquivo_regex: '^bem_candidato_{ano}_(?P<ue>[A-Z]{2}|BRASIL)\.csv$'
+    leiame: "bem_candidato/leiame-bem_candidato.pdf"
+    chave: ["sq_candidato", "ano_eleicao", "nr_ordem_bem"]
+    obrigatorios:
+      - ano_eleicao
+      - sq_candidato
+      - valor_bem
+    campos:
+      ano_eleicao:      [ANO_ELEICAO]
+      cd_tipo_eleicao:  [CD_TIPO_ELEICAO]
+      cd_eleicao:       [CD_ELEICAO]
+      ds_eleicao:       [DS_ELEICAO]
+      sg_uf:            [SG_UF]
+      sg_ue:            [SG_UE]
+      nm_ue:            [NM_UE]
+      sq_candidato:     [SQ_CANDIDATO]
+      nr_ordem_bem:     [NR_ORDEM_BEM_CANDIDATO, NR_ORDEM_CANDIDATO]
+      cd_tipo_bem:      [CD_TIPO_BEM_CANDIDATO]
+      ds_tipo_bem:      [DS_TIPO_BEM_CANDIDATO]
+      ds_bem:           [DS_BEM_CANDIDATO]
+      valor_bem:        [VR_BEM_CANDIDATO]
+      dt_ultima_atualizacao: [DT_ULTIMA_ATUALIZACAO]
+
+  vagas:
+    pacote: "consulta_vagas/consulta_vagas_{ano}.zip"
+    arquivo_regex: '^consulta_vagas_{ano}_(?P<ue>[A-Z]{2}|BRASIL)\.csv$'
+    leiame: "consulta_vagas/leiame-consulta_vagas.pdf"
+    chave: ["ano_eleicao", "sg_ue", "cod_cargo"]
+    obrigatorios:
+      - ano_eleicao
+      - cod_cargo
+      - qt_vagas
+    campos:
+      ano_eleicao:  [ANO_ELEICAO]
+      cd_eleicao:   [CD_ELEICAO]
+      ds_eleicao:   [DS_ELEICAO]
+      dt_eleicao:   [DT_ELEICAO]
+      nr_turno:     [NR_TURNO]
+      sg_uf:        [SG_UF]
+      sg_ue:        [SG_UE]
+      nm_ue:        [NM_UE]
+      cod_cargo:    [CD_CARGO]
+      ds_cargo:     [DS_CARGO]
+      qt_vagas:     [QT_VAGA, QT_VAGAS]   # 2026 usa QT_VAGA (singular) — conferido 27/08/2026
+      dt_posse:     [DT_POSSE]
+
+  coligacoes:
+    pacote: "consulta_coligacao/consulta_coligacao_{ano}.zip"
+    arquivo_regex: '^consulta_coligacao_{ano}_(?P<ue>[A-Z]{2}|BRASIL)\.csv$'
+    leiame: "consulta_coligacao/leiame-consulta_coligacao.pdf"
+    chave: ["ano_eleicao", "sq_coligacao"]
+    obrigatorios:
+      - ano_eleicao
+      - sq_coligacao
+    campos:
+      ano_eleicao:          [ANO_ELEICAO]
+      cd_eleicao:           [CD_ELEICAO]
+      ds_eleicao:           [DS_ELEICAO]
+      nr_turno:             [NR_TURNO]
+      sg_uf:                [SG_UF]
+      sg_ue:                [SG_UE]
+      nm_ue:                [NM_UE]
+      cod_cargo:            [CD_CARGO]
+      ds_cargo:             [DS_CARGO]
+      tp_agremiacao:        [TP_AGREMIACAO]
+      nr_partido:           [NR_PARTIDO]
+      sigla_partido:        [SG_PARTIDO]
+      nome_partido:         [NM_PARTIDO]
+      sq_coligacao:         [SQ_COLIGACAO]
+      nome_coligacao:       [NM_COLIGACAO]
+      composicao_coligacao: [DS_COMPOSICAO_COLIGACAO]

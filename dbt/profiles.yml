@@ -1,0 +1,46 @@
+# Versionado de proposito: nao ha' segredo aqui, so' env_var().
+# Defina antes de rodar:
+#   RADAR_GCP_PROJECT   (ex.: radar-brasil)
+#   RADAR_BQ_LOCATION   (US — ver docs/adr/ADR-003)
+#   GOOGLE_APPLICATION_CREDENTIALS  (caminho da service account)
+radar_brasil:
+  target: "{{ env_var('RADAR_DBT_TARGET', 'dev') }}"
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+      dataset: "{{ env_var('RADAR_BQ_DATASET_DEV', 'dbt_dev') }}"
+      location: "{{ env_var('RADAR_BQ_LOCATION', 'US') }}"
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', '') }}"
+      threads: 4
+      timeout_seconds: 600
+      priority: interactive
+      # Teto de custo por query: o free tier do BigQuery da' 1 TB/mes (SPEC 0.5).
+      # Uma query que tentar varrer mais de 20 GB falha em vez de gastar.
+      maximum_bytes_billed: 21474836480
+
+    prod:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+      dataset: "{{ env_var('RADAR_BQ_DATASET_PROD', 'radar') }}"
+      location: "{{ env_var('RADAR_BQ_LOCATION', 'US') }}"
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', '') }}"
+      threads: 8
+      timeout_seconds: 1800
+      priority: interactive
+      maximum_bytes_billed: 21474836480
+
+    # Alvo usado pelo GitHub Actions, que injeta o JSON da service account
+    # inteiro numa variavel em vez de gravar arquivo no runner.
+    ci:
+      type: bigquery
+      method: service-account-json
+      project: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+      dataset: "{{ env_var('RADAR_BQ_DATASET_CI', 'dbt_ci') }}"
+      location: "{{ env_var('RADAR_BQ_LOCATION', 'US') }}"
+      threads: 8
+      timeout_seconds: 1800
+      maximum_bytes_billed: 21474836480
+      keyfile_json: "{{ env_var('RADAR_GCP_SA_JSON', '{}') | as_native }}"

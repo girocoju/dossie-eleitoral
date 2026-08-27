@@ -1,0 +1,46 @@
+# ── Dados brutos e derivados nunca vão para o repo (Constituição §6) ──
+data/
+*.zip
+*.csv
+*.ndjson
+*.ndjson.gz
+*.parquet
+*.xlsx
+
+# ── Segredos ──
+.env
+*.json.key
+service-account*.json
+gcp-key*.json
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# ── dbt ──
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/.user.yml
+# dbt/profiles.yml E' versionado: so' tem env_var(), nenhum segredo.
+
+# ── Power BI ──
+bi/**/.pbi/localSettings.json
+bi/**/*.pbix
+bi/**/cache.abf
+
+# ── SO / editores ──
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# dbt package lock gerado por `dbt deps`
+dbt/package-lock.yml

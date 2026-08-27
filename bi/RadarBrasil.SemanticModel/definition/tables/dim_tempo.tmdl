@@ -1,0 +1,58 @@
+table dim_tempo
+	/// Calendario anual de 1980 ao ano corrente.
+	lineageTag: d87d748c-14d2-cb4f-2c18-35adddf588c7
+
+	column ano
+		dataType: int64
+		lineageTag: ffe4e84f-1b05-4634-814b-eaf4b1d1e817
+		summarizeBy: none
+		sourceColumn: ano
+
+		annotation SummarizationSetBy = Automatic
+
+	column data_inicio_ano
+		dataType: dateTime
+		formatString: yyyy
+		isHidden
+		lineageTag: 7227399c-5eeb-42d4-dc32-261ef3f820a4
+		summarizeBy: none
+		sourceColumn: data_inicio_ano
+
+		annotation SummarizationSetBy = Automatic
+
+	column is_ano_eleicao
+		dataType: boolean
+		lineageTag: 3041955f-7c7e-2fa3-ca96-6307d74d61c2
+		summarizeBy: none
+		sourceColumn: is_ano_eleicao
+
+		annotation SummarizationSetBy = Automatic
+
+	column ano_eleicao_anterior
+		dataType: int64
+		lineageTag: ee61bf96-e4a8-ace5-5348-77e3a01c266c
+		summarizeBy: none
+		sourceColumn: ano_eleicao_anterior
+
+		annotation SummarizationSetBy = Automatic
+
+	column decada
+		dataType: int64
+		lineageTag: 223970f9-8e52-c92b-d7d3-89a8e022142d
+		summarizeBy: none
+		sourceColumn: decada
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_tempo = m
+		mode: import
+		source =
+				let
+				    Fonte = GoogleBigQuery.Database([BillingProject = ProjetoGCP]),
+				    Projeto = Fonte{[Name = ProjetoGCP]}[Data],
+				    Dataset = Projeto{[Name = DatasetMarts]}[Data],
+				    Tabela = Dataset{[Name = "dim_tempo"]}[Data]
+				in
+				    Tabela
+
+	annotation PBI_ResultType = Table

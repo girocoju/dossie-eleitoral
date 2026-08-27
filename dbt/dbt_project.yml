@@ -1,0 +1,49 @@
+name: "radar_brasil"
+version: "0.1.0"
+config-version: 2
+profile: "radar_brasil"
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["analyses"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+require-dbt-version: [">=1.8.0", "<2.0.0"]
+
+vars:
+  # Anos de eleicao geral cobertos pelo projeto (SPEC 2.1)
+  anos_eleicao: [1998, 2002, 2006, 2010, 2014, 2018, 2022, 2026]
+  ano_eleicao_atual: 2026
+  # Cargos que entram no modulo "Durante o mandato" (SPEC 2.2: so' Presidente e
+  # Governador — o vinculo individuo<->indicador regional e' fraco demais para
+  # deputados e senadores).
+  cargos_mandato_executivo: [1, 3]
+
+models:
+  radar_brasil:
+    +persist_docs: { relation: true, columns: true }
+    staging:
+      +materialized: view
+      +schema: stg
+    marts:
+      +materialized: table
+      +schema: marts
+
+seeds:
+  radar_brasil:
+    +schema: marts
+    +quote_columns: false
+    cargo_tse:
+      +column_types:
+        cod_cargo: INT64
+        duracao_mandato_anos: INT64
+        no_escopo_mvp: BOOLEAN
+    dim_uf:
+      +column_types:
+        cod_ibge: STRING
+    dim_indicador:
+      +column_types:
+        verificado: BOOLEAN

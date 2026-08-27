@@ -1,0 +1,157 @@
+# Catalogo de indicadores socioeconomicos — F-04 / SPEC 3 (S6..S11).
+#
+# Este arquivo e' a FONTE UNICA da `dim_indicador` do SPEC 5: o seed
+# `dbt/seeds/dim_indicador.csv` e' gerado daqui por `scripts/gerar_seeds.py` e um
+# teste falha se os dois divergirem.
+#
+# `verificado` = a chamada real da API ja' foi conferida nesta base de codigo.
+#   python -m ingest.ibge_sidra verify
+#   python -m ingest.ipeadata  verify
+#
+# `direcao_desejavel` existe SO' para escolher a cor neutra de tendencia no Power BI
+# (Constituicao 0.1). Nao e' juizo sobre gestao, e a tela nunca atribui a variacao
+# a um mandato (Constituicao 0.2).
+versao: 1
+
+indicadores:
+
+  # ── IBGE / SIDRA (S6) ────────────────────────────────────────────────
+  PIB:
+    nome: "Produto Interno Bruto a precos correntes"
+    fonte: "IBGE — Contas Regionais (SIDRA t/5938)"
+    unidade: "R$ mil correntes"
+    periodicidade: anual
+    direcao_desejavel: cima
+    provedor: sidra
+    verificado: true
+    conferido_em: "2026-08-27"
+    notas: "Divulgacao com ~2 anos de defasagem: em 08/2026 a serie termina em 2023."
+    parametros:
+      tabela: 5938
+      variavel: 37
+      niveis: [n1, n3]
+      periodos: all
+
+  POPULACAO:
+    nome: "Populacao residente estimada"
+    fonte: "IBGE — Estimativas de Populacao (SIDRA t/6579)"
+    unidade: "pessoas"
+    periodicidade: anual
+    direcao_desejavel: neutro
+    provedor: sidra
+    verificado: true
+    conferido_em: "2026-08-27"
+    notas: "Serie 2001-2025. Usada tambem como denominador do PIB per capita."
+    parametros:
+      tabela: 6579
+      variavel: 9324
+      niveis: [n1, n3]
+      periodos: all
+
+  DESOCUPACAO:
+    nome: "Taxa de desocupacao (14 anos ou mais)"
+    fonte: "IBGE — PNAD Continua trimestral (SIDRA t/4099)"
+    unidade: "%"
+    periodicidade: anual
+    direcao_desejavel: baixo
+    provedor: sidra
+    verificado: true
+    conferido_em: "2026-08-27"
+    notas: >
+      A fonte e' trimestral desde 2012T1; o valor anual e' a MEDIA SIMPLES dos
+      trimestres disponiveis no ano, e o ano so' entra se tiver os 4 trimestres
+      (`min_periodos: 4`) — meio ano de dado nao vira "o ano".
+    parametros:
+      tabela: 4099
+      variavel: 4099
+      niveis: [n1, n3]
+      periodos: all
+      agregacao: media_anual
+      min_periodos: 4
+
+  # ── IPEA / Ipeadata (S7, S9) ─────────────────────────────────────────
+  # SERCODIGO conferido por `python -m ingest.ipeadata verify`. Enquanto
+  # `verificado: false`, o indicador NAO entra na carga automatica (--somente-verificados).
+  HOMICIDIOS:
+    nome: "Taxa de homicidios por 100 mil habitantes"
+    fonte: "IPEA — Atlas da Violencia (Ipeadata)"
+    unidade: "por 100 mil hab."
+    periodicidade: anual
+    direcao_desejavel: baixo
+    provedor: ipeadata
+    verificado: true
+    conferido_em: "2026-08-27"
+    notas: >
+      Serie AVIOL12_THOMIC do Atlas da Violencia: Estados 1980-2024 (45 anos x 27 UFs)
+      e Brasil no mesmo pacote. A resposta traz todos os niveis territoriais
+      (467.988 linhas, ate' municipio) — o loader fica so' com Estados e Brasil.
+    parametros:
+      sercodigo: "AVIOL12_THOMIC"
+      niveis: [Estados, Brasil]
+
+  MORTALIDADE_INFANTIL:
+    nome: "Taxa de mortalidade infantil"
+    fonte: "DATASUS — SIM/SINASC (S9)"
+    unidade: "por mil nascidos vivos"
+    periodicidade: anual
+    direcao_desejavel: baixo
+    provedor: arquivo
+    verificado: false
+    notas: >
+      NAO existe no Ipeadata com quebra por UF — a unica serie de mortalidade
+      infantil la' e' DEPIS_TMI, de base Macroeconomica (so' Brasil), conferido em
+      27/08/2026. Tem de vir do DATASUS/TabNet (S9). Ate' la', o indicador fica fora
+      da carga (`--somente-verificados`) e a lacuna esta' em docs/LACUNAS.md.
+    parametros:
+      url: null
+      formato: csv
+
+  # ── Derivados (calculados no dbt, nao ingeridos) ─────────────────────
+  # Existem no catalogo para aparecerem na `dim_indicador` com fonte e unidade
+  # corretas. `provedor: derivado` significa: nenhum download, o valor nasce de
+  # `marts/fct_indicador_uf_ano.sql`.
+  PIB_PER_CAPITA:
+    nome: "PIB per capita a precos correntes"
+    fonte: "Calculado: IBGE t/5938 (PIB) / IBGE t/6579 (populacao)"
+    unidade: "R$ correntes por habitante"
+    periodicidade: anual
+    direcao_desejavel: cima
+    provedor: derivado
+    verificado: true
+    conferido_em: "2026-08-27"
+    notas: >
+      Nao existe variavel de PIB per capita por UF na t/5938; e' derivado.
+      So' ha' valor nos anos em que PIB e populacao coexistem.
+    parametros:
+      formula: "PIB * 1000 / POPULACAO"
+      depende_de: [PIB, POPULACAO]
+
+  # ── Fontes de arquivo (S8, S10) — fase 3, ver docs/LACUNAS.md ────────
+  IDHM:
+    nome: "Indice de Desenvolvimento Humano Municipal (agregado por UF)"
+    fonte: "Atlas do Desenvolvimento Humano (PNUD/IPEA/FJP)"
+    unidade: "indice 0-1"
+    periodicidade: decenal
+    direcao_desejavel: cima
+    provedor: arquivo
+    verificado: false
+    notas: >
+      Serie curta (2000, 2010, 2021) — o SPEC 3 (S8) manda usar com cautela.
+      Nao entra em `fct_mandato_indicador` como variacao anual; aparece so' como
+      corte de contexto, porque dois pontos em 20 anos nao descrevem um mandato.
+    parametros:
+      url: null    # preencher com a URL do CSV/XLSX publicado
+      formato: xlsx
+
+  IDEB:
+    nome: "IDEB — anos finais do ensino fundamental (rede publica)"
+    fonte: "INEP"
+    unidade: "indice 0-10"
+    periodicidade: bienal
+    direcao_desejavel: cima
+    provedor: arquivo
+    verificado: false
+    notas: "Bienal; a janela de mandato costuma pegar 2 medicoes."
+    parametros:
+      url: null
+      formato: xlsx

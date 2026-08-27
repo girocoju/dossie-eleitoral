@@ -1,0 +1,108 @@
+# Layout TSE 2026 — herda tse_base.yml e sobrescreve so' o que muda.
+# CONFERIDO contra o arquivo real em 27/08/2026 (pacote gerado pelo TSE em 27/08/2026 08:30).
+#   python -m ingest.tse verify-layout --ano 2026
+extends: tse_base.yml
+ano: 2026
+verificado: true
+notas: |
+  Eleicoes gerais de 04/10/2026 (1o turno) e 25/10/2026 (2o turno).
+  Cargos em disputa: 1 Presidente, 3 Governador, 5 Senador,
+  6 Deputado Federal, 7 Deputado Estadual, 8 Deputado Distrital.
+
+  O que a conferencia do header real mostrou (e nao dava para adivinhar):
+
+  1. O TSE PARTIU o cadastro em dois arquivos em 2026. `consulta_cand` ficou com
+     50 colunas de identificacao/partido/perfil; `consulta_cand_complementar`
+     (49 colunas) levou situacao de julgamento, reeleicao, bens declarados,
+     despesa maxima, quilombola/etnia indigena e suplencia. Quem quiser
+     `st_reeleicao` ou `vr_despesa_max_campanha` PRECISA do complementar.
+  2. O complementar e' chaveado so' por (ano_eleicao, cd_eleicao, sq_candidato) —
+     nao tem sg_uf nem cd_cargo. O join com `candidatos` e' por sq_candidato.
+  3. `DS_SITUACAO_CANDIDATURA` vem `#NE` (cd -3) enquanto o registro esta' sub judice.
+     A situacao util antes da eleicao e' `DS_SITUACAO_JULGAMENTO` (DEFERIDO/INDEFERIDO/...),
+     que so' existe no complementar. Ver docs/LACUNAS.md.
+  4. `ST_REELEICAO` vem `#NE` em 2026 — a flag de reeleicao tem de ser DERIVADA do
+     historico de mandatos (`fct_mandato`), nao lida da fonte.
+  5. `VR_DESPESA_MAX_CAMPANHA` vem com ponto decimal (`3176572.53`), nao virgula.
+  6. `NR_CPF_CANDIDATO` esta' presente — a vinculacao de pessoa em 2026 nao precisa
+     do fallback nome+nascimento.
+  7. Colunas novas: NR_FEDERACAO, DS_EMAIL, NR_TITULO_ELEITORAL_CANDIDATO.
+     As duas ultimas sao descartadas na ingestao (privacidade, Constituicao 0.7).
+  8. O pacote e' republicado diariamente ate' a eleicao; a ingestao e' idempotente
+     (substitui a particao do ano) e pode rodar todo dia.
+
+datasets:
+
+  candidatos:
+    # 2026 nao tem estes campos no arquivo principal — eles migraram para o
+    # complementar. Listados aqui so' para documentar; resolvem para NULL.
+    obrigatorios:
+      - ano_eleicao
+      - nr_turno
+      - sg_uf
+      - cod_cargo
+      - sq_candidato
+      - nome_completo
+      - sigla_partido
+      - cd_situacao_turno
+
+  vagas:
+    obrigatorios:
+      - ano_eleicao
+      - cod_cargo
+      - qt_vagas
+
+  # S3 — conferido campo a campo em 27/08/2026 (49 colunas).
+  complementar:
+    pacote: "consulta_cand_complementar/consulta_cand_complementar_{ano}.zip"
+    arquivo_regex: '^consulta_cand_complementar_{ano}_(?P<ue>[A-Z]{2}|BRASIL)\.csv$'
+    leiame: "consulta_cand_complementar/leiame-consulta_cand_complementar.pdf"
+    chave: ["sq_candidato", "ano_eleicao"]
+    obrigatorios:
+      - ano_eleicao
+      - sq_candidato
+      - situacao_julgamento
+    campos:
+      ano_eleicao:              [ANO_ELEICAO]
+      cd_eleicao:               [CD_ELEICAO]
+      sq_candidato:             [SQ_CANDIDATO]
+      cd_detalhe_situacao:      [CD_DETALHE_SITUACAO_CAND]
+      ds_detalhe_situacao:      [DS_DETALHE_SITUACAO_CAND]
+      cd_nacionalidade:         [CD_NACIONALIDADE]
+      ds_nacionalidade:         [DS_NACIONALIDADE]
+      nm_municipio_nascimento:  [NM_MUNICIPIO_NASCIMENTO]
+      idade_data_posse:         [NR_IDADE_DATA_POSSE]
+      st_quilombola:            [ST_QUILOMBOLA]
+      cd_etnia_indigena:        [CD_ETNIA_INDIGENA]
+      ds_etnia_indigena:        [DS_ETNIA_INDIGENA]
+      vr_despesa_max_campanha:  [VR_DESPESA_MAX_CAMPANHA]
+      st_reeleicao:             [ST_REELEICAO]
+      st_declarar_bens:         [ST_DECLARAR_BENS]
+      nr_processo:              [NR_PROCESSO]
+      cd_situacao_pleito:       [CD_SITUACAO_CANDIDATO_PLEITO]
+      ds_situacao_pleito:       [DS_SITUACAO_CANDIDATO_PLEITO]
+      cd_situacao_urna:         [CD_SITUACAO_CANDIDATO_URNA]
+      ds_situacao_urna:         [DS_SITUACAO_CANDIDATO_URNA]
+      st_candidato_inserido_urna: [ST_CANDIDATO_INSERIDO_URNA]
+      nm_tipo_destinacao_votos: [NM_TIPO_DESTINACAO_VOTOS]
+      cd_situacao_turno:        [CD_SITUACAO_CANDIDATO_TOT, CD_SIT_TOT_TURNO]
+      situacao_turno:           [DS_SITUACAO_CANDIDATO_TOT, DS_SIT_TOT_TURNO]
+      st_prest_contas:          [ST_PREST_CONTAS]
+      st_substituido:           [ST_SUBSTITUIDO]
+      sq_substituido:           [SQ_SUBSTITUIDO]
+      sq_ordem_suplencia:       [SQ_ORDEM_SUPLENCIA]
+      dt_aceite_candidatura:    [DT_ACEITE_CANDIDATURA]
+      cd_situacao_julgamento:   [CD_SITUACAO_JULGAMENTO]
+      situacao_julgamento:      [DS_SITUACAO_JULGAMENTO]
+      cd_situacao_julgamento_pleito: [CD_SITUACAO_JULGAMENTO_PLEITO]
+      ds_situacao_julgamento_pleito: [DS_SITUACAO_JULGAMENTO_PLEITO]
+      cd_situacao_julgamento_urna:   [CD_SITUACAO_JULGAMENTO_URNA]
+      ds_situacao_julgamento_urna:   [DS_SITUACAO_JULGAMENTO_URNA]
+      cd_situacao_cassacao:     [CD_SITUACAO_CASSACAO]
+      ds_situacao_cassacao:     [DS_SITUACAO_CASSACAO]
+      cd_situacao_diploma:      [CD_SITUACAO_DIPLOMA]
+      ds_situacao_diploma:      [DS_SITUACAO_DIPLOMA]
+      cd_genero_fefc:           [CD_GENERO_FEFC]
+      ds_genero_fefc:           [DS_GENERO_FEFC]
+      cd_cor_raca_fefc:         [CD_COR_RACA_FEFC]
+      ds_cor_raca_fefc:         [DS_COR_RACA_FEFC]

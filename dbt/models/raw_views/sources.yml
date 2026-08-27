@@ -1,0 +1,65 @@
+version: 2
+
+sources:
+  - name: raw_tse
+    description: >
+      Copia fiel dos pacotes do TSE Dados Abertos, tudo em STRING (SPEC 4).
+      Carregada por `ingest/tse.py`; particionada por `data_particao`
+      (1o de janeiro do ano da eleicao) para que recarregar um ano substitua
+      apenas aquele ano.
+    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    schema: raw_tse
+    config:
+      loaded_at_field: _extracted_at
+      freshness:
+        # Ate' a eleicao o TSE republica o pacote todo dia; uma semana sem
+        # atualizacao antes de 04/10/2026 e' problema.
+        warn_after: { count: 8, period: day }
+        error_after: { count: 21, period: day }
+    tables:
+      - name: candidatos
+        description: "S1 — consulta_cand. Um registro por candidatura x turno."
+        columns:
+          - name: sq_candidato
+            description: "Chave do TSE para a candidatura DENTRO de uma eleicao. Nao e' chave de pessoa."
+          - name: cpf_hash
+            description: >
+              HMAC-SHA256 do CPF, calculado na ingestao. O CPF em claro nunca e'
+              gravado (Constituicao 0.7 / ADR-006, ADR-007).
+          - name: _extras
+            description: "JSON com as colunas da fonte que o layout do ano nao mapeou."
+      - name: bens
+        description: "S2 — bem_candidato. Um registro por bem declarado."
+      - name: vagas
+        description: "S5 — consulta_vagas. Vagas em disputa por cargo e unidade eleitoral."
+      - name: coligacoes
+        description: "S5 — consulta_coligacao."
+      - name: complementar
+        description: >
+          S3 — consulta_cand_complementar. Em 2026 o TSE moveu para ca' situacao de
+          julgamento, reeleicao, despesa maxima e declaracao de bens. Chaveada por
+          sq_candidato, sem sg_uf nem cd_cargo.
+
+  - name: raw_ibge
+    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    schema: raw_ibge
+    config:
+      loaded_at_field: _extracted_at
+      freshness:
+        warn_after: { count: 45, period: day }
+        error_after: { count: 120, period: day }
+    tables:
+      - name: indicadores
+        description: "S6 — formato longo (cod_indicador, sg_uf, ano, valor) vindo do SIDRA."
+
+  - name: raw_ipea
+    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    schema: raw_ipea
+    config:
+      loaded_at_field: _extracted_at
+      freshness:
+        warn_after: { count: 45, period: day }
+        error_after: { count: 120, period: day }
+    tables:
+      - name: indicadores
+        description: "S7 — formato longo vindo do Ipeadata (Atlas da Violencia)."

@@ -1,0 +1,44 @@
+relationship 1e01d1df-42dc-0912-d90c-86baebf1a662
+	cardinality: oneToOne
+	fromColumn: fct_candidatura.sq_candidato
+	toColumn: dim_candidato.sq_candidato
+
+relationship 19e1ab52-6741-828f-2248-1522a3ddbfdc
+	fromColumn: fct_candidatura.cod_cargo
+	toColumn: dim_cargo.cod_cargo
+
+relationship cafc566c-54dd-a079-2697-e09f52f2fb9e
+	fromColumn: fct_candidatura.sg_uf
+	toColumn: dim_uf.sg_uf
+
+relationship 4a0630ec-50cf-b208-5d47-dc99aaaeab50
+	fromColumn: fct_candidatura.ano_eleicao
+	toColumn: dim_tempo.ano
+
+relationship 9fe6b082-ba98-0ee5-bd93-a77f283f0934
+	fromColumn: fct_mandato.cod_cargo
+	toColumn: dim_cargo.cod_cargo
+
+relationship 415fb32c-903d-e94a-66f4-7d3dc824a611
+	fromColumn: fct_mandato.sg_uf
+	toColumn: dim_uf.sg_uf
+
+relationship cc459d7e-a225-1be1-a146-7b06cf6b5abf
+	fromColumn: fct_indicador_uf_ano.cod_indicador
+	toColumn: dim_indicador.cod_indicador
+
+relationship 62fe4b1d-2a18-652a-e7c5-252bf33b807e
+	fromColumn: fct_indicador_uf_ano.sg_uf
+	toColumn: dim_uf.sg_uf
+
+relationship d2144eef-9717-8ed4-d664-1466ee5266c7
+	fromColumn: fct_indicador_uf_ano.ano
+	toColumn: dim_tempo.ano
+
+relationship dd58ff34-5970-7ea3-5553-02844b46ecbd
+	fromColumn: fct_mandato_indicador.sk_mandato
+	toColumn: fct_mandato.sk_mandato
+
+relationship 4cca6963-3527-9031-735c-70a4fe22669c
+	fromColumn: fct_mandato_indicador.cod_indicador
+	toColumn: dim_indicador.cod_indicador

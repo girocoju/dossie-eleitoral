@@ -1,0 +1,155 @@
+name: pipeline
+
+# F-10 — ingestao + dbt semanal ate' a eleicao, e verificacao em todo PR.
+#
+# Dois jobs de proposito:
+#   `verificar` roda SEMPRE e nao precisa de nenhum segredo — e' o portao de merge.
+#   `pipeline`  roda so' quando ha' credenciais GCP (push na main, agendado ou manual).
+# Assim um PR vindo de fork continua sendo verificado sem expor segredo nenhum.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Segundas as 09:00 UTC (06:00 em Brasilia). Ate' 04/10/2026 o TSE republica
+    # o pacote de candidaturas diariamente; semanal e' o suficiente para o produto.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      anos:
+        description: "Anos do TSE a recarregar (separados por espaco)"
+        default: "2026"
+        required: false
+
+env:
+  RADAR_GCP_PROJECT: ${{ vars.RADAR_GCP_PROJECT || 'radar-brasil' }}
+  RADAR_BQ_LOCATION: ${{ vars.RADAR_BQ_LOCATION || 'US' }}
+  RADAR_LOG_LEVEL: INFO
+
+jobs:
+
+  verificar:
+    name: lint + testes + dbt parse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dbt,dev]"
+
+      - name: Lint
+        run: ruff check ingest tests scripts
+
+      - name: Testes unitarios (sem rede)
+        run: pytest -m "not network and not bigquery"
+
+      - name: Seeds em dia com as fontes de verdade
+        run: python scripts/gerar_seeds.py --check
+
+      - name: dbt parse
+        working-directory: dbt
+        env:
+          DBT_PROFILES_DIR: .
+        run: |
+          dbt deps
+          dbt parse --no-partial-parse
+
+  pipeline:
+    name: ingestao + dbt build
+    runs-on: ubuntu-latest
+    needs: verificar
+    # Sem service account configurada o job e' pulado em vez de falhar vermelho.
+    if: >
+      github.event_name != 'pull_request' &&
+      (github.event_name == 'schedule' ||
+       github.event_name == 'workflow_dispatch' ||
+       github.ref == 'refs/heads/main')
+    concurrency:
+      group: pipeline-${{ github.ref }}
+      cancel-in-progress: false
+    env:
+      RADAR_DBT_TARGET: ci
+      RADAR_GCP_SA_JSON: ${{ secrets.RADAR_GCP_SA_JSON }}
+      RADAR_CPF_SALT: ${{ secrets.RADAR_CPF_SALT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir se ha' credenciais
+        id: cred
+        run: |
+          if [ -z "${RADAR_GCP_SA_JSON}" ]; then
+            echo "temos=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Secret RADAR_GCP_SA_JSON ausente — etapa de carga pulada (ver docs/STATUS.md, T-002)."
+          else
+            echo "temos=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.cred.outputs.temos == 'true'
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependencias
+        if: steps.cred.outputs.temos == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dbt,dev]"
+
+      - name: Cache dos pacotes baixados
+        if: steps.cred.outputs.temos == 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: fontes-${{ hashFiles('ingest/layouts/*.yml') }}-${{ github.run_id }}
+          restore-keys: fontes-${{ hashFiles('ingest/layouts/*.yml') }}-
+
+      - name: Ingestao TSE
+        if: steps.cred.outputs.temos == 'true'
+        run: |
+          for ano in ${{ github.event.inputs.anos || '2026' }}; do
+            python -m ingest.tse load --ano "$ano"
+          done
+
+      - name: Ingestao socioeconomica
+        if: steps.cred.outputs.temos == 'true'
+        run: |
+          python -m ingest.ibge_sidra load --somente-verificados
+          python -m ingest.ipeadata  load --somente-verificados
+
+      - name: dbt build
+        if: steps.cred.outputs.temos == 'true'
+        working-directory: dbt
+        env:
+          DBT_PROFILES_DIR: .
+        run: |
+          dbt deps
+          dbt seed
+          dbt run
+          dbt test
+
+      - name: Frescor das fontes
+        if: steps.cred.outputs.temos == 'true'
+        working-directory: dbt
+        env:
+          DBT_PROFILES_DIR: .
+        run: dbt source freshness
+
+      - name: Guardar relatorio de carga
+        if: always() && steps.cred.outputs.temos == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-carga
+          path: |
+            data/staging/qa/
+            dbt/target/run_results.json
+          retention-days: 30
+          if-no-files-found: ignore

@@ -1,0 +1,138 @@
+table fct_mandato
+	/// Um mandato exercido por linha.
+	lineageTag: a0f4b96b-a293-4d36-ab08-cac4afd25c37
+
+	measure 'Mandatos' = COUNTROWS(fct_mandato)
+		formatString: #,0
+		lineageTag: b77ba1e3-0f9d-343c-0cd8-ff64849ea2be
+		displayFolder: Contagem
+
+	column sk_mandato
+		dataType: string
+		isHidden
+		lineageTag: 468cabe3-7542-30f8-a225-653e9d857227
+		summarizeBy: none
+		sourceColumn: sk_mandato
+
+		annotation SummarizationSetBy = Automatic
+
+	column id_pessoa
+		dataType: string
+		isHidden
+		lineageTag: c3ec49a5-6116-bcfb-88c6-f1a59d18be96
+		summarizeBy: none
+		sourceColumn: id_pessoa
+
+		annotation SummarizationSetBy = Automatic
+
+	column sq_candidato
+		dataType: string
+		isHidden
+		lineageTag: e074ddbe-b1df-56ef-a20e-80706f94c4af
+		summarizeBy: none
+		sourceColumn: sq_candidato
+
+		annotation SummarizationSetBy = Automatic
+
+	column nome_urna
+		dataType: string
+		lineageTag: 6a5f8e9c-52ad-1d6a-0e5c-e55712e9b364
+		summarizeBy: none
+		sourceColumn: nome_urna
+
+		annotation SummarizationSetBy = Automatic
+
+	column cod_cargo
+		dataType: int64
+		isHidden
+		lineageTag: b3781d33-2342-16d0-e72d-7d4a564f49ed
+		summarizeBy: none
+		sourceColumn: cod_cargo
+
+		annotation SummarizationSetBy = Automatic
+
+	column sg_uf
+		dataType: string
+		isHidden
+		lineageTag: 249e53fc-2d7a-54b4-6498-aeef03404960
+		summarizeBy: none
+		sourceColumn: sg_uf
+
+		annotation SummarizationSetBy = Automatic
+
+	column nm_ue
+		dataType: string
+		lineageTag: 0a4ad048-bd0e-17d7-4b64-0c4a4baa343c
+		summarizeBy: none
+		sourceColumn: nm_ue
+
+		annotation SummarizationSetBy = Automatic
+
+	column sigla_partido
+		dataType: string
+		lineageTag: 2fe7460c-c50b-5d7f-1aad-45ff21ae3510
+		summarizeBy: none
+		sourceColumn: sigla_partido
+
+		annotation SummarizationSetBy = Automatic
+
+	column ano_eleicao
+		dataType: int64
+		lineageTag: 0e4a9e6d-fd73-d9fa-ece9-5a306dd75262
+		summarizeBy: none
+		sourceColumn: ano_eleicao
+
+		annotation SummarizationSetBy = Automatic
+
+	column ano_inicio
+		dataType: int64
+		lineageTag: 91868b88-c277-45c5-3737-5c3d6dae954a
+		summarizeBy: none
+		sourceColumn: ano_inicio
+
+		annotation SummarizationSetBy = Automatic
+
+	column ano_fim
+		dataType: int64
+		lineageTag: 35f28f4d-7a90-e695-3733-28f8da57900d
+		summarizeBy: none
+		sourceColumn: ano_fim
+
+		annotation SummarizationSetBy = Automatic
+
+	column motivo_fim
+		dataType: string
+		lineageTag: 687d2c5a-ad58-fbfc-4345-ab206cadefb1
+		summarizeBy: none
+		sourceColumn: motivo_fim
+
+		annotation SummarizationSetBy = Automatic
+
+	column em_curso
+		dataType: boolean
+		lineageTag: 476e5edd-11fe-01b3-e7a2-0e623dff9934
+		summarizeBy: none
+		sourceColumn: em_curso
+
+		annotation SummarizationSetBy = Automatic
+
+	column link_confiavel
+		dataType: boolean
+		lineageTag: a1f2986f-5462-f2f6-5fb5-867afef13455
+		summarizeBy: none
+		sourceColumn: link_confiavel
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fct_mandato = m
+		mode: import
+		source =
+				let
+				    Fonte = GoogleBigQuery.Database([BillingProject = ProjetoGCP]),
+				    Projeto = Fonte{[Name = ProjetoGCP]}[Data],
+				    Dataset = Projeto{[Name = DatasetMarts]}[Data],
+				    Tabela = Dataset{[Name = "fct_mandato"]}[Data]
+				in
+				    Tabela
+
+	annotation PBI_ResultType = Table

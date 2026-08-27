@@ -1,0 +1,92 @@
+table dim_indicador
+	/// Catalogo de indicadores com fonte, unidade e data de conferencia.
+	lineageTag: 64db0601-46a9-05ae-80c4-e436180ff439
+
+	column cod_indicador
+		dataType: string
+		isHidden
+		lineageTag: ab3a45b7-6074-e3be-d9e9-c4d4cc8c5545
+		summarizeBy: none
+		sourceColumn: cod_indicador
+
+		annotation SummarizationSetBy = Automatic
+
+	column nome
+		dataType: string
+		lineageTag: 0899aa97-4071-d0ab-9170-8f1494ffc8b4
+		summarizeBy: none
+		sourceColumn: nome
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Vai para o rodape de toda visualizacao (Constituicao 0.3).
+	column fonte
+		dataType: string
+		lineageTag: a49532f8-a0b6-1651-f832-939c4c770375
+		summarizeBy: none
+		sourceColumn: fonte
+
+		annotation SummarizationSetBy = Automatic
+
+	column unidade
+		dataType: string
+		lineageTag: e7672acb-02d8-a626-f4ab-ff5c728006b1
+		summarizeBy: none
+		sourceColumn: unidade
+
+		annotation SummarizationSetBy = Automatic
+
+	column periodicidade
+		dataType: string
+		lineageTag: 7461bd53-c09b-740b-66e5-8b259825d666
+		summarizeBy: none
+		sourceColumn: periodicidade
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Usado SO' para escolher a cor neutra de tendencia. Nao e' juizo sobre gestao (Constituicao 0.1).
+	column direcao_desejavel
+		dataType: string
+		lineageTag: f919355f-9697-fa17-e92c-c551322d8668
+		summarizeBy: none
+		sourceColumn: direcao_desejavel
+
+		annotation SummarizationSetBy = Automatic
+
+	column provedor
+		dataType: string
+		isHidden
+		lineageTag: dac6b195-bc60-b922-ea12-098e75f18d92
+		summarizeBy: none
+		sourceColumn: provedor
+
+		annotation SummarizationSetBy = Automatic
+
+	column verificado
+		dataType: boolean
+		lineageTag: 1b2440c7-24e9-9eb8-c7aa-be3f3e2e1748
+		summarizeBy: none
+		sourceColumn: verificado
+
+		annotation SummarizationSetBy = Automatic
+
+	column notas
+		dataType: string
+		lineageTag: 65c3714e-8357-db71-6d2e-467530e6b3f4
+		summarizeBy: none
+		sourceColumn: notas
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_indicador = m
+		mode: import
+		source =
+				let
+				    Fonte = GoogleBigQuery.Database([BillingProject = ProjetoGCP]),
+				    Projeto = Fonte{[Name = ProjetoGCP]}[Data],
+				    Dataset = Projeto{[Name = DatasetMarts]}[Data],
+				    Tabela = Dataset{[Name = "dim_indicador"]}[Data]
+				in
+				    Tabela
+
+	annotation PBI_ResultType = Table

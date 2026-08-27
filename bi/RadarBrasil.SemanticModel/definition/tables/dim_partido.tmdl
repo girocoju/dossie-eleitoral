@@ -1,0 +1,74 @@
+table dim_partido
+	/// Estado do partido em cada eleicao. Sem cor partidaria por padrao.
+	lineageTag: 03a19835-56c3-6a79-c429-245a0f3528a4
+
+	column sk_partido
+		dataType: string
+		isHidden
+		lineageTag: 41dff86e-ddfd-724a-0406-a78f593ab35b
+		summarizeBy: none
+		sourceColumn: sk_partido
+
+		annotation SummarizationSetBy = Automatic
+
+	column ano_eleicao
+		dataType: int64
+		isHidden
+		lineageTag: 7dfd5902-4ae7-4b1a-32e3-883e4fdd799e
+		summarizeBy: none
+		sourceColumn: ano_eleicao
+
+		annotation SummarizationSetBy = Automatic
+
+	column sigla_partido
+		dataType: string
+		lineageTag: 74bf8ea6-7d6b-48ef-6eee-97a5ca2299a2
+		summarizeBy: none
+		sourceColumn: sigla_partido
+
+		annotation SummarizationSetBy = Automatic
+
+	column nome_partido
+		dataType: string
+		lineageTag: 21d5fd4e-5c80-dd39-0b6f-94f4b119108b
+		summarizeBy: none
+		sourceColumn: nome_partido
+
+		annotation SummarizationSetBy = Automatic
+
+	column nr_partido
+		dataType: int64
+		lineageTag: b258a105-d957-b186-6c2a-00c43cf2d24c
+		summarizeBy: none
+		sourceColumn: nr_partido
+
+		annotation SummarizationSetBy = Automatic
+
+	column sg_federacao
+		dataType: string
+		lineageTag: e11d3450-c58b-21cf-aee1-09a09d7314ba
+		summarizeBy: none
+		sourceColumn: sg_federacao
+
+		annotation SummarizationSetBy = Automatic
+
+	column em_federacao
+		dataType: boolean
+		lineageTag: e6bac4d1-5fbe-f967-4eaa-0fe6b31eb92b
+		summarizeBy: none
+		sourceColumn: em_federacao
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_partido = m
+		mode: import
+		source =
+				let
+				    Fonte = GoogleBigQuery.Database([BillingProject = ProjetoGCP]),
+				    Projeto = Fonte{[Name = ProjetoGCP]}[Data],
+				    Dataset = Projeto{[Name = DatasetMarts]}[Data],
+				    Tabela = Dataset{[Name = "dim_partido"]}[Data]
+				in
+				    Tabela
+
+	annotation PBI_ResultType = Table

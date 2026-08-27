@@ -1,0 +1,214 @@
+version: 2
+
+models:
+
+  - name: dim_cargo
+    description: "Cargos do TSE com esfera, duracao de mandato e vagas em disputa em 2026."
+    columns:
+      - name: cod_cargo
+        tests: [not_null, unique]
+      - name: descricao
+        tests: [not_null]
+      - name: esfera
+        tests:
+          - accepted_values:
+              arguments:
+                values: [federal, estadual, distrital, municipal]
+      - name: duracao_mandato_anos
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [4, 8]
+                quote: false
+      - name: modulo_durante_mandato
+        description: >
+          TRUE apenas para Presidente e Governador. SPEC 2.2 mantem deputados e
+          senadores fora do modulo "Durante o mandato" de proposito.
+      - name: vagas_2026
+        description: "Somatorio de `consulta_vagas` de 2026. NULL para cargo fora da disputa."
+
+  - name: dim_candidato
+    description: "Uma linha por candidatura-pessoa. Chave: sq_candidato."
+    columns:
+      - name: sq_candidato
+        tests: [not_null, unique]
+      - name: id_pessoa
+        description: >
+          Chave que liga a mesma pessoa entre eleicoes: cpf_hash quando ha' CPF,
+          senao hash de nome normalizado + data de nascimento (ADR-005).
+      - name: link_confiavel
+        description: "FALSE quando `id_pessoa` veio do fallback nome+nascimento."
+        tests: [not_null]
+      - name: idade_na_posse
+        description: "Idade em 1o de janeiro do ano seguinte a eleicao."
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 17
+                max_value: 110
+                inclusive: true
+      - name: cod_cargo
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_cargo')
+                field: cod_cargo
+
+  - name: dim_partido
+    description: "Estado do partido em cada eleicao (sigla, numero, federacao)."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [sigla_partido, ano_eleicao]
+    columns:
+      - name: sk_partido
+        tests: [not_null, unique]
+      - name: sigla_partido
+        tests: [not_null]
+
+  - name: dim_tempo
+    description: "Calendario anual de 1980 ao ano corrente."
+    columns:
+      - name: ano
+        tests: [not_null, unique]
+
+  - name: fct_candidatura
+    description: "F-05 — uma candidatura por linha. Grao: sq_candidato."
+    columns:
+      - name: sq_candidato
+        tests: [not_null, unique]
+      - name: ano_eleicao
+        tests: [not_null]
+      - name: cod_cargo
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_cargo')
+                field: cod_cargo
+      - name: sg_uf
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_uf')
+                field: sg_uf
+      - name: is_reeleicao
+        description: >
+          DERIVADO do historico de mandatos, nao lido da fonte: em 2026 o TSE
+          publica `ST_REELEICAO` como `#NE` ate' a apuracao (conferido 27/08/2026).
+        tests: [not_null]
+      - name: total_bens_declarados
+        description: "Soma dos bens em reais correntes do ano da eleicao. Zero quando nao declarou."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: votos_nominais
+        description: >
+          Reservado para a ingestao de `votacao_candidato_munzona` (S4), ainda nao
+          habilitada — ver docs/LACUNAS.md. Sempre NULL por enquanto.
+
+  - name: fct_mandato
+    description: "F-05 — um mandato exercido por linha. Base do modulo 'Durante o mandato'."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [id_pessoa, cod_cargo, sg_ue, ano_inicio]
+    columns:
+      - name: sk_mandato
+        tests: [not_null, unique]
+      - name: id_pessoa
+        tests: [not_null]
+      - name: ano_inicio
+        tests: [not_null]
+      - name: ano_fim
+        tests: [not_null]
+      - name: cod_cargo
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_cargo')
+                field: cod_cargo
+      - name: motivo_fim
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["cassacao", "nao informado"]
+
+  - name: fct_indicador_uf_ano
+    description: "F-04/F-05 — indicador x UF x ano com comparador nacional e regional na mesma linha."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [cod_indicador, sg_uf, ano]
+    columns:
+      - name: cod_indicador
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_indicador')
+                field: cod_indicador
+      - name: sg_uf
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_uf')
+                field: sg_uf
+      - name: ano
+        tests: [not_null]
+      - name: valor
+        tests: [not_null]
+      - name: valor_brasil
+        description: >
+          Mesmo indicador e ano, agregado nacional. Existe para que nenhum numero
+          de UF possa ser exibido sem comparador (Constituicao 0.2).
+
+  - name: fct_mandato_indicador
+    description: >
+      F-06 — o que aconteceu com o indicador durante a janela do mandato, com os
+      comparadores Brasil e regiao. NAO mede efeito de gestao.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [sk_mandato, cod_indicador]
+    columns:
+      - name: sk_mandato
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_mandato')
+                field: sk_mandato
+      - name: cod_indicador
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_indicador')
+                field: cod_indicador
+      - name: ano_referencia_inicio
+        description: "Ano do ponto inicial de fato usado — em geral o ano anterior a posse."
+        tests: [not_null]
+      - name: ano_referencia_fim
+        tests: [not_null]
+      - name: janela_incompleta
+        description: >
+          TRUE quando a serie termina antes do fim do mandato (defasagem de
+          divulgacao). A tela obrigatoriamente sinaliza.
+        tests: [not_null]
+      - name: base_e_heranca
+        description: "TRUE quando o ponto inicial e' mesmo o ano anterior a posse."
+        tests: [not_null]
+      - name: delta_vs_brasil
+        description: >
+          variacao_pct - variacao_brasil_pct. Contraste descritivo entre duas
+          variacoes observadas no mesmo periodo. Nunca rotular como resultado.
+      - name: aviso_metodologico
+        description: "Texto fixo que acompanha o registro onde quer que ele seja exibido."
+        tests: [not_null]

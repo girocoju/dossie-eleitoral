@@ -1,0 +1,133 @@
+version: 2
+
+models:
+
+  - name: stg_tse__candidaturas
+    description: >
+      F-03 — candidaturas de 1998 a 2026 com schema unico. Grao:
+      (sq_candidato, ano_eleicao, nr_turno).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [sq_candidato, ano_eleicao, nr_turno]
+    columns:
+      - name: sq_candidato
+        description: "Chave TSE da candidatura dentro de uma eleicao (nao e' chave de pessoa)."
+        tests: [not_null]
+      - name: ano_eleicao
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1998, 2002, 2006, 2010, 2014, 2018, 2022, 2026]
+                quote: false
+      - name: cod_cargo
+        description: "Codigo de cargo do TSE. 1..10 sao os cargos das eleicoes gerais."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_cargo')
+                field: cod_cargo
+      - name: sg_uf
+        description: "UF da candidatura. `BR` aparece nas candidaturas a Presidente."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_uf')
+                field: sg_uf
+      - name: nr_turno
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2]
+                quote: false
+      - name: cpf_hash
+        description: "HMAC-SHA256 do CPF. Chave de pessoa entre anos (ADR-005/006)."
+      - name: nome_completo
+        tests: [not_null]
+      - name: sigla_partido
+        tests: [not_null]
+      - name: foi_eleito
+        description: "Derivado de situacao_turno. FALSE para 2026 ate' a apuracao."
+        tests: [not_null]
+      - name: data_nascimento
+        description: "NULL quando a fonte traz data-sentinela."
+      - name: despesa_max_campanha
+        description: "Limite legal de gasto, nao gasto realizado. Financiamento e' F-11 (fase 2)."
+
+  - name: stg_tse__bens
+    description: "Bens declarados por candidatura (S2). Grao: um bem."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [sq_candidato, ano_eleicao, nr_ordem_bem]
+    columns:
+      - name: sq_candidato
+        tests: [not_null]
+      - name: valor_bem
+        description: "Valor declarado em reais correntes do ano da eleicao — nao deflacionado."
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+
+  - name: stg_tse__vagas
+    description: "Vagas em disputa por cargo e unidade eleitoral (S5)."
+    columns:
+      - name: qt_vagas
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: cod_cargo
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_cargo')
+                field: cod_cargo
+
+  - name: stg_tse__coligacoes
+    description: "Coligacoes e federacoes por cargo e UE (S5)."
+    columns:
+      - name: sq_coligacao
+        tests: [not_null]
+
+  - name: stg_indicadores
+    description: >
+      F-04 — indicadores socioeconomicos de todas as fontes no formato longo
+      (cod_indicador, sg_uf, ano, valor).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [cod_indicador, sg_uf, ano]
+    columns:
+      - name: cod_indicador
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_indicador')
+                field: cod_indicador
+      - name: sg_uf
+        description: "27 UFs mais `BR`, que guarda o agregado nacional comparador."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_uf')
+                field: sg_uf
+      - name: ano
+        tests: [not_null]
+      - name: valor
+        tests: [not_null]
+      - name: n_periodos
+        description: >
+          Quantas medidas da fonte entraram no valor anual. 1 para series anuais;
+          4 para a media dos trimestres da PNAD Continua.

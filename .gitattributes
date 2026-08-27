@@ -1,0 +1,13 @@
+# Normaliza fim de linha: o repo guarda LF, o checkout usa o padrao do SO.
+* text=auto
+
+# Artefatos do Power BI: o Desktop grava CRLF: preserva para nao gerar diff falso.
+*.tmdl   text eol=crlf
+*.pbism  text eol=crlf
+*.pbir   text eol=crlf
+*.pbip   text eol=crlf
+
+# Dados nunca deveriam entrar, mas se entrarem nao passam por normalizacao.
+*.csv    -text
+*.ndjson -text
+*.zip    binary

@@ -1,0 +1,71 @@
+version: 2
+
+seeds:
+
+  - name: dim_uf
+    description: >
+      27 unidades da federacao mais a linha `BR`, que guarda o agregado nacional
+      usado como comparador obrigatorio (Constituicao 0.2).
+      GERADO por `scripts/gerar_seeds.py` a partir de `ingest/common/ufs.py` —
+      nao edite a mao; o CI compara os dois.
+    columns:
+      - name: sg_uf
+        tests: [not_null, unique]
+      - name: nome
+        tests: [not_null]
+      - name: regiao
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [Norte, Nordeste, Sudeste, Sul, Centro-Oeste, Brasil]
+      - name: cod_ibge
+        description: "Codigo territorial do IBGE — e' por ele que a resposta do SIDRA e' casada."
+        tests: [not_null, unique]
+
+  - name: cargo_tse
+    description: >
+      Atributos estaveis dos cargos do TSE. Codigos conferidos contra o pacote
+      real de 2026 em 27/08/2026 (o arquivo traz os cargos 1 a 10).
+    columns:
+      - name: cod_cargo
+        tests: [not_null, unique]
+      - name: descricao
+        tests: [not_null]
+      - name: no_escopo_mvp
+        tests: [not_null]
+      - name: modulo_durante_mandato
+        tests: [not_null]
+
+  - name: dim_indicador
+    description: >
+      Catalogo de indicadores. GERADO por `scripts/gerar_seeds.py` a partir de
+      `ingest/layouts/indicadores.yml` — a fonte, a unidade e a data de conferencia
+      de cada serie moram la'.
+    columns:
+      - name: cod_indicador
+        tests: [not_null, unique]
+      - name: nome
+        tests: [not_null]
+      - name: fonte
+        description: "Aparece no rodape de toda visualizacao que usar o indicador (Constituicao 0.3)."
+        tests: [not_null]
+      - name: unidade
+        tests: [not_null]
+      - name: direcao_desejavel
+        description: >
+          Usado SO' para escolher a cor neutra de tendencia no Power BI
+          (Constituicao 0.1). Nao e' juizo sobre gestao.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [cima, baixo, neutro]
+      - name: provedor
+        tests:
+          - accepted_values:
+              arguments:
+                values: [sidra, ipeadata, arquivo, derivado]
+      - name: verificado
+        description: "TRUE quando a chamada real da fonte ja' foi conferida nesta base de codigo."
+        tests: [not_null]
