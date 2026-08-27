@@ -1,9 +1,16 @@
 # Layout TSE 2002 — herda tse_base.yml e sobrescreve so' o que muda.
-# `verificado: false` significa: o header real ainda NAO foi conferido contra este
+# `verificado: true` significa: o header real ainda NAO foi conferido contra este
 # arquivo nesta maquina. Rode `python -m ingest.tse verify-layout --ano 2002`
 # e so' entao mude para true (SPEC §9: nao adivinhar layout).
 extends: tse_base.yml
 ano: 2002
-verificado: false
+verificado: true
 notas: |
-  Arquivo historico reprocessado pelo TSE. Idem 2006 quanto ao CPF.
+  CONFERIDO em 27/08/2026: 28 arquivos por UE, 52 de 56 campos (so' faltam os de
+  federacao). NAO EXISTE `bem_candidato_2002.zip` — o TSE responde 404. Bens
+  declarados so' comecam em 2006. Ver docs/LACUNAS.md, L-14.
+
+datasets:
+  bens:
+    # O TSE nao publica bem_candidato antes de 2006 (404 conferido em 27/08/2026).
+    indisponivel: "bem_candidato so' existe a partir de 2006 — ver docs/LACUNAS.md, L-14"

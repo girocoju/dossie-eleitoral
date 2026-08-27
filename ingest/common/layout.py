@@ -74,6 +74,7 @@ class DatasetLayout:
     chave: tuple[str, ...]
     descartar: frozenset[str] = frozenset()
     hash_map: dict[str, str] = field(default_factory=dict)
+    indisponivel: str | None = None
 
     def colunas_saida(self) -> list[str]:
         """Colunas que de fato chegam ao BigQuery, na ordem do schema.
@@ -195,6 +196,7 @@ class Layout:
             chave=tuple(spec.get("chave", ())),
             descartar=frozenset(privacidade.get("descartar", ()) or ()),
             hash_map=dict(privacidade.get("hash", {}) or {}),
+            indisponivel=spec.get("indisponivel"),
         )
 
 

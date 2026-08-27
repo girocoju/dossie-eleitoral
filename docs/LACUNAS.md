@@ -178,3 +178,19 @@ populacional ao lado.
 
 **Como fechar:** ingerir a PNAD Continua Caracteristicas Gerais (SIDRA) por UF,
 ano, sexo e cor/raca, e acrescentar como comparador em `fct_indicador_uf_ano`.
+
+---
+
+## L-14 · Bens declarados nao existem antes de 2006
+
+**O que falta:** `bem_candidato_1998.zip` e `bem_candidato_2002.zip`. O CDN do TSE
+responde **404** para os dois (conferido em 27/08/2026, na mesma execucao em que
+2006–2022 baixaram normalmente).
+
+**Impacto:** candidaturas de 1998 e 2002 tem `total_bens_declarados = 0` e
+`declarou_algum_bem = false` — o que significa "a fonte nao publica", e nao
+"o candidato nao tinha bens". Qualquer comparacao de patrimonio ao longo do tempo
+tem de comecar em 2006.
+
+**Como fechar:** nao fecha. O dataset nao foi publicado. Os layouts de 1998 e 2002
+declaram `indisponivel` para `bens`, e a ingestao pula com aviso em vez de falhar.

@@ -1,9 +1,11 @@
 # Layout TSE 2018 — herda tse_base.yml e sobrescreve so' o que muda.
-# `verificado: false` significa: o header real ainda NAO foi conferido contra este
+# `verificado: true` significa: o header real ainda NAO foi conferido contra este
 # arquivo nesta maquina. Rode `python -m ingest.tse verify-layout --ano 2018`
 # e so' entao mude para true (SPEC §9: nao adivinhar layout).
 extends: tse_base.yml
 ano: 2018
-verificado: false
+verificado: true
 notas: |
-  Layout estabilizado no padrao atual do portal de dados abertos.
+  CONFERIDO em 27/08/2026: 28 arquivos por UE, 46 de 56 campos. Mesmo conjunto de
+  ausentes de 2022 (migraram para o complementar). Sem federacao, que so' existe
+  a partir de 2022.

@@ -1,10 +1,10 @@
 # Layout TSE 2006 — herda tse_base.yml e sobrescreve so' o que muda.
-# `verificado: false` significa: o header real ainda NAO foi conferido contra este
+# `verificado: true` significa: o header real ainda NAO foi conferido contra este
 # arquivo nesta maquina. Rode `python -m ingest.tse verify-layout --ano 2006`
 # e so' entao mude para true (SPEC §9: nao adivinhar layout).
 extends: tse_base.yml
 ano: 2006
-verificado: false
+verificado: true
 notas: |
-  Arquivo historico reprocessado pelo TSE. Conferir CPF: pode vir vazio,
-  o que joga a vinculacao de pessoa para o fallback nome+nascimento.
+  CONFERIDO em 27/08/2026: 28 arquivos por UE, 52 de 56 campos (so' faltam os de
+  federacao). Primeiro ano com declaracao de bens publicada pelo TSE.

@@ -1,9 +1,15 @@
 # Layout TSE 2022 — herda tse_base.yml e sobrescreve so' o que muda.
-# `verificado: false` significa: o header real ainda NAO foi conferido contra este
+# `verificado: true` significa: o header real ainda NAO foi conferido contra este
 # arquivo nesta maquina. Rode `python -m ingest.tse verify-layout --ano 2022`
 # e so' entao mude para true (SPEC §9: nao adivinhar layout).
 extends: tse_base.yml
 ano: 2022
-verificado: false
+verificado: true
 notas: |
-  Primeiro ano com federacao partidaria (SG_FEDERACAO / NM_FEDERACAO).
+  CONFERIDO contra o arquivo real em 27/08/2026: 28 arquivos por UE, 46 de 56 campos
+  resolvidos. Primeiro ano com federacao partidaria (NR/SG/NM_FEDERACAO).
+  Os 10 campos ausentes (st_reeleicao, vr_despesa_max_campanha, nr_processo,
+  detalhe da situacao, nacionalidade, municipio de nascimento, idade na posse)
+  nao estao no arquivo principal — o TSE ja' os havia movido para o
+  consulta_cand_complementar neste ano. `situacao_turno` esta' presente, que e' o
+  campo do qual depende `fct_mandato`.

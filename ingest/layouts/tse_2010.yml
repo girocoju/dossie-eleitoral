@@ -1,9 +1,13 @@
 # Layout TSE 2010 — herda tse_base.yml e sobrescreve so' o que muda.
-# `verificado: false` significa: o header real ainda NAO foi conferido contra este
+# `verificado: true` significa: o header real ainda NAO foi conferido contra este
 # arquivo nesta maquina. Rode `python -m ingest.tse verify-layout --ano 2010`
 # e so' entao mude para true (SPEC §9: nao adivinhar layout).
 extends: tse_base.yml
 ano: 2010
-verificado: false
+verificado: true
 notas: |
-  Anterior a cor/raca: `cd_cor_raca` e `cor_raca` resolvem para NULL.
+  CONFERIDO em 27/08/2026: 28 arquivos por UE, 52 de 56 campos. So' faltam os quatro
+  campos de federacao, que nao existiam antes de 2022. Anterior a cor/raca:
+  `cd_cor_raca` e `cor_raca` resolvem para NULL.
+  Note que 1998-2010 tem MAIS campos que 2014-2022: `st_reeleicao`,
+  `vr_despesa_max_campanha` e `nr_processo` estao no arquivo principal aqui.

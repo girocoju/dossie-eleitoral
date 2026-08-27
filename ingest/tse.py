@@ -174,6 +174,13 @@ def processar(
     settings.ensure_dirs()
     ds = load_layout(ano).dataset(nome_dataset)
 
+    # A fonte pode simplesmente nao existir naquele ano (ex.: o TSE so' publica
+    # declaracao de bens a partir de 2006). Isso e' ausencia conhecida e
+    # declarada, nao falha: pular com aviso e' o comportamento correto.
+    if ds.indisponivel:
+        log.warning("%s %s indisponivel: %s", nome_dataset, ano, ds.indisponivel)
+        return None
+
     art = baixar(ds, force=force, dry_run=dry_run)
     if dry_run:
         log.info("[dry-run] %s %s: leria %s", nome_dataset, ano, ds.url)

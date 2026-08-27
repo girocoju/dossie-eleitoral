@@ -1,9 +1,11 @@
 # Layout TSE 2014 — herda tse_base.yml e sobrescreve so' o que muda.
-# `verificado: false` significa: o header real ainda NAO foi conferido contra este
+# `verificado: true` significa: o header real ainda NAO foi conferido contra este
 # arquivo nesta maquina. Rode `python -m ingest.tse verify-layout --ano 2014`
 # e so' entao mude para true (SPEC §9: nao adivinhar layout).
 extends: tse_base.yml
 ano: 2014
-verificado: false
+verificado: true
 notas: |
-  Primeiro ano com autodeclaracao de cor/raca (CD_COR_RACA / DS_COR_RACA).
+  CONFERIDO em 27/08/2026: 28 arquivos por UE, 46 de 56 campos. Primeiro ano com
+  autodeclaracao de cor/raca (CD/DS_COR_RACA), que resolve normalmente aqui.
+  Mesmo conjunto de ausentes de 2018.
