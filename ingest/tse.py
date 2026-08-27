@@ -50,7 +50,8 @@ CLUSTERING = {
     "bens": ("sg_uf",),
     "vagas": ("sg_uf", "cod_cargo"),
     "coligacoes": ("sg_uf", "cod_cargo"),
-    "complementar": ("sg_uf",),
+    # o complementar nao tem sg_uf nem cod_cargo — e' chaveado so' por candidatura
+    "complementar": ("sq_candidato",),
 }
 
 
@@ -105,7 +106,6 @@ def _linhas(
 ) -> Iterator[tuple[dict[str, Any], Resolucao, str]]:
     """Gera as linhas de todos os CSVs do pacote, ja' no formato da tabela raw."""
     extraido_em = art.extracted_at or utc_now()
-    particao = f"{ds.ano:04d}-01-01"
     emitidas = 0
 
     with zipfile.ZipFile(zip_file) as zf:
@@ -147,7 +147,6 @@ def _linhas(
                 }
                 linha["_extras"] = json.dumps(extras, ensure_ascii=False) if extras else None
                 linha["ano_eleicao"] = ds.ano
-                linha["data_particao"] = particao
                 linha["_extracted_at"] = extraido_em
                 linha["_source_url"] = art.url
                 linha["_source_file"] = nome_arquivo
@@ -274,16 +273,34 @@ def _grava_qa(resultado: Resultado) -> None:
 
 
 def carregar_bigquery(ano: int, nome_dataset: str, resultado: Resultado) -> int:
+    """Reconstroi a tabela raw a partir de TODOS os anos presentes em staging.
+
+    Nao ha' substituicao cirurgica de um ano (ver ADR-009): a tabela passa a
+    refletir exatamente os NDJSON em disco. Por isso o log lista os anos que
+    entraram — se um ano sumir daqui, ele sumiu da tabela.
+    """
     ds = load_layout(ano).dataset(nome_dataset)
     campos = ds.colunas_saida() + ["_extras"]
-    schema = build_schema(campos, partition_extra=["ano_eleicao"])
+    schema = build_schema(campos, inteiros=["ano_eleicao"])
+
+    arquivos = sorted(resultado.ndjson.parent.glob(f"{nome_dataset}_*.ndjson.gz"))
+    anos = [a.stem.split("_")[-1].removesuffix(".ndjson") for a in arquivos]
+    log.info("%s: a tabela vai refletir os anos %s", nome_dataset, anos)
+    if len(arquivos) > 1:
+        log.warning(
+            "%s: carregando %d anos de uma vez. Para manter o historico no "
+            "BigQuery, rode a ingestao de todos os anos antes de carregar.",
+            nome_dataset,
+            len(arquivos),
+        )
+
     ensure_datasets()
     return load_ndjson(
-        resultado.ndjson,
+        arquivos,
         DATASET_RAW_TSE,
         nome_dataset,
         schema=schema,
-        ano_particao=ano,
+        particionar_por="ano_eleicao",
         clustering=CLUSTERING.get(nome_dataset, ()),
     )
 

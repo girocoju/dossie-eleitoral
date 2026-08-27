@@ -75,12 +75,22 @@ serie as (
 
 ),
 
--- todo par mandato x indicador que tenha ao menos um ponto dentro da janela
-pares as (
+-- todo ponto da serie que cai dentro da janela do mandato (incluindo o ano
+-- anterior a posse, que e' a base preferida)
+pontos as (
 
-    select distinct
+    select
         m.sk_mandato,
-        s.cod_indicador
+        m.ano_inicio,
+        m.ano_fim,
+        s.cod_indicador,
+        s.ano,
+        s.valor,
+        s.valor_brasil,
+        s.valor_regiao,
+        s.unidade,
+        s.fonte,
+        s._extracted_at
     from mandatos as m
     inner join serie as s
       on  s.sg_uf = m.sg_uf
@@ -88,61 +98,32 @@ pares as (
 
 ),
 
+/*
+  As pontas sao escolhidas por ARRAY_AGG ordenado, e nao por subconsulta
+  correlacionada: o BigQuery so' aceita subconsulta correlacionada que ele consiga
+  transformar em JOIN, e `ORDER BY ... LIMIT 1` por grupo nao e' um desses casos.
+  `ARRAY_AGG(STRUCT(...) ORDER BY ano LIMIT 1)[OFFSET(0)]` faz o mesmo em uma
+  unica passada de agregacao.
+*/
 pontas as (
 
     select
-        p.sk_mandato,
-        p.cod_indicador,
-
-        -- ponta inicial: preferir o ano anterior a posse (situacao herdada)
-        (
-            select as struct s.ano, s.valor, s.valor_brasil, s.valor_regiao
-            from serie as s
-            where s.cod_indicador = p.cod_indicador
-              and s.sg_uf = m.sg_uf
-              and s.ano between m.ano_inicio - 1 and m.ano_fim
-            order by s.ano
-            limit 1
-        ) as inicio,
-
-        -- ponta final: o ultimo ano disponivel que ainda esta' dentro da janela
-        (
-            select as struct s.ano, s.valor, s.valor_brasil, s.valor_regiao
-            from serie as s
-            where s.cod_indicador = p.cod_indicador
-              and s.sg_uf = m.sg_uf
-              and s.ano between m.ano_inicio - 1 and m.ano_fim
-            order by s.ano desc
-            limit 1
-        ) as fim,
-
-        (
-            select max(s._extracted_at)
-            from serie as s
-            where s.cod_indicador = p.cod_indicador and s.sg_uf = m.sg_uf
-        ) as _extracted_at,
-
-        (
-            select any_value(s.unidade)
-            from serie as s
-            where s.cod_indicador = p.cod_indicador and s.sg_uf = m.sg_uf
-        ) as unidade,
-
-        (
-            select any_value(s.fonte)
-            from serie as s
-            where s.cod_indicador = p.cod_indicador and s.sg_uf = m.sg_uf
-        ) as fonte,
-
-        (
-            select count(*)
-            from serie as s
-            where s.cod_indicador = p.cod_indicador
-              and s.sg_uf = m.sg_uf
-              and s.ano between m.ano_inicio and m.ano_fim
-        ) as anos_com_dado
-    from pares as p
-    inner join mandatos as m using (sk_mandato)
+        sk_mandato,
+        cod_indicador,
+        ano_inicio,
+        ano_fim,
+        array_agg(
+            struct(ano, valor, valor_brasil, valor_regiao) order by ano asc limit 1
+        )[offset(0)]                                        as inicio,
+        array_agg(
+            struct(ano, valor, valor_brasil, valor_regiao) order by ano desc limit 1
+        )[offset(0)]                                        as fim,
+        any_value(unidade)                                  as unidade,
+        any_value(fonte)                                    as fonte,
+        max(_extracted_at)                                  as _extracted_at,
+        countif(ano between ano_inicio and ano_fim)         as anos_com_dado
+    from pontos
+    group by sk_mandato, cod_indicador, ano_inicio, ano_fim
 
 ),
 

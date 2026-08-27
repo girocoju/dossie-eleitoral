@@ -73,7 +73,6 @@ class Observacao:
 
     def to_row(self) -> dict[str, Any]:
         linha = asdict(self)
-        linha["data_particao"] = f"{self.ano:04d}-01-01"
         linha["_extracted_at"] = linha.pop("extracted_at")
         linha["_source_url"] = linha.pop("source_url")
         return linha

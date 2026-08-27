@@ -1,15 +1,23 @@
-"""Carga no BigQuery: uma funcao, um contrato — *substituir a particao do ano*.
+"""Carga no BigQuery: uma funcao, um contrato — *a tabela reflete o staging*.
 
-Regra de F-01: "reexecutar nao duplica linhas (carga substitui particao do ano)".
-Implementacao: as tabelas `raw_*` sao particionadas por DIA sobre a coluna
-`data_particao` (= 1o de janeiro do ano de referencia), o que permite carregar
-com o decorador `tabela$YYYY0101` em modo WRITE_TRUNCATE. Assim a reexecucao de
-um ano troca apenas aquele ano, sem tocar nos demais e **sem nenhum SQL**
-(SPEC §9: nenhum SQL fora do dbt).
+Regra de F-01: "reexecutar nao duplica linhas". A primeira implementacao usava
+particionamento por DIA sobre uma data derivada do ano da eleicao, para trocar
+so' a particao do ano com o decorador `tabela$YYYYMMDD`. **Isso nao sobrevive ao
+BigQuery sandbox** (ADR-009): o sandbox impoe expiracao de 60 dias por particao,
+contada a partir da DATA DA PARTICAO — uma particao datada de 2026-01-01 nasce com
+mais de 200 dias e e' descartada na hora. Conferido em 27/08/2026: 20.765 linhas
+carregadas, 0 linhas na tabela.
 
-Se a biblioteca `google-cloud-bigquery` nao estiver instalada, o import falha
-apenas quando a carga e' de fato pedida — `--target local` e `--dry-run` seguem
-funcionando sem nenhuma dependencia externa.
+Desenho atual: particionamento por INTERVALO DE INTEIROS sobre `ano_eleicao`, que
+nao tem expiracao por data, e carga que **substitui a tabela inteira** a partir de
+todos os NDJSON presentes em `data/staging`. Continua idempotente e continua sem
+nenhum SQL fora do dbt (SPEC 9); o preco e' que a carga de um ano precisa dos
+NDJSON dos demais anos em disco — por isso `load_ndjson` avisa em log exatamente
+quais anos entraram na tabela.
+
+Se `google-cloud-bigquery` nao estiver instalado, o import falha apenas quando a
+carga e' de fato pedida — `--target local` e `--dry-run` seguem funcionando sem
+nenhuma dependencia externa.
 """
 
 from __future__ import annotations
@@ -26,14 +34,19 @@ if TYPE_CHECKING:  # pragma: no cover
 
 log = get_logger("bq")
 
-# Colunas de procedencia acrescentadas a TODA tabela raw (Constituicao §3).
+# Colunas de procedencia acrescentadas a TODA tabela raw (Constituicao 0.3).
 META_COLUMNS: tuple[tuple[str, str], ...] = (
     ("_extracted_at", "TIMESTAMP"),
     ("_source_url", "STRING"),
     ("_source_file", "STRING"),
     ("_source_sha256", "STRING"),
 )
-PARTITION_COLUMN = "data_particao"
+
+# Faixa do particionamento por inteiro. Um ano por particao, com folga nas pontas
+# para nao precisar mexer aqui a cada eleicao.
+PARTICAO_INICIO = 1990
+PARTICAO_FIM = 2040
+PARTICAO_INTERVALO = 1
 
 
 def _client(settings: Settings | None = None):
@@ -48,24 +61,22 @@ def _client(settings: Settings | None = None):
     return bigquery.Client(project=settings.project, location=settings.location)
 
 
-def build_schema(campos: Sequence[str], *, partition_extra: Sequence[str] = ()) -> list[Any]:
+def build_schema(campos: Sequence[str], *, inteiros: Sequence[str] = ()) -> list[Any]:
     """Schema explicito (nunca autodetect): campos da fonte em STRING + metadados.
 
-    `partition_extra` sao colunas de chave que precisam de tipo proprio
-    (ex.: `ano_eleicao` como INT64) para o dbt nao ter que castear no staging.
+    `inteiros` sao colunas de chave que precisam de tipo proprio (ex.: `ano_eleicao`
+    como INT64, que e' tambem a coluna de particionamento).
     """
     from google.cloud import bigquery
 
     schema = [bigquery.SchemaField(nome, "STRING") for nome in campos]
-    for nome in partition_extra:
-        schema.append(bigquery.SchemaField(nome, "INT64"))
-    schema.append(bigquery.SchemaField(PARTITION_COLUMN, "DATE"))
+    schema += [bigquery.SchemaField(nome, "INT64") for nome in inteiros]
     schema += [bigquery.SchemaField(nome, tipo) for nome, tipo in META_COLUMNS]
     return schema
 
 
 def ensure_datasets(settings: Settings | None = None) -> None:
-    """Cria os datasets do SPEC §4 se nao existirem. Idempotente."""
+    """Cria os datasets do SPEC 4 se nao existirem. Idempotente."""
     from google.cloud import bigquery
 
     settings = settings or get_settings()
@@ -79,19 +90,20 @@ def ensure_datasets(settings: Settings | None = None) -> None:
 
 
 def load_ndjson(
-    ndjson_path: Path,
+    ndjson_paths: Path | Sequence[Path],
     dataset: str,
     tabela: str,
     *,
     schema: list[Any],
-    ano_particao: int | None = None,
+    particionar_por: str | None = None,
     clustering: Sequence[str] = (),
     settings: Settings | None = None,
 ) -> int:
-    """Carrega um `.ndjson.gz` numa tabela particionada. Devolve linhas gravadas.
+    """Substitui `dataset.tabela` pelo conteudo de todos os `ndjson_paths`.
 
-    `ano_particao` define a particao substituida. Sem ele, a tabela inteira e'
-    substituida (usado por fontes pequenas, como os indicadores).
+    O primeiro arquivo entra com WRITE_TRUNCATE e os demais com WRITE_APPEND, o que
+    torna a tabela final exatamente igual ao conjunto de arquivos passado — sem
+    duplicata possivel, mesmo reexecutando.
     """
     from google.cloud import bigquery
 
@@ -99,25 +111,60 @@ def load_ndjson(
     client = _client(settings)
     table_id = f"{settings.project}.{dataset}.{tabela}"
 
-    destino = table_id
-    if ano_particao is not None:
-        destino = f"{table_id}${ano_particao:04d}0101"
+    caminhos = [ndjson_paths] if isinstance(ndjson_paths, Path) else sorted(ndjson_paths)
+    if not caminhos:
+        raise RuntimeError(f"nenhum NDJSON para carregar em {table_id}")
 
-    job_config = bigquery.LoadJobConfig(
-        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-        schema=schema,
-        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-        time_partitioning=bigquery.TimePartitioning(
-            type_=bigquery.TimePartitioningType.DAY, field=PARTITION_COLUMN
-        ),
-        clustering_fields=list(clustering) or None,
-        ignore_unknown_values=False,
-        max_bad_records=0,
-    )
+    # Clustering por coluna inexistente derruba o job inteiro com um 400. Como a
+    # lista vem do layout do ano, ela pode legitimamente mudar — entao o pedido e'
+    # reduzido ao que existe no schema, com aviso, em vez de falhar uma carga que
+    # de resto esta' correta.
+    nomes = {campo.name for campo in schema}
+    pedidas = list(clustering)
+    clustering = [c for c in pedidas if c in nomes]
+    if len(clustering) != len(pedidas):
+        log.warning(
+            "clustering ignorado para %s: %s nao existe(m) no schema",
+            tabela,
+            [c for c in pedidas if c not in nomes],
+        )
 
-    with ndjson_path.open("rb") as fh:
-        job = client.load_table_from_file(fh, destino, job_config=job_config)
-    job.result()
+    particionamento = None
+    if particionar_por and particionar_por in nomes:
+        particionamento = bigquery.RangePartitioning(
+            field=particionar_por,
+            range_=bigquery.PartitionRange(
+                start=PARTICAO_INICIO, end=PARTICAO_FIM, interval=PARTICAO_INTERVALO
+            ),
+        )
 
-    log.info("carregado %s <- %s (%s linhas)", destino, ndjson_path.name, job.output_rows)
-    return int(job.output_rows or 0)
+    total = 0
+    for i, caminho in enumerate(caminhos):
+        job_config = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+            schema=schema,
+            write_disposition=(
+                bigquery.WriteDisposition.WRITE_TRUNCATE
+                if i == 0
+                else bigquery.WriteDisposition.WRITE_APPEND
+            ),
+            range_partitioning=particionamento,
+            clustering_fields=list(clustering) or None,
+            ignore_unknown_values=False,
+            max_bad_records=0,
+        )
+        with caminho.open("rb") as fh:
+            job = client.load_table_from_file(fh, table_id, job_config=job_config)
+        job.result()
+        total += int(job.output_rows or 0)
+        log.info(
+            "%s %s <- %s (%s linhas)",
+            "carregado" if i == 0 else "  anexado",
+            table_id,
+            caminho.name,
+            job.output_rows,
+        )
+
+    if len(caminhos) > 1:
+        log.info("%s: %d arquivos, %d linhas no total", table_id, len(caminhos), total)
+    return total

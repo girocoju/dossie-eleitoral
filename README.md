@@ -73,15 +73,28 @@ Nada disso precisa de credencial.
 
 ### 3. Configurar o BigQuery
 
+O projeto roda em **BigQuery sandbox**: sem cartao de credito, custo zero
+garantido ([ADR-009](docs/adr/ADR-009-particionamento-sandbox.md)).
+
 ```bash
-export RADAR_GCP_PROJECT=seu-projeto
-export RADAR_BQ_LOCATION=US                    # ver ADR-003
-export GOOGLE_APPLICATION_CREDENTIALS=/caminho/sa.json
-export RADAR_CPF_SALT='um-segredo-longo'       # ver ADR-006 — sem isto o hash nao protege o CPF
+gcloud auth application-default login
+gcloud auth application-default set-quota-project SEU_PROJETO
 ```
 
-A service account precisa de `BigQuery Data Editor` e `BigQuery Job User` no
-projeto. Os datasets sao criados sozinhos na primeira carga.
+Depois crie um `.env` na raiz (ele esta' no `.gitignore`):
+
+```bash
+RADAR_GCP_PROJECT=seu-projeto
+RADAR_BQ_LOCATION=US                  # ver ADR-003
+RADAR_DBT_TARGET=dev
+RADAR_CPF_SALT=um-segredo-longo       # ver ADR-006 — sem isto o hash nao protege o CPF
+```
+
+E carregue antes de rodar: `set -a; . ./.env; set +a`.
+
+O alvo `dev` do dbt usa OAuth/ADC — **nao ha' arquivo de chave de service
+account em lugar nenhum**. Os datasets sao criados sozinhos na primeira carga.
+Para o GitHub Actions, o alvo `ci` usa uma service account passada por secret.
 
 ### 4. Pipeline completo
 

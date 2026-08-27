@@ -229,6 +229,7 @@ def cmd_load(args: argparse.Namespace) -> int:
         DATASET_RAW_IBGE,
         "indicadores",
         schema=_schema(),
+        particionar_por="ano",
         clustering=("cod_indicador", "sg_uf"),
     )
     return 0

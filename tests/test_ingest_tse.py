@@ -70,10 +70,12 @@ def test_le_apenas_os_csv_que_casam_o_padrao(zip_sintetico, artifact, monkeypatc
     assert {linha["_source_file"] for linha in linhas} == {"consulta_cand_2026_AC.csv"}
 
 
-def test_ano_eleicao_e_particao_sao_derivados_do_layout(zip_sintetico, artifact, monkeypatch):
+def test_ano_eleicao_vem_do_layout_e_e_inteiro(zip_sintetico, artifact, monkeypatch):
+    """`ano_eleicao` e' a coluna de particionamento (ADR-009), entao e' INT64."""
     linha = _linhas(zip_sintetico, artifact, monkeypatch)[0]
-    assert linha["ano_eleicao"] == 2026  # inteiro, nao string
-    assert linha["data_particao"] == "2026-01-01"
+    assert linha["ano_eleicao"] == 2026
+    assert isinstance(linha["ano_eleicao"], int)
+    assert "data_particao" not in linha
 
 
 def test_procedencia_vai_junto_com_cada_linha(zip_sintetico, artifact, monkeypatch):

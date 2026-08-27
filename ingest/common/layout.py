@@ -81,7 +81,7 @@ class DatasetLayout:
         Difere de `campos` em dois pontos: o que `privacidade.descartar` remove
         nunca aparece, e o que `privacidade.hash` cobre aparece com o nome do
         hash (`nr_cpf` -> `cpf_hash`). `ano_eleicao` sai daqui porque e' INT64
-        e entra pelo `partition_extra` do schema.
+        e entra pelo argumento `inteiros` do schema — e' a coluna de particionamento.
         """
         saida: list[str] = []
         for canonico in self.campos:

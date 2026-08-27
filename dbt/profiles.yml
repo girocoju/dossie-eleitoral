@@ -6,13 +6,15 @@
 radar_brasil:
   target: "{{ env_var('RADAR_DBT_TARGET', 'dev') }}"
   outputs:
+    # Local: usa as credenciais do `gcloud auth application-default login`.
+    # Nenhum arquivo de chave envolvido — chave de service account em disco e'
+    # justamente o segredo que costuma vazar para dentro de um repo.
     dev:
       type: bigquery
-      method: service-account
+      method: oauth
       project: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
-      dataset: "{{ env_var('RADAR_BQ_DATASET_DEV', 'dbt_dev') }}"
+      dataset: "{{ env_var('RADAR_BQ_DATASET_DEV', 'marts') }}"
       location: "{{ env_var('RADAR_BQ_LOCATION', 'US') }}"
-      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', '') }}"
       threads: 4
       timeout_seconds: 600
       priority: interactive

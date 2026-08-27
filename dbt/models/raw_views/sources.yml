@@ -4,9 +4,9 @@ sources:
   - name: raw_tse
     description: >
       Copia fiel dos pacotes do TSE Dados Abertos, tudo em STRING (SPEC 4).
-      Carregada por `ingest/tse.py`; particionada por `data_particao`
-      (1o de janeiro do ano da eleicao) para que recarregar um ano substitua
-      apenas aquele ano.
+      Carregada por `ingest/tse.py`, particionada por intervalo de inteiros sobre
+      `ano_eleicao` (ADR-009). A carga substitui a tabela inteira a partir dos
+      NDJSON em `data/staging`, entao reexecutar nunca duplica.
     database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
     schema: raw_tse
     config:

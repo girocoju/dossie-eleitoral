@@ -100,13 +100,11 @@ models:
           publica `ST_REELEICAO` como `#NE` ate' a apuracao (conferido 27/08/2026).
         tests: [not_null]
       - name: total_bens_declarados
-        description: "Soma dos bens em reais correntes do ano da eleicao. Zero quando nao declarou."
-        tests:
-          - not_null
-          - dbt_utils.accepted_range:
-              arguments:
-                min_value: 0
-                inclusive: true
+        description: >
+          Soma dos bens em reais correntes do ano da eleicao. Zero quando nao
+          declarou. Pode ser negativo, embora seja raro: saldo de conta corrente
+          negativo entra na soma com sinal (ver `stg_tse__bens.valor_bem`).
+        tests: [not_null]
       - name: votos_nominais
         description: >
           Reservado para a ingestao de `votacao_candidato_munzona` (S4), ainda nao

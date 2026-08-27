@@ -68,12 +68,14 @@ models:
       - name: sq_candidato
         tests: [not_null]
       - name: valor_bem
-        description: "Valor declarado em reais correntes do ano da eleicao — nao deflacionado."
-        tests:
-          - dbt_utils.accepted_range:
-              arguments:
-                min_value: 0
-                inclusive: true
+        description: >
+          Valor declarado em reais correntes do ano da eleicao — nao deflacionado.
+          PODE SER NEGATIVO: saldo de conta corrente no cheque especial e' um bem
+          declarado com sinal negativo. Conferido em 27/08/2026: 5 dos 76.410 bens
+          de 2026 sao negativos, todos do tipo deposito bancario, o menor
+          -R$ 38.101,07. Nao e' erro de parsing — o valor bruto no CSV do TSE ja'
+          vem `-38101,07`.
+        tests: [not_null]
 
   - name: stg_tse__vagas
     description: "Vagas em disputa por cargo e unidade eleitoral (S5)."
