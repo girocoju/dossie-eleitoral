@@ -16,3 +16,4 @@ junto com qualquer arquivo daqui.
 | [ADR-008](ADR-008-layout-declarativo.md) | Layout do TSE declarado em YAML, resolvido contra o header real | Aceita |
 | [ADR-009](ADR-009-particionamento-sandbox.md) | Particao por inteiro e carga da tabela inteira (BigQuery sandbox) | Substituida pela ADR-010 |
 | [ADR-010](ADR-010-particao-por-ano.md) | Volta da particao por ano com substituicao cirurgica | Aceita |
+| [ADR-011](ADR-011-autenticacao-sem-chave.md) | GitHub Actions sem chave de service account (OIDC/WIF) | Aceita |

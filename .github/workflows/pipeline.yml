@@ -78,9 +78,13 @@ jobs:
     concurrency:
       group: pipeline-${{ github.ref }}
       cancel-in-progress: false
+    # Necessario para o OIDC do GitHub: e' o token de identidade que substitui a
+    # chave de service account (ADR-011).
+    permissions:
+      contents: read
+      id-token: write
     env:
       RADAR_DBT_TARGET: ci
-      RADAR_GCP_SA_JSON: ${{ secrets.RADAR_GCP_SA_JSON }}
       RADAR_CPF_SALT: ${{ secrets.RADAR_CPF_SALT }}
     steps:
       - uses: actions/checkout@v4
@@ -88,12 +92,21 @@ jobs:
       - name: Conferir se ha' credenciais
         id: cred
         run: |
-          if [ -z "${RADAR_GCP_SA_JSON}" ]; then
+          if [ -z "${{ vars.RADAR_WIF_PROVIDER }}" ]; then
             echo "temos=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Secret RADAR_GCP_SA_JSON ausente — etapa de carga pulada (ver docs/STATUS.md, T-002)."
+            echo "::notice::Variavel RADAR_WIF_PROVIDER ausente — etapa de carga pulada (ver docs/STATUS.md)."
           else
             echo "temos=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # Autenticacao SEM CHAVE: o GitHub emite um token OIDC, o GCP troca por
+      # credencial de curta duracao. Nenhum segredo de longa duracao existe.
+      - name: Autenticar no Google Cloud (Workload Identity Federation)
+        if: steps.cred.outputs.temos == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.RADAR_WIF_PROVIDER }}
+          service_account: ${{ vars.RADAR_WIF_SERVICE_ACCOUNT }}
 
       - uses: actions/setup-python@v5
         if: steps.cred.outputs.temos == 'true'

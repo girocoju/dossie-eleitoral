@@ -34,15 +34,15 @@ radar_brasil:
       priority: interactive
       maximum_bytes_billed: 21474836480
 
-    # Alvo usado pelo GitHub Actions, que injeta o JSON da service account
-    # inteiro numa variavel em vez de gravar arquivo no runner.
+    # Alvo do GitHub Actions. Usa ADC, preenchido pela action de Workload Identity
+    # Federation: o runner recebe uma credencial de curta duracao e NENHUMA chave
+    # de service account existe em lugar nenhum (ADR-011).
     ci:
       type: bigquery
-      method: service-account-json
+      method: oauth
       project: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
-      dataset: "{{ env_var('RADAR_BQ_DATASET_CI', 'dbt_ci') }}"
+      dataset: "{{ env_var('RADAR_BQ_DATASET_CI', 'marts') }}"
       location: "{{ env_var('RADAR_BQ_LOCATION', 'US') }}"
       threads: 8
       timeout_seconds: 1800
       maximum_bytes_billed: 21474836480
-      keyfile_json: "{{ env_var('RADAR_GCP_SA_JSON', '{}') | as_native }}"
