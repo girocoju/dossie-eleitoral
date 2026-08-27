@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ingest.common.bq import build_schema, ensure_datasets, load_ndjson
+from ingest.common.bq import build_schema, ensure_datasets, load_ano
 from ingest.common.config import DATASET_RAW_TSE, get_settings
 from ingest.common.http import Artifact, download, utc_now
 from ingest.common.layout import (
@@ -110,6 +110,7 @@ def _linhas(
     pertence a outra eleicao e deve ser descartada pelo chamador.
     """
     extraido_em = art.extracted_at or utc_now()
+    particao = f"{ds.ano:04d}-01-01"
     emitidas = 0
 
     with zipfile.ZipFile(zip_file) as zf:
@@ -151,6 +152,7 @@ def _linhas(
                 }
                 linha["_extras"] = json.dumps(extras, ensure_ascii=False) if extras else None
                 linha["ano_eleicao"] = ds.ano
+                linha["data_particao"] = particao
                 linha["_extracted_at"] = extraido_em
                 linha["_source_url"] = art.url
                 linha["_source_file"] = nome_arquivo
@@ -292,34 +294,22 @@ def _grava_qa(resultado: Resultado) -> None:
 
 
 def carregar_bigquery(ano: int, nome_dataset: str, resultado: Resultado) -> int:
-    """Reconstroi a tabela raw a partir de TODOS os anos presentes em staging.
+    """Substitui a particao do ano na tabela raw (F-01, ADR-010).
 
-    Nao ha' substituicao cirurgica de um ano (ver ADR-009): a tabela passa a
-    refletir exatamente os NDJSON em disco. Por isso o log lista os anos que
-    entraram — se um ano sumir daqui, ele sumiu da tabela.
+    Recarregar 2026 nao toca em 1998–2022. E' o que permite ao pipeline diario
+    rodar num runner limpo sem apagar o historico.
     """
     ds = load_layout(ano).dataset(nome_dataset)
     campos = ds.colunas_saida() + ["_extras"]
-    schema = build_schema(campos, inteiros=["ano_eleicao"])
-
-    arquivos = sorted(resultado.ndjson.parent.glob(f"{nome_dataset}_*.ndjson.gz"))
-    anos = [a.stem.split("_")[-1].removesuffix(".ndjson") for a in arquivos]
-    log.info("%s: a tabela vai refletir os anos %s", nome_dataset, anos)
-    if len(arquivos) > 1:
-        log.warning(
-            "%s: carregando %d anos de uma vez. Para manter o historico no "
-            "BigQuery, rode a ingestao de todos os anos antes de carregar.",
-            nome_dataset,
-            len(arquivos),
-        )
+    schema = build_schema(campos, inteiros=["ano_eleicao"], particao=True)
 
     ensure_datasets()
-    return load_ndjson(
-        arquivos,
+    return load_ano(
+        resultado.ndjson,
         DATASET_RAW_TSE,
         nome_dataset,
         schema=schema,
-        particionar_por="ano_eleicao",
+        ano=ano,
         clustering=CLUSTERING.get(nome_dataset, ()),
     )
 

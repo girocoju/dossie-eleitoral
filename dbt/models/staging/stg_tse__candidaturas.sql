@@ -92,6 +92,10 @@ junto as (
             {{ decimal_br('x.vr_despesa_max_campanha') }}
         )                                                  as despesa_max_campanha,
         {{ limpa('x.ds_situacao_cassacao') }}              as situacao_cassacao,
+        {{ limpa('x.ds_situacao_urna') }}                  as situacao_urna,
+        {{ limpa('x.ds_detalhe_situacao') }}               as detalhe_situacao,
+        {{ sim_nao('x.st_substituido') }}                  as foi_substituido,
+        {{ limpa('x.sq_substituido') }}                    as sq_substituido,
         {{ limpa('x.ds_etnia_indigena') }}                 as etnia_indigena,
         {{ sim_nao('x.st_quilombola') }}                   as quilombola,
 

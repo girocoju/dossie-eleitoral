@@ -83,7 +83,7 @@ Ipeadata (homicidios 1980–2024). Todas com 27 UFs + Brasil.
 |---|---|---|
 | T-401 Pagina Metodologia + `docs/METODOLOGIA.md` | ✅ | Documento escrito; pagina do relatorio a montar |
 | T-402 Perfil de candidatos completo (F-08) | 🟡 | Medidas de perfil no modelo; filtros a montar no Desktop |
-| T-403 GitHub Actions semanal (F-10) | ✅ | `.github/workflows/pipeline.yml` — lint, pytest, dbt e ingestao agendada |
+| T-403 GitHub Actions **diario** (F-10) | 🟡 | Workflow pronto com `dbt snapshot` e trava de historico. **Falta o secret `RADAR_GCP_SA_JSON`** — sem ele o job de carga e' pulado e o snapshot nao acumula |
 | T-404 Publish to web, README com prints, post | ⬜ | Depende de T-002 e do relatorio montado |
 
 ## Fase 5 — Pos-eleicao
@@ -116,6 +116,20 @@ Governador cruzados com 5 indicadores.
 
 `fct_indicador_uf_ano` tem **0 linhas sem comparador nacional** — a regra da
 Constituicao secao 2 esta' satisfeita no dado, nao so' no visual.
+
+## Snapshot diario da situacao das candidaturas — a peca com prazo
+
+`marts.snap_candidatura_2026` (SCD2) + `marts.fct_mudanca_candidatura` (eventos).
+Primeira captura em **27/08/2026**: 20.765 candidaturas, 64,3% ainda aguardando
+julgamento.
+
+E' a unica tabela do projeto que **nao pode ser reconstruida das fontes**: o TSE
+republica o estado atual e descarta o anterior. Cada dia sem rodar e' um dia de
+historico perdido para sempre, ate' 04/10/2026.
+
+Para acumular de verdade, o pipeline precisa rodar diariamente — o que hoje
+depende do secret `RADAR_GCP_SA_JSON` no GitHub. **Enquanto ele nao existir, a
+serie so' avanca quando alguem rodar `make run` na mao.**
 
 ## O caminho critico
 

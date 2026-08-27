@@ -4,6 +4,7 @@ config-version: 2
 profile: "radar_brasil"
 
 model-paths: ["models"]
+snapshot-paths: ["snapshots"]
 seed-paths: ["seeds"]
 test-paths: ["tests"]
 macro-paths: ["macros"]

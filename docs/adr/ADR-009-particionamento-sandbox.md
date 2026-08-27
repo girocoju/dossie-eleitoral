@@ -1,6 +1,11 @@
 # ADR-009 — Particionamento por inteiro e carga da tabela inteira
 
-**Status:** Aceita · **Data:** 2026-08-27 · **Substitui parte de:** [ADR-002](ADR-002-import-mode.md)
+**Status:** SUBSTITUIDA pela [ADR-010](ADR-010-particao-por-ano.md) em 2026-08-27 · **Substitui parte de:** [ADR-002](ADR-002-import-mode.md)
+
+> Esta decisao valeu enquanto o projeto rodava em BigQuery sandbox. Com o
+> faturamento ativo, a restricao que a motivou desapareceu e a particao por ano
+> voltou. O registro fica porque a analise do problema continua valida — e volta a
+> valer se o projeto retornar ao sandbox.
 
 ## Contexto
 

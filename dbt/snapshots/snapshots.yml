@@ -1,0 +1,18 @@
+version: 2
+
+snapshots:
+  - name: snap_candidatura_2026
+    description: >
+      SCD2 da situacao das candidaturas de 2026, capturado diariamente ate' a
+      eleicao. E' a unica tabela do projeto que NAO pode ser reconstruida a partir
+      das fontes: o TSE republica o estado atual e descarta o anterior.
+      Perder um dia de captura e' perder aquele dia para sempre.
+    columns:
+      - name: sk_candidatura
+        description: "Chave da candidatura. Nao e' unica aqui — ha' uma linha por versao."
+        tests: [not_null]
+      - name: dbt_valid_from
+        description: "Momento da captura em que esta versao passou a valer."
+        tests: [not_null]
+      - name: dbt_valid_to
+        description: "NULL na versao vigente."

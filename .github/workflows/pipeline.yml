@@ -12,9 +12,12 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    # Segundas as 09:00 UTC (06:00 em Brasilia). Ate' 04/10/2026 o TSE republica
-    # o pacote de candidaturas diariamente; semanal e' o suficiente para o produto.
-    - cron: "0 9 * * 1"
+    # DIARIO as 09:00 UTC (06:00 em Brasilia) — e' o que sustenta o snapshot da
+    # situacao das candidaturas. O TSE republica o pacote todo dia ate' 04/10/2026
+    # e publica sempre o estado atual: um dia sem rodar e' um dia de historico
+    # perdido para sempre. Depois do 2o turno (25/10/2026) da' para voltar a
+    # semanal — ver docs/STATUS.md.
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       anos:
@@ -112,6 +115,8 @@ jobs:
           key: fontes-${{ hashFiles('ingest/layouts/*.yml') }}-${{ github.run_id }}
           restore-keys: fontes-${{ hashFiles('ingest/layouts/*.yml') }}-
 
+      # Recarregar 2026 substitui APENAS a particao de 2026 (ADR-010); o historico
+      # 1998-2022 no BigQuery nao e' tocado e nao precisa estar em disco aqui.
       - name: Ingestao TSE
         if: steps.cred.outputs.temos == 'true'
         run: |
@@ -134,7 +139,14 @@ jobs:
           dbt deps
           dbt seed
           dbt run
+          dbt snapshot
           dbt test
+
+      # Trava contra a regressao silenciosa mais cara possivel: o historico sumir
+      # do BigQuery sem ninguem perceber. Falha o job se `fct_mandato` encolher.
+      - name: Conferir que o historico continua la
+        if: steps.cred.outputs.temos == 'true'
+        run: python scripts/verificar_historico.py
 
       - name: Frescor das fontes
         if: steps.cred.outputs.temos == 'true'

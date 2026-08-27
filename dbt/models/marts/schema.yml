@@ -245,3 +245,36 @@ models:
       - name: aviso_metodologico
         description: "Texto fixo que acompanha o registro onde quer que ele seja exibido."
         tests: [not_null]
+
+  - name: fct_mudanca_candidatura
+    description: >
+      Cada mudanca observada numa candidatura de 2026. Serie construida por captura
+      diaria e **irreproduzivel depois de 04/10/2026** — o TSE publica o estado
+      atual, nunca o historico.
+    columns:
+      - name: sk_candidatura
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_candidatura')
+                field: sk_candidatura
+      - name: data_observacao
+        description: >
+          Dia em que o pipeline VIU a mudanca — nao o dia do ato do TSE. Com
+          execucao diaria, localiza o evento com precisao de um dia.
+        tests: [not_null]
+      - name: dias_desde_observacao_anterior
+        description: >
+          Torna explicita a incerteza da data: se o pipeline ficou tres dias sem
+          rodar, a mudanca aconteceu em algum ponto desses tres dias.
+      - name: versao
+        description: "Sempre >= 2: a versao 1 e' a primeira observacao, nao uma mudanca."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 2
+                inclusive: true
+      - name: aviso_temporal
+        tests: [not_null]

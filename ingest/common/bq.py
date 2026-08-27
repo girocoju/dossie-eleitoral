@@ -48,6 +48,10 @@ PARTICAO_INICIO = 1990
 PARTICAO_FIM = 2040
 PARTICAO_INTERVALO = 1
 
+# Coluna de particionamento por DIA usada pela carga cirurgica por ano (ADR-010).
+# Vale 1o de janeiro do ano de referencia, o que permite o decorador `tabela$YYYY0101`.
+PARTITION_COLUMN = "data_particao"
+
 
 def _client(settings: Settings | None = None):
     try:
@@ -61,7 +65,9 @@ def _client(settings: Settings | None = None):
     return bigquery.Client(project=settings.project, location=settings.location)
 
 
-def build_schema(campos: Sequence[str], *, inteiros: Sequence[str] = ()) -> list[Any]:
+def build_schema(
+    campos: Sequence[str], *, inteiros: Sequence[str] = (), particao: bool = False
+) -> list[Any]:
     """Schema explicito (nunca autodetect): campos da fonte em STRING + metadados.
 
     `inteiros` sao colunas de chave que precisam de tipo proprio (ex.: `ano_eleicao`
@@ -71,6 +77,8 @@ def build_schema(campos: Sequence[str], *, inteiros: Sequence[str] = ()) -> list
 
     schema = [bigquery.SchemaField(nome, "STRING") for nome in campos]
     schema += [bigquery.SchemaField(nome, "INT64") for nome in inteiros]
+    if particao:
+        schema.append(bigquery.SchemaField(PARTITION_COLUMN, "DATE"))
     schema += [bigquery.SchemaField(nome, tipo) for nome, tipo in META_COLUMNS]
     return schema
 
@@ -87,6 +95,50 @@ def ensure_datasets(settings: Settings | None = None) -> None:
         ref.description = f"Radar Brasil — camada {nome}"
         client.create_dataset(ref, exists_ok=True)
         log.info("dataset   %s.%s pronto (%s)", settings.project, nome, settings.location)
+
+
+def load_ano(
+    ndjson_path: Path,
+    dataset: str,
+    tabela: str,
+    *,
+    schema: list[Any],
+    ano: int,
+    clustering: Sequence[str] = (),
+    settings: Settings | None = None,
+) -> int:
+    """Substitui APENAS a particao do ano, sem tocar nos demais (ADR-010).
+
+    A tabela e' particionada por DIA sobre `data_particao` (1o de janeiro do ano),
+    o que habilita o decorador `tabela$YYYY0101` numa carga WRITE_TRUNCATE. E' o
+    unico jeito de recarregar 2026 todo dia sem precisar dos NDJSON de 1998 a 2022
+    em disco — e sem nenhum SQL de manutencao fora do dbt.
+    """
+    from google.cloud import bigquery
+
+    settings = settings or get_settings()
+    client = _client(settings)
+    table_id = f"{settings.project}.{dataset}.{tabela}"
+    nomes = {campo.name for campo in schema}
+    clustering = [c for c in clustering if c in nomes]
+
+    job_config = bigquery.LoadJobConfig(
+        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        schema=schema,
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+        time_partitioning=bigquery.TimePartitioning(
+            type_=bigquery.TimePartitioningType.DAY, field=PARTITION_COLUMN
+        ),
+        clustering_fields=list(clustering) or None,
+        ignore_unknown_values=False,
+        max_bad_records=0,
+    )
+    destino = f"{table_id}${ano:04d}0101"
+    with ndjson_path.open("rb") as fh:
+        job = client.load_table_from_file(fh, destino, job_config=job_config)
+    job.result()
+    log.info("carregado %s <- %s (%s linhas)", destino, ndjson_path.name, job.output_rows)
+    return int(job.output_rows or 0)
 
 
 def load_ndjson(

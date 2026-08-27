@@ -14,4 +14,5 @@ junto com qualquer arquivo daqui.
 | [ADR-006](ADR-006-hmac-no-cpf.md) | HMAC com salt, nao SHA-256 puro | Aceita |
 | [ADR-007](ADR-007-hash-na-ingestao.md) | Hash na ingestao: CPF nunca chega ao warehouse | Aceita |
 | [ADR-008](ADR-008-layout-declarativo.md) | Layout do TSE declarado em YAML, resolvido contra o header real | Aceita |
-| [ADR-009](ADR-009-particionamento-sandbox.md) | Particao por inteiro e carga da tabela inteira (BigQuery sandbox) | Aceita |
+| [ADR-009](ADR-009-particionamento-sandbox.md) | Particao por inteiro e carga da tabela inteira (BigQuery sandbox) | Substituida pela ADR-010 |
+| [ADR-010](ADR-010-particao-por-ano.md) | Volta da particao por ano com substituicao cirurgica | Aceita |
