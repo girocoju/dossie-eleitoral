@@ -163,6 +163,12 @@ class Layout:
     _raw: dict[str, Any]
 
     @property
+    def ue_esperadas(self) -> int | None:
+        """Quantas unidades eleitorais o pacote do ano deve ter (27 UFs + BR)."""
+        valor = self._raw.get("ue_esperadas")
+        return int(valor) if valor else None
+
+    @property
     def datasets(self) -> tuple[str, ...]:
         return tuple(self._raw.get("datasets", {}))
 

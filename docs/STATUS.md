@@ -23,7 +23,7 @@
 | Task | Estado | Nota |
 |---|---|---|
 | T-101 `ingest/tse.py`: download, Latin-1, carga particionada | ✅ | Rodou contra o pacote real de 27/08/2026 |
-| T-102 Bens, complementar, vagas, coligacoes | ✅ | 5 datasets, 29 arquivos cada |
+| T-102 Bens, complementar, vagas, coligacoes | ✅ | 5 datasets, 28 arquivos cada |
 | T-103 `stg_tse__candidaturas` + testes | 🟡 | Modelo e testes escritos; falta `dbt run` com credenciais |
 | T-104 `dim_candidato`, `dim_partido`, `fct_candidatura` | 🟡 | idem |
 | T-105 Power BI: conexao + Visao Geral, Presidencia, Governadores | 🟡 | Modelo semantico TMDL escrito; visuais faltam ser montados no Desktop |
@@ -32,17 +32,25 @@
 
 | Dataset | Linhas | Arquivos | UEs |
 |---|---:|---:|---:|
-| candidatos | 41.530 | 29 | 28 (27 UFs + BR) |
-| complementar | 41.530 | 29 | — |
-| bens | 152.820 | 29 | 28 |
-| coligacoes | 8.662 | 29 | 28 |
-| vagas | 382 | 29 | 28 |
+| candidatos | 20.765 | 28 | 28 (27 UFs + BR) |
+| complementar | 20.765 | 28 | — |
+| bens | 76.410 | 28 | 28 |
+| coligacoes | 4.331 | 28 | 28 |
+| vagas | 191 | 28 | 28 |
 
-Candidaturas por cargo: 1 Presidente 26 · 2 Vice-Presidente 26 · 3 Governador 396 ·
-4 Vice-Governador 406 · 5 Senador 636 · 6 Dep. Federal 15.450 · 7 Dep. Estadual 22.414 ·
-8 Dep. Distrital 858 · 9 1o Suplente 656 · 10 2o Suplente 662.
+Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 198 ·
+4 Vice-Governador 203 · 5 Senador 318 · 6 Dep. Federal 7.725 · 7 Dep. Estadual 11.207 ·
+8 Dep. Distrital 429 · 9 1o Suplente 328 · 10 2o Suplente 331. Vagas em disputa: 1.790.
 
-**Aceite F-01** (≥ 18.000 candidaturas e 27 UFs): ✅ 41.530 candidaturas, 27 UFs + BR.
+> **Correcao de 27/08/2026.** A primeira carga registrou o dobro disso (41.530
+> candidaturas). O pacote do TSE traz, alem de um CSV por unidade eleitoral, um
+> `_BRASIL` consolidado, e o `arquivo_regex` casava os dois. Corrigido, com duas
+> travas novas no loader: a carga falha se o numero de unidades lidas nao for 28
+> ou se alguma chave declarada se repetir. A segunda trava ja' pegou um erro
+> independente — a chave declarada de `coligacoes` estava incompleta (o grao real
+> e' coligacao x partido x cargo).
+
+**Aceite F-01** (≥ 18.000 candidaturas e 27 UFs): ✅ 20.765 candidaturas, 27 UFs + BR.
 **Conferencia amostral contra o DivulgaCandContas** (10 casos): ⬜ pendente.
 
 ## Fase 2 — Historico e mandatos

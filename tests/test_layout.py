@@ -88,12 +88,22 @@ def test_alias_ignora_caixa_acento_e_aspas():
     assert resolucao.ok
 
 
-def test_regex_do_arquivo_casa_uf_e_brasil():
+def test_regex_casa_unidade_eleitoral_mas_nunca_o_consolidado():
+    """O `_BRASIL` do pacote e' um consolidado de todas as UFs.
+
+    Le-lo junto com os arquivos por UF duplica cada candidatura — foi o que
+    aconteceu em 27/08/2026: 41.530 linhas para 20.765 candidaturas reais.
+    """
     padrao = load_layout(2026).dataset("candidatos").compila_regex()
     assert padrao.match("consulta_cand_2026_AC.csv")
-    assert padrao.match("consulta_cand_2026_BRASIL.csv")
+    assert padrao.match("consulta_cand_2026_BR.csv")      # UE da eleicao nacional
+    assert not padrao.match("consulta_cand_2026_BRASIL.csv")  # consolidado
     assert not padrao.match("consulta_cand_2022_AC.csv")
     assert not padrao.match("leiame-consulta_cand.pdf")
+
+
+def test_layout_declara_quantas_unidades_eleitorais_esperar():
+    assert load_layout(2026).ue_esperadas == 28   # 27 UFs + BR
 
 
 def test_url_do_pacote_usa_o_ano():

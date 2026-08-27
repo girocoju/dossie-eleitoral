@@ -54,6 +54,15 @@ caso do TSE, o `sha256` do pacote de onde veio.
 O que ainda **nao** entrou esta' em [LACUNAS.md](LACUNAS.md), com o motivo.
 Nenhum buraco de serie e' preenchido por interpolacao, media ou estimativa.
 
+### Uma armadilha do pacote do TSE
+
+O `.zip` de cada dataset traz um CSV por unidade eleitoral (`_AC`, `_SP`, ..., `_BR`)
+**e** um `_BRASIL` que e' o consolidado de todos eles. Ler os dois duplica cada
+registro — e a duplicata e' silenciosa, porque todos os totais continuam
+plausiveis, so' que dobrados. O layout casa somente siglas de duas letras, e a
+ingestao falha se o numero de unidades lidas nao for 28 (27 UFs + BR) ou se
+alguma chave declarada se repetir.
+
 ## 3. Como o perfil do candidato e' lido
 
 Perfil vem **do que o candidato declarou ao TSE**, e nao de uma classificacao
@@ -145,7 +154,10 @@ isso for quebrado.
 
 `PIB_PER_CAPITA` nao existe por UF na tabela 5938 do SIDRA (conferido em
 27/08/2026); e' calculado como `PIB (R$ mil) * 1000 / populacao`, no BigQuery, e
-so' existe nos anos em que as duas series coexistem.
+so' existe nos anos em que as duas series coexistem. Na pratica isso significa
+que **ele para em 2021**: a tabela de estimativas de populacao nao publica anos de
+Censo (2007, 2010, 2022, 2023), justamente os dois ultimos do PIB. Ver
+[L-12](LACUNAS.md).
 
 `DESOCUPACAO` e' trimestral na fonte. O valor anual e' a **media simples dos
 quatro trimestres**, e um ano com menos de quatro trimestres e' descartado — em

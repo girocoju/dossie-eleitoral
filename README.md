@@ -23,9 +23,9 @@ O pipeline de ingestao foi exercitado contra os **arquivos reais** das fontes em
 
 | Fonte | O que veio | Periodo |
 |---|---:|---|
-| TSE — candidaturas 2026 | 41.530 linhas, 27 UFs + BR | 2026 |
-| TSE — bens declarados | 152.820 linhas | 2026 |
-| TSE — complementar, vagas, coligacoes | 50.574 linhas | 2026 |
+| TSE — candidaturas 2026 | 20.765 linhas, 27 UFs + BR | 2026 |
+| TSE — bens declarados | 76.410 linhas | 2026 |
+| TSE — complementar, vagas, coligacoes | 25.287 linhas | 2026 |
 | IBGE/SIDRA — PIB, populacao, desocupacao | 1.596 observacoes | 2001–2025 |
 | IPEA — taxa de homicidios | 1.260 observacoes | 1980–2024 |
 
@@ -114,7 +114,14 @@ Isso nao e' zelo abstrato. A conferencia do pacote de 2026 mostrou que o TSE
 **partiu o cadastro em dois arquivos**: `ST_REELEICAO`, `VR_DESPESA_MAX_CAMPANHA`
 e a situacao de julgamento migraram para o `consulta_cand_complementar`. Um
 leitor que assumisse o layout de 2022 leria 2026 com metade dos campos nulos, em
-silencio. Ver [ADR-008](docs/adr/ADR-008-layout-declarativo.md).
+silencio.
+
+O mesmo pacote guarda uma segunda armadilha: alem de um CSV por unidade
+eleitoral, ele traz um `_BRASIL` **consolidado**. Ler os dois dobra cada
+candidatura sem nenhum sinal de erro — todos os totais continuam plausiveis. Por
+isso a ingestao tambem falha quando o numero de unidades lidas nao e' 28 ou
+quando uma chave declarada se repete. Ver
+[ADR-008](docs/adr/ADR-008-layout-declarativo.md).
 
 **2. O CPF nunca chega ao warehouse.** Ele e' transformado em HMAC-SHA256 durante
 a leitura do CSV e o valor original nao e' gravado em lugar nenhum — nem no

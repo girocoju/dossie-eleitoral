@@ -147,3 +147,34 @@ nao rotula como "fim regular" o que nao sabe.
 
 **Como fechar:** exigiria outra fonte (diarios oficiais, Camara/Senado). Fora do
 escopo do MVP.
+
+---
+
+## L-12 · Estimativas de populacao nao cobrem anos de Censo
+
+**O que falta:** 2007, 2010, 2022 e 2023 na tabela 6579 do SIDRA (conferido em
+27/08/2026). Sao anos de Censo/Contagem, publicados em outras tabelas.
+
+**Impacto:** `PIB_PER_CAPITA` e' derivado de PIB / populacao e so' existe onde as
+duas series coexistem — ou seja, **para em 2021**, apesar de o PIB ir ate' 2023.
+Perdem-se justamente os dois anos mais recentes. O modelo nao inventa o
+denominador: o par (UF, ano) simplesmente nao aparece.
+
+**Como fechar:** acrescentar ao catalogo as tabelas do Censo 2022 (4709) e do
+Censo 2010, com `provedor: sidra`, e unir as tres series em `stg_indicadores`
+marcando a origem de cada ponto.
+
+---
+
+## L-13 · Composicao da populacao nao ingerida
+
+**O que falta:** distribuicao de genero e cor/raca da populacao brasileira por UF.
+
+**Impacto:** o perfil dos candidatos (34,9% de mulheres, 48,7% pretos e pardos)
+nao pode ser comparado com a populacao **dentro do produto** — e comparar com um
+numero lembrado de fora violaria a Constituicao secao 3 (fonte e data de extracao em
+toda visualizacao). Hoje a tela mostra a composicao das candidaturas sem base
+populacional ao lado.
+
+**Como fechar:** ingerir a PNAD Continua Caracteristicas Gerais (SIDRA) por UF,
+ano, sexo e cor/raca, e acrescentar como comparador em `fct_indicador_uf_ano`.

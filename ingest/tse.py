@@ -66,6 +66,7 @@ class Resultado:
     campos_ausentes: list[str]
     extras: list[str]
     ano_divergente: int = 0
+    chaves_duplicadas: int = 0
 
     def resumo(self) -> str:
         return (
@@ -186,6 +187,8 @@ def processar(
     ausentes: set[str] = set()
     extras: set[str] = set()
     divergente = 0
+    vistas: set[tuple[str, ...]] = set()
+    duplicadas = 0
 
     with NdjsonWriter(destino) as writer:
         for linha, resolucao, ano_fonte in _linhas(_zip_path(ano, ds), ds, art, limite=limite):
@@ -199,6 +202,12 @@ def processar(
                 por_cargo[str(linha["cod_cargo"])] += 1
             if ano_fonte and ano_fonte != str(ano):
                 divergente += 1
+            if ds.chave:
+                chave = tuple(str(linha.get(c)) for c in ds.chave)
+                if chave in vistas:
+                    duplicadas += 1
+                else:
+                    vistas.add(chave)
         linhas = writer.rows
 
     if divergente:
@@ -206,6 +215,25 @@ def processar(
             "%d linhas com ANO_ELEICAO diferente de %d — conferir o pacote da fonte",
             divergente,
             ano,
+        )
+
+    # Duas travas contra o erro mais caro desta ingestao: ler o mesmo registro
+    # duas vezes. O pacote do TSE traz um CSV por unidade eleitoral E um
+    # `_BRASIL` consolidado; casar os dois duplica tudo em silencio.
+    esperadas = load_layout(ano).ue_esperadas
+    if esperadas and len(por_uf) not in (0, esperadas):
+        raise LayoutError(
+            f"{nome_dataset} {ano}: li {len(por_uf)} unidades eleitorais, esperava "
+            f"{esperadas} (27 UFs + BR). Confira `arquivo_regex` em "
+            f"ingest/layouts/tse_{ano}.yml — o pacote tem um CSV `_BRASIL` "
+            f"consolidado que NAO deve ser lido junto com os por UF."
+        )
+    if duplicadas:
+        raise LayoutError(
+            f"{nome_dataset} {ano}: {duplicadas} linhas repetem a chave "
+            f"{list(ds.chave)}. Quase sempre significa que o mesmo registro foi "
+            f"lido de dois arquivos do pacote (ex.: `_SP` e `_BRASIL`). "
+            f"Confira `arquivo_regex` em ingest/layouts/tse_{ano}.yml."
         )
 
     resultado = Resultado(
@@ -219,6 +247,7 @@ def processar(
         campos_ausentes=sorted(ausentes),
         extras=sorted(extras),
         ano_divergente=divergente,
+        chaves_duplicadas=duplicadas,
     )
     _grava_qa(resultado)
     log.info("%s", resultado.resumo())
@@ -239,6 +268,7 @@ def _grava_qa(resultado: Resultado) -> None:
         "campos_opcionais_ausentes": resultado.campos_ausentes,
         "colunas_nao_mapeadas": resultado.extras,
         "linhas_com_ano_divergente": resultado.ano_divergente,
+        "linhas_com_chave_duplicada": resultado.chaves_duplicadas,
     }
     qa.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 

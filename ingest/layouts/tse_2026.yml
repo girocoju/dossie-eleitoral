@@ -55,7 +55,7 @@ datasets:
   # S3 — conferido campo a campo em 27/08/2026 (49 colunas).
   complementar:
     pacote: "consulta_cand_complementar/consulta_cand_complementar_{ano}.zip"
-    arquivo_regex: '^consulta_cand_complementar_{ano}_(?P<ue>[A-Z]{2}|BRASIL)\.csv$'
+    arquivo_regex: '^consulta_cand_complementar_{ano}_(?P<ue>[A-Z]{2})\.csv$'
     leiame: "consulta_cand_complementar/leiame-consulta_cand_complementar.pdf"
     chave: ["sq_candidato", "ano_eleicao"]
     obrigatorios:

@@ -11,6 +11,13 @@ delimitador: ";"
 # Constituicao 0.7 — dado pessoal que o projeto se recusa a persistir.
 # `descartar` some antes do NDJSON (nem em `_extras` sobra).
 # `hash` troca a coluna pelo HMAC-SHA256 do valor (ver ADR-006/ADR-007).
+# O pacote do TSE traz, alem de um CSV por unidade eleitoral (`_AC`, `_SP`, `_BR`),
+# um `_BRASIL` que e' o CONSOLIDADO de todas elas. Ler os dois duplica cada
+# candidatura — conferido em 27/08/2026: 41.530 linhas para 20.765 candidaturas.
+# Por isso `arquivo_regex` casa somente siglas de 2 letras. `ue_esperadas` e' a
+# trava: a carga falha se o numero de unidades lidas nao bater.
+ue_esperadas: 28   # 27 UFs + BR (unidade eleitoral da eleicao presidencial)
+
 privacidade:
   descartar:
     - ds_email
@@ -24,7 +31,7 @@ datasets:
 
   candidatos:
     pacote: "consulta_cand/consulta_cand_{ano}.zip"
-    arquivo_regex: '^consulta_cand_{ano}_(?P<ue>[A-Z]{2}|BRASIL)\.csv$'
+    arquivo_regex: '^consulta_cand_{ano}_(?P<ue>[A-Z]{2})\.csv$'
     leiame: "consulta_cand/leiame-consulta_cand.pdf"
     chave: ["sq_candidato", "ano_eleicao", "nr_turno"]
     obrigatorios:
@@ -95,7 +102,7 @@ datasets:
 
   bens:
     pacote: "bem_candidato/bem_candidato_{ano}.zip"
-    arquivo_regex: '^bem_candidato_{ano}_(?P<ue>[A-Z]{2}|BRASIL)\.csv$'
+    arquivo_regex: '^bem_candidato_{ano}_(?P<ue>[A-Z]{2})\.csv$'
     leiame: "bem_candidato/leiame-bem_candidato.pdf"
     chave: ["sq_candidato", "ano_eleicao", "nr_ordem_bem"]
     obrigatorios:
@@ -120,7 +127,7 @@ datasets:
 
   vagas:
     pacote: "consulta_vagas/consulta_vagas_{ano}.zip"
-    arquivo_regex: '^consulta_vagas_{ano}_(?P<ue>[A-Z]{2}|BRASIL)\.csv$'
+    arquivo_regex: '^consulta_vagas_{ano}_(?P<ue>[A-Z]{2})\.csv$'
     leiame: "consulta_vagas/leiame-consulta_vagas.pdf"
     chave: ["ano_eleicao", "sg_ue", "cod_cargo"]
     obrigatorios:
@@ -143,9 +150,12 @@ datasets:
 
   coligacoes:
     pacote: "consulta_coligacao/consulta_coligacao_{ano}.zip"
-    arquivo_regex: '^consulta_coligacao_{ano}_(?P<ue>[A-Z]{2}|BRASIL)\.csv$'
+    arquivo_regex: '^consulta_coligacao_{ano}_(?P<ue>[A-Z]{2})\.csv$'
     leiame: "consulta_coligacao/leiame-consulta_coligacao.pdf"
-    chave: ["ano_eleicao", "sq_coligacao"]
+    # Grao conferido em 27/08/2026: uma linha por PARTIDO dentro da coligacao,
+    # por cargo. `sq_coligacao` sozinho repete ate' 18 vezes (uma federacao com
+    # muitos partidos), entao nao e' chave.
+    chave: ["ano_eleicao", "sq_coligacao", "sigla_partido", "cod_cargo"]
     obrigatorios:
       - ano_eleicao
       - sq_coligacao
