@@ -13,7 +13,7 @@
 | Task | Estado | Nota |
 |---|---|---|
 | T-001 Repo, estrutura, `CLAUDE.md`, `.gitignore`, `pyproject.toml` | ✅ | Repo Git proprio inicializado na pasta do projeto |
-| T-002 Projeto GCP, datasets, credenciais | ✅ | Projeto `radar-brasil-ddi` em modo **sandbox** (sem cartao). Credencial local via ADC, sem chave de service account. Secrets do Actions ainda pendentes |
+| T-002 Projeto GCP, datasets, credenciais | ✅ | Projeto `radar-brasil-ddi` com faturamento ativo, orcamento de R$ 20 com alertas. Credencial local via ADC, sem chave de service account. Secrets do Actions ainda pendentes |
 | T-003 dbt inicializado, `profiles.yml` por env var | ✅ | `dbt parse` limpo, 13 modelos, 107 testes, 0 deprecacoes |
 | T-004 `dim_uf` e `dim_cargo` como seeds | ✅ | Gerados de `ingest/common/ufs.py` e do catalogo; teste impede divergencia |
 
@@ -60,7 +60,7 @@ Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 
 |---|---|---|
 | T-201 ADR: Base dos Dados vs. CSV bruto | ✅ | [ADR-004](adr/ADR-004-fonte-do-historico.md): CSV do TSE; BdD so' para conferencia |
 | T-202 Ingestao do historico + resultados por UF | 🟡 | Ingestao roda para qualquer ano; layouts 1998–2022 nao conferidos ([L-01](LACUNAS.md)); votos nao ingeridos ([L-02](LACUNAS.md)) |
-| T-203 Mapa de colunas por ano em `layouts/tse_{ano}.yml` | ✅ | 8 anos declarados; 2026 conferido contra o arquivo real |
+| T-203 Mapa de colunas por ano em `layouts/tse_{ano}.yml` | ✅ | **8 anos conferidos** contra os arquivos reais (L-01 fechada) |
 | T-204 `fct_mandato` + teste de cobertura | 🟡 | Materializado com **0 linhas** — correto: em 2026 ninguem foi eleito ainda e o historico 1998–2022 nao entrou ([L-01](LACUNAS.md)) |
 | T-205 Vinculacao de pessoa + relatorio de taxa de match | 🟡 | `analyses/relatorio_vinculacao_pessoa.sql` escrito; medicao pendente ([L-10](LACUNAS.md)) |
 
@@ -119,9 +119,8 @@ Constituicao secao 2 esta' satisfeita no dado, nao so' no visual.
 
 ## O caminho critico
 
-1. **L-01** — `make verify-layout ANO=...` para os sete anos historicos e depois
-   `make ingest-historico`. E' isto que faz `fct_mandato` e o modulo
-   "Durante o mandato" deixarem de ser vazios.
+1. `make ingest-historico` — os 8 layouts ja' estao conferidos. E' isto que faz
+   `fct_mandato` e o modulo "Durante o mandato" deixarem de ser vazios.
 2. Montar os visuais no Power BI Desktop sobre o modelo TMDL ja' escrito,
    apontando `ProjetoGCP = radar-brasil-ddi` e `DatasetMarts = marts`.
 3. Secrets do GitHub Actions (`RADAR_GCP_SA_JSON`, `RADAR_CPF_SALT`) para o

@@ -52,3 +52,35 @@ expiraria instantaneamente.
   agendamento semanal ja' cobre isso com folga.
 - Se um dia o faturamento for ativado, nada aqui precisa mudar — a decisao continua
   correta, apenas deixa de ser obrigatoria.
+
+## Atualizacao — 2026-08-27, faturamento ativado
+
+O faturamento foi ativado no projeto (conta `01ED6F-D836CC-93C415`) e as
+limitacoes do sandbox deixaram de valer. Conferido na hora:
+
+| | sandbox | com faturamento |
+|---|---|---|
+| `CREATE TABLE AS`, views, materialized views | OK | OK |
+| `UPDATE` / `DELETE` / `MERGE` / `INSERT` | 403 | OK |
+| Expiracao de tabelas e particoes | 60 dias | nenhuma |
+
+**A decisao acima e' mantida.** Particao por inteiro e carga da tabela inteira
+continuam corretas para o volume do projeto (~20 mil linhas por ano de eleicao), e
+voltar ao decorador de particao so' acrescentaria complexidade sem beneficio.
+
+O que muda e' o que passa a ser *possivel*, e nao o que e' obrigatorio:
+
+- **`dbt snapshot`** (que usa `MERGE`) agora funciona — e' o que viabiliza guardar
+  a evolucao diaria da situacao das candidaturas ate' 04/10/2026, serie que o TSE
+  nao publica historicamente e que nao pode ser reconstruida depois.
+- **Modelos incrementais** ficam disponiveis se a ingestao de votos (S4, GBs)
+  algum dia precisar deles.
+
+As tabelas ja' criadas herdaram a expiracao de 60 dias do periodo sandbox
+(venciam em 26/10/2026, tres semanas depois do 1o turno). A expiracao foi removida
+de todas as tabelas e o padrao dos datasets foi zerado.
+
+**Guarda-corpos de custo em vigor:** `maximum_bytes_billed: 20 GB` por query no
+`profiles.yml` e orcamento de R$ 20 com alertas em 25%, 50% e 90%. Medido em
+27/08/2026: o pipeline completo — ingestao, 8 modelos e 107 testes, rodado duas
+vezes — consumiu **0,0029 TB de 1 TB gratuitos por mes**, ou 0,3% da franquia.
