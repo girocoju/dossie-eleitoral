@@ -148,12 +148,13 @@ jobs:
         working-directory: dbt
         env:
           DBT_PROFILES_DIR: .
+        # `dbt build` e' o comando certo aqui, e nao `run` + `snapshot` separados:
+        # ele executa seeds, snapshots, modelos e testes na ordem do DAG. Com os
+        # comandos separados, `fct_mudanca_candidatura` era construida ANTES do
+        # snapshot do dia e saia sempre uma execucao atrasada.
         run: |
           dbt deps
-          dbt seed
-          dbt run
-          dbt snapshot
-          dbt test
+          dbt build
 
       # Trava contra a regressao silenciosa mais cara possivel: o historico sumir
       # do BigQuery sem ninguem perceber. Falha o job se `fct_mandato` encolher.

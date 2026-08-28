@@ -68,6 +68,8 @@
 | S10 | INEP | IDEB por UF | XLSX | Bienal |
 | S11 | Tesouro — SICONFI | Receita/despesa dos estados | API/CSV | Opcional no MVP |
 | S12 | **Base dos Dados** (`basedosdados` no BigQuery) | Versões já tratadas de TSE, IBGE, IPEA | SQL direto no BigQuery | **Atalho recomendado para o histórico 1998–2022.** Verificar cobertura de 2026 antes de depender; para 2026 usar S1–S3 direto |
+| S13 | TSE — `foto_cand{ano}_{UF}_div.zip` | Foto de cada candidato | ZIP de JPG, um por UF, em `eleicoes/eleicoes{ano}/fotos/` | **Confirmada disponível em 27/08/2026** (AC 2,3 MB · DF 3,9 MB · SP 15,4 MB · BR 0,3 MB). ~150–250 MB no total de 2026 — não vai para o BigQuery; destino natural é bucket público no Cloud Storage, com a URL na `dim_candidato`. Proposta de inclusão pendente de decisão |
+| S14 | TSE — DivulgaCandContas | Proposta de governo (PDF) | Uma requisição por candidato | **Não existe em lote** — ver docs/LACUNAS.md, L-17. Só obrigatória para majoritários: 529 de 20.765 candidaturas em 2026 |
 
 **Regra:** cada fonte tem um script/idempotente em `ingest/` que baixa, valida hash, e carrega em `raw_*`. A data de extração é gravada em coluna `_extracted_at`.
 

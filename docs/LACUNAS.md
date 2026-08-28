@@ -234,3 +234,52 @@ E' o unico ciclo presidencial ausente entre 1998 e 2022. O modulo
 **Como fechar:** cruzar com `votacao_candidato_munzona_2006` (S4, ver L-02), que
 traz a votacao apurada, ou com a serie de resultados do proprio TSE. Ate' la', a
 ausencia fica visivel na tela em vez de ser preenchida.
+
+---
+
+## L-17 · Plataforma de governo nao esta no portal de dados abertos
+
+**O que falta:** um pacote em lote das propostas de governo. Conferido em
+27/08/2026 com cabecalho de requisicao valido (ver L-18): quatro caminhos
+plausiveis em `cdn.tse.jus.br/estatistica/sead/odsele/` retornam **404**,
+inclusive para 2022 — nao e' questao de o ano ser recente.
+
+As propostas existem, mas vivem no **DivulgaCandContas**, o sistema de consulta
+individual, como PDF por candidato. Nao ha' download em lote.
+
+**Impacto:** o SPEC 2.2 ja' colocava "propostas de governo (texto livre)" fora do
+escopo. Esta conferencia mostra que o custo tambem e' maior do que parecia:
+seria uma requisicao por candidato, e nao um `.zip` por ano.
+
+**Dimensao real:** a proposta so' e' exigida por lei de cargos MAJORITARIOS —
+Presidente (13), Governador (198) e Senador (318) em 2026. Sao **529 de 20.765
+candidaturas (2,5%)**. Os 19.361 candidatos a deputado nao tem proposta nenhuma.
+Qualquer tela que trate o campo como padrao fica vazia em 19 de cada 20 fichas.
+
+**Como fechar:** fase propria, com decisao consciente de raspar 529 PDFs do
+DivulgaCandContas, e exibicao restrita a majoritarios com rotulo explicito de
+"nao se aplica a este cargo" para os demais.
+
+---
+
+## L-18 · O WAF do TSE recusa requisicao com cabecalho incompleto
+
+**O que era:** o CDN do TSE responde **403** a requisicoes que nao trazem o
+conjunto completo de cabecalhos de um navegador. Nao basta `User-Agent`.
+
+Medido em 27/08/2026, mesma URL, mesmo minuto:
+
+| Requisicao | Resposta |
+|---|---|
+| So' `User-Agent` de navegador | 403 |
+| + `Accept`, `Accept-Language`, `Referer`, `Sec-Fetch-*`, `sec-ch-ua`, `Upgrade-Insecure-Requests` | **206 OK** |
+
+**Como apareceu:** o primeiro pipeline no GitHub Actions falhou com 403 na
+PRIMEIRA requisicao. Parecia bloqueio de IP de datacenter — hipotese que teria
+levado a solucoes caras e erradas (runner auto-hospedado, proxy). Era o formato
+da requisicao. Varios "rate limits" atribuidos ao CDN durante o desenvolvimento
+foram provavelmente a mesma coisa.
+
+**Estado:** resolvido em `ingest/common/http.py`, com pausa de 2s entre downloads.
+Fica registrado porque, se o TSE apertar a regra de novo, o sintoma sera' 403 e a
+primeira suspeita deve ser esta — nao o IP.
