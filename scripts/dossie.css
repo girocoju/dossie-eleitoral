@@ -69,3 +69,20 @@ border-radius:3px;padding:8px 12px;display:flex;align-items:baseline;gap:9px}
 .urna b{font-family:var(--mono);font-size:27px;letter-spacing:.06em;
 font-variant-numeric:tabular-nums;line-height:1;color:var(--ink)}
 .urna small{font-size:12px;color:var(--ink-3)}
+
+/* rotulos abaixo do retrato — sem eles "BR" e "21 PCB" nao dizem nada */
+dl.rotulado{margin:12px 0 0;display:flex;flex-direction:column;gap:10px}
+.rotulado>div{display:flex;flex-direction:column;gap:2px}
+.rotulado dt{font-size:11.5px;color:var(--ink-3)}
+.rotulado dd{margin:0;font-size:15px;color:var(--ink)}
+.rotulado .urna{margin-top:0}
+
+/* tooltip do glossario: o nome tecnico do indicador nao explica nada sozinho */
+.ajuda{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
+margin-left:6px;border-radius:50%;border:1px solid var(--rule);background:var(--surface-2);
+font-family:var(--mono);font-size:10px;color:var(--ink-3);cursor:help;vertical-align:middle}
+.ajuda:hover,.ajuda:focus{border-color:var(--accent);color:var(--accent);outline:none}
+
+.nota-lei{font-size:13px;color:var(--ink-3);margin:0 0 22px;padding-left:11px;
+border-left:2px solid var(--rule)}
+.cartao[hidden]{display:none}

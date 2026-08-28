@@ -292,7 +292,8 @@ def _anexar_indicadores(cliente, por_pessoa: dict[str, list[Candidato]]) -> None
     for r in cliente.query(sql).result():
         for c in por_pessoa.get(r.id_pessoa, []):
             c.indicadores.append({
-                "indicador": r.indicador, "unidade": r.unidade, "ue": r.nm_ue,
+                "cod": r.cod_indicador, "indicador": r.indicador,
+                "unidade": r.unidade, "ue": r.nm_ue,
                 "cargo": r.cod_cargo, "a1": r.ano_inicio, "a2": r.ano_fim,
                 "ref1": r.ano_referencia_inicio, "ref2": r.ano_referencia_fim,
                 "v1": r.valor_inicio, "v2": r.valor_fim,

@@ -22,6 +22,66 @@ from scripts.gerar_site import BASE_URL, CARGOS, PROPORCIONAIS, Candidato, brl, 
 
 FONTE = "TSE — Divulgação de Candidaturas"
 
+# Nome curto e explicacao de uma linha para cada indicador.
+#
+# "Rendimento medio mensal real do trabalho" e' o nome tecnico correto e quase
+# ninguem sabe o que significa. A tela mostra o nome curto e guarda a definicao
+# num tooltip — sem simplificar o DADO, so' a forma de nomea-lo.
+_GLOSSARIO = {
+    "PIB": ("PIB do estado",
+            "Soma de tudo que foi produzido no estado no ano, em reais correntes."),
+    "PIB_PER_CAPITA": ("PIB por habitante",
+            "O PIB dividido pela população. Não é renda das pessoas: é produção por cabeça."),
+    "POPULACAO": ("População",
+            "Estimativa do IBGE de quantas pessoas moram no estado."),
+    "POPULACAO_CENSO": ("População (Censo)",
+            "Contagem do Censo, feita de porta em porta — mais precisa que a estimativa."),
+    "DESOCUPACAO": ("Desemprego",
+            "Percentual de quem tem 14 anos ou mais, procura trabalho e não encontra."),
+    "RENDIMENTO_MEDIO": ("Rendimento do trabalho",
+            "Quanto ganha por mês, em média, quem está ocupado — já descontada a inflação."),
+    "HOMICIDIOS": ("Homicídios",
+            "Mortes por agressão a cada 100 mil habitantes."),
+    "MORTALIDADE_INFANTIL": ("Mortalidade infantil",
+            "Mortes de crianças com menos de 1 ano a cada mil nascidas vivas."),
+    "RECEITA_ESTADUAL": ("Receita do estado",
+            "Quanto o governo estadual arrecadou no ano, já descontadas as deduções."),
+    "DESPESA_ESTADUAL": ("Despesa do estado",
+            "Quanto o governo estadual se comprometeu a gastar no ano."),
+    "RESULTADO_ORCAMENTARIO": ("Resultado do estado",
+            "Receita menos despesa. Positivo não é bom nem ruim: déficit pode ser "
+            "investimento, superávit pode ser gasto que não saiu."),
+    "IDEB": ("IDEB (rede pública)",
+            "Nota da educação básica pública, de 0 a 10, medida a cada dois anos."),
+    "IDHM": ("IDHM",
+            "Índice de desenvolvimento humano do município, de 0 a 1. Medido a cada dez anos."),
+    "IPCA": ("Inflação (IPCA)",
+            "Índice oficial de inflação, acumulado no ano."),
+    "SELIC": ("Juros (Selic)",
+            "Taxa básica de juros. Definida pelo Banco Central, não pelo Executivo."),
+    "RECEITA_LIQUIDA_UNIAO": ("Receita da União",
+            "Receita primária federal menos o que é repassado a estados e municípios."),
+    "DESPESA_PRIMARIA_UNIAO": ("Despesa da União",
+            "Gasto federal sem contar juros da dívida."),
+    "RESULTADO_PRIMARIO_UNIAO": ("Resultado primário da União",
+            "Receita líquida menos despesa primária. Negativo é déficit."),
+}
+
+_CARGO_CURTO = {1: "Presidente", 3: "Governador"}
+
+_UF_NOME = {
+    "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia",
+    "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás",
+    "MA": "Maranhão", "MT": "Mato Grosso", "MS": "Mato Grosso do Sul",
+    "MG": "Minas Gerais", "PA": "Pará", "PB": "Paraíba", "PR": "Paraná",
+    "PE": "Pernambuco", "PI": "Piauí", "RJ": "Rio de Janeiro",
+    "RN": "Rio Grande do Norte", "RS": "Rio Grande do Sul", "RO": "Rondônia",
+    "RR": "Roraima", "SC": "Santa Catarina", "SP": "São Paulo", "SE": "Sergipe",
+    "TO": "Tocantins", "BR": "Brasil (nacional)",
+}
+
+
+
 CSS = (Path(__file__).parent / "dossie.css").read_text(encoding="utf-8")
 
 
@@ -86,9 +146,17 @@ def _urna(c: Candidato) -> str:
     perdido entre atributos declarados.
     """
     if c.nr_candidato is None:
-        return '<div class="urna"><span class="marca-dado m-ausente">sem número</span></div>'
-    return (f'<div class="urna"><b>{c.nr_candidato}</b>'
-            f'<small>{e(c.sigla_partido) or ""}</small></div>')
+        num = '<span class="marca-dado m-ausente">sem número</span>'
+    else:
+        num = (f'<div class="urna"><b>{c.nr_candidato}</b>'
+               f'<small>{e(c.sigla_partido) or ""}</small></div>')
+    return f"""<dl class="rotulado">
+      <div><dt>Número na urna</dt>{num}</div>
+      <div><dt>Concorre a</dt><dd>{e(c.cargo_nome)}</dd></div>
+      <div><dt>{'Circunscrição' if c.cod_cargo == 1 else 'Estado'}</dt>
+        <dd>{e(_UF_NOME.get(c.sg_uf, c.sg_uf))}</dd></div>
+      <div><dt>Situação no TSE</dt><dd>{e(c.situacao) or '—'}</dd></div>
+    </dl>"""
 
 
 def _legenda(c: Candidato) -> str:
@@ -164,8 +232,13 @@ def _indicadores(c: Candidato) -> str:
         janela = f"{i['ref1']}–{i['ref2']}"
         incompleta = (' <span class="marca-dado m-ausente">janela incompleta</span>'
                       if i["incompleta"] else "")
+        nome, ajuda = _GLOSSARIO.get(
+            i["cod"], (i["indicador"], "Ver metodologia para a definição completa."))
+        cargo = _CARGO_CURTO.get(i["cargo"], "—")
         linhas.append(
-            f"<tr><td>{e(i['indicador'])}{incompleta}</td>"
+            f"<tr><td>{e(nome)}<span class='ajuda' tabindex='0' "
+            f"aria-label='{e(ajuda)}' title='{e(ajuda)}'>?</span>{incompleta}</td>"
+            f"<td>{e(cargo)}</td>"
             f"<td class='num'>{janela}</td>"
             f"<td class='num'>{pct}</td><td class='num'>{pct_br}</td></tr>")
     if not linhas:
@@ -174,8 +247,8 @@ def _indicadores(c: Candidato) -> str:
     return f"""<section class="bloco">
       <h2>Durante mandatos anteriores — {e(primeiro['ue'])}, {primeiro['a1']}–{primeiro['a2']}</h2>
       <div class="rolagem"><table>
-        <thead><tr><th>Indicador</th><th>Janela</th><th>Variação</th>
-        <th>Brasil no mesmo período</th></tr></thead>
+        <thead><tr><th>Indicador</th><th>No cargo de</th><th>Janela</th>
+        <th>Variação</th><th>Brasil no mesmo período</th></tr></thead>
         <tbody>{''.join(linhas)}</tbody></table></div>
       <p class="aviso" style="margin:10px 0 0">
         <b>Estes números descrevem o período, não o efeito do mandato.</b>
@@ -193,11 +266,6 @@ def _ficha(c: Candidato, quando: str) -> str:
     {_retrato(c)}
     <div class="legenda">foto de urna — TSE</div>
     {_urna(c)}
-    <div class="chips">
-      <span class="chip">{e(c.cargo_nome)}</span>
-      <span class="chip">{e(c.sg_uf)}</span>
-      {f'<span class="chip">{e(c.situacao)}</span>' if c.situacao else ''}
-    </div>
   </div>
   <div>
     <h1>{e(c.nome_urna)}</h1>
@@ -248,17 +316,24 @@ def _ficha(c: Candidato, quando: str) -> str:
     elif c.proposta_obrigatoria:
         plano = ('<span class="marca-dado m-ausente">exigido para este cargo, não consta</span>')
     else:
-        plano = ('<span class="marca-dado m-na">não é exigido para este cargo</span>'
-                 '<p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">'
-                 'A Lei 9.504/97 (art. 11, §1º, IX) exige proposta de Prefeito, Governador e '
-                 'Presidente. Senador é cargo majoritário, mas não consta da lista.</p>')
+        # Nao vira bloco proprio: dar peso visual igual ao de conteudo real
+        # sugeriria que falta alguma coisa. Vira uma nota discreta, que ainda
+        # impede alguem de ler ausencia como omissao do candidato.
+        plano = None
 
     bens = (f"<dl class='campos'><div><dt>Total declarado</dt><dd>{brl(c.bens_total)}</dd></div>"
             f"<div><dt>Itens</dt><dd>{c.bens_n or 0}</dd></div></dl>"
             if c.bens_total is not None else
             "<span class='marca-dado m-ausente'>não declarou bens</span>")
 
-    partes.append(f"""
+    if plano is None:
+        partes.append(f"""
+    <section class="bloco"><h2>Bens declarados</h2>{bens}</section>
+    <p class="nota-lei">Plano de governo não é exigido para este cargo. A Lei
+      9.504/97 (art. 11, §1º, IX) o exige de Prefeito, Governador e Presidente;
+      Senador é majoritário, mas não consta da lista.</p>""")
+    else:
+        partes.append(f"""
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px" class="par">
       <section class="bloco"><h2>Bens declarados</h2>{bens}</section>
       <section class="bloco"><h2>Plano de governo</h2>{plano}</section>
@@ -290,16 +365,50 @@ def _ficha(c: Candidato, quando: str) -> str:
 def _cartao(c: Candidato) -> str:
     foto = (f'<img src="{e(c.url_foto)}" alt="" loading="lazy" width="52" height="69">'
             if c.url_foto else '<div class="semfoto"></div>')
-    return (f'<a class="cartao" href="{BASE_URL}/{c.caminho}/">{foto}<span>'
-            f'<b>{e(c.nome_urna)}</b><small>{e(c.sg_uf)} · {e(c.sigla_partido) or "—"}</small>'
+    busca = e((c.nome_urna + " " + (c.nome_completo or "")).lower())
+    return (f'<a class="cartao" href="{BASE_URL}/{c.caminho}/" data-uf="{e(c.sg_uf)}" '
+            f'data-partido="{e(c.sigla_partido) or ""}" data-nome="{busca}">{foto}<span>'
+            f'<b>{e(c.nome_urna)}</b>'
+            f'<small>{e(_UF_NOME.get(c.sg_uf, c.sg_uf))} · {e(c.sigla_partido) or "—"}'
+            f' · nº {c.nr_candidato or "—"}</small>'
             f'<small>{e(c.situacao) or ""}</small></span></a>')
 
 
 def _listagem_majoritaria(chave: str, nome: str, cands: list[Candidato], quando: str) -> str:
-    corpo = (f"<h1>{e(nome)}</h1><p class='sub'>{len(cands)} candidaturas registradas em 2026. "
-             f"Cada uma tem ficha própria, com perfil declarado, trajetória eleitoral e plano de "
-             f"governo quando a lei o exige.</p>"
-             f"<div class='grade'>{''.join(_cartao(c) for c in cands)}</div>")
+    ufs = sorted({c.sg_uf for c in cands})
+    op_uf = "".join(f'<option value="{u}">{_UF_NOME.get(u, u)}</option>' for u in ufs)
+    partidos = sorted({c.sigla_partido for c in cands if c.sigla_partido})
+    op_pt = "".join(f'<option value="{p}">{p}</option>' for p in partidos)
+    filtro_uf = (f'<select id="uf"><option value="">Todos os estados</option>{op_uf}</select>'
+                 if len(ufs) > 1 else "")
+    corpo = f"""<h1>{e(nome)}</h1>
+<p class="sub">{len(cands)} candidaturas registradas em 2026. Cada uma tem ficha
+própria, com perfil declarado, trajetória eleitoral e plano de governo quando a lei
+o exige.</p>
+<div class="filtros">
+  {filtro_uf}
+  <select id="partido"><option value="">Todos os partidos</option>{op_pt}</select>
+  <input id="busca" type="search" placeholder="Buscar por nome" autocomplete="off">
+</div>
+<p class="contagem" id="contagem">{len(cands)} candidaturas</p>
+<div class="grade" id="grade">{''.join(_cartao(c) for c in cands)}</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const cartoes = [...document.querySelectorAll("#grade .cartao")];
+function filtrar() {{
+  const uf = $("uf") ? $("uf").value : "";
+  const pt = $("partido").value, q = $("busca").value.trim().toLowerCase();
+  let n = 0;
+  cartoes.forEach(el => {{
+    const ok = (!uf || el.dataset.uf === uf) && (!pt || el.dataset.partido === pt) &&
+      (!q || el.dataset.nome.includes(q));
+    el.hidden = !ok; if (ok) n++;
+  }});
+  $("contagem").textContent = n + (n === 1 ? " candidatura" : " candidaturas");
+}}
+["uf","partido"].forEach(i => $(i) && $(i).addEventListener("change", filtrar));
+$("busca").addEventListener("input", filtrar);
+</script>"""
     desc = f"{len(cands)} candidaturas a {nome} em 2026, com perfil declarado ao TSE."
     return _pagina(nome, desc, corpo, quando, f"{BASE_URL}/{chave}/", chave)
 
