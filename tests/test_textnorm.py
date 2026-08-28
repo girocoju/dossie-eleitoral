@@ -71,7 +71,18 @@ def test_parse_bool_sn(entrada, esperado):
 
 
 class TestCpfHash:
-    """Constituicao 0.7: o CPF vira chave sem virar dado exposto."""
+    """Constituicao 0.7: o CPF vira chave sem virar dado exposto.
+
+    O numero usado aqui e' `12345678900`, INVALIDO por construcao: a Receita
+    rejeita CPF de digitos repetidos, entao ele nao pertence nem pode pertencer a
+    ninguem.
+
+    Ate' 28/08/2026 estes testes usavam um numero que passava no digito
+    verificador. Como qualquer CPF valido pode ser de uma pessoa real, e o
+    repositorio e' publico, um numero impossivel serve igual e nao carrega esse
+    risco. A funcao so' normaliza e faz hash — nao valida CPF — entao a troca nao
+    enfraquece o teste.
+    """
 
     def test_hash_e_deterministico_com_o_mesmo_salt(self, monkeypatch):
         monkeypatch.setenv("RADAR_CPF_SALT", "salt-de-teste")
