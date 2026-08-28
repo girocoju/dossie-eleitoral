@@ -12,7 +12,8 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    # DIARIO as 11:00 em Brasilia. O cron do GitHub Actions so' entende UTC, e o
+    # DIARIO as 11:00 em Brasilia: so' o que muda todo dia (TSE, fotos, propostas,
+    # legislativo). As fontes anuais rodam no cron de domingo, logo abaixo. O cron do GitHub Actions so' entende UTC, e o
     # Brasil nao tem mais horario de verao desde 2019 (Decreto 9.772/2019), entao
     # UTC-3 vale o ano inteiro e 11:00 BRT = 14:00 UTC, sem excecao em nenhum mes.
     #
@@ -28,6 +29,9 @@ on:
     # problema aqui — o que importa e' rodar uma vez por dia, nao rodar as 11:00
     # em ponto.
     - cron: "0 14 * * *"
+    # DOMINGO as 11:30 de Brasilia: as fontes ANUAIS. Ver a etapa "Ingestao
+    # socioeconomica" para o porque de nao rodarem todo dia.
+    - cron: "30 14 * * 0"
   workflow_dispatch:
     inputs:
       anos:
@@ -162,12 +166,24 @@ jobs:
             python -m ingest.tse load --ano "$ano"
           done
 
-      - name: Ingestao socioeconomica
-        if: steps.cred.outputs.temos == 'true'
+      # SEMANAL, nao diario. Todas estas fontes publicam UMA VEZ POR ANO ou perto
+      # disso: DCA do SICONFI, IDEB (bienal), RTN, PIB, Censo, IDHM (decenal).
+      #
+      # O comentario anterior aqui dizia que o SICONFI rodava "sem custo
+      # relevante". Estava errado: sao 594 consultas com pausa de 1,5s, dois
+      # anexos cada — cerca de 30 minutos, o maior custo isolado do pipeline. Num
+      # repositorio privado isso e' minuto de Actions medido, e a execucao diaria
+      # sozinha consumia perto da cota mensal gratuita.
+      #
+      # O que REALMENTE muda todo dia e' o TSE (situacao das candidaturas), e essa
+      # etapa continua diaria.
+      - name: Ingestao socioeconomica (semanal)
+        if: >
+          steps.cred.outputs.temos == 'true' &&
+          (github.event_name != 'schedule' || github.event.schedule == '30 14 * * 0')
         run: |
           python -m ingest.ibge_sidra load --somente-verificados
           python -m ingest.ipeadata  load --somente-verificados
-          # SICONFI so' publica DCA uma vez por ano; roda junto sem custo relevante
           python -m ingest.siconfi   load
           python -m ingest.ideb      load
           python -m ingest.rtn       load

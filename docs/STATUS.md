@@ -182,6 +182,30 @@ correcoes de nome de urna (MA, MT, RJ) que teriam sumido sem rastro.
 | F-16 / [ADR-015](adr/ADR-015-atividade-legislativa.md) | Atividade legislativa dos deputados | ✅ **Entregue** — 296.962 proposicoes de 710 deputados, so' `proponente = 1` |
 | Indicadores IPCA e SELIC | Inflacao e juros para a pagina de presidenciaveis | ✅ **Entregue** — IPCA 1980-2025 (46 anos), Selic 1974-2025 (52 anos), so' `BR` |
 
+## Custo do pipeline e cota do GitHub Actions
+
+O repositorio e' **privado**, e minuto de Actions e' medido (2.000/mes na conta
+pessoal). Em 28/08/2026 o job de ingestao passou a falhar **sem receber runner** —
+`runner_id: null`, zero passos executados, o job comeca e termina no mesmo segundo,
+sem log nenhum. Essa e' a assinatura de cota estourada, nao de erro de codigo.
+
+**O que consumia:** a etapa socioeconomica rodava DIARIAMENTE, e dentro dela o
+SICONFI faz 594 consultas com pausa de 1,5s em dois anexos — cerca de 30 minutos.
+A DCA publica **uma vez por ano**.
+
+**Correcao:** as fontes anuais (SIDRA, Ipeadata, SICONFI, IDEB, RTN) passaram para
+um cron **semanal**, aos domingos. O diario ficou so' com o que muda todo dia: TSE,
+fotos, propostas e legislativo.
+
+| | antes | depois |
+|---|---|---|
+| execucao diaria | ~35-50 min | ~10 min |
+| por mes | ~1.500 min | ~300 min + 4x40 min |
+
+**A saida definitiva e' tornar o repositorio PUBLICO**, que ja' e' o plano: Actions
+e' gratuito e ilimitado em repositorio publico, e o projeto e' feito para ser
+consultado. Enquanto for privado, a cota e' um teto real.
+
 ## Local e CI gravam nas MESMAS tabelas
 
 Nao ha' ambiente de desenvolvimento separado: `radar-brasil-ddi` e' um so'. Uma
