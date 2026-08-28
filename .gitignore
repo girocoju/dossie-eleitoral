@@ -12,6 +12,11 @@ data/
 !dbt/seeds/*.csv
 !tests/**/*.csv
 
+# ── Site gerado ──
+# Saida de `scripts/gerar_site.py`. E' derivado dos marts e refeito a cada
+# execucao — versionar seria guardar 536 arquivos que o pipeline reproduz.
+/site/
+
 # ── Configuracao local do Claude Code ──
 # Permissoes pessoais da maquina, incluindo operacoes destrutivas de git. Nao vao
 # para um repositorio publico.

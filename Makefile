@@ -51,6 +51,12 @@ ingest-legislativo:  ## parlamentares em exercicio e atividade legislativa (F-15
 	$(BIN)/python -m ingest.legislativo load
 	$(BIN)/python -m ingest.proposicoes load
 
+site:  ## gera o Dossie Eleitoral em site/ (F-07, ADR-018)
+	$(BIN)/python -m scripts.gerar_site --saida site
+
+site-rapido:  ## gera so' 20 fichas, para conferir layout sem esperar
+	$(BIN)/python -m scripts.gerar_site --saida site --limite 20
+
 verify-layout:  ## confere o header real do TSE contra ingest/layouts/tse_$(ANO).yml
 	$(BIN)/python -m ingest.tse verify-layout --ano $(ANO)
 
@@ -78,7 +84,7 @@ lint:  ## ruff check
 fmt:  ## ruff format
 	$(BIN)/python -m ruff format ingest tests
 
-run: ingest ingest-historico ingest-socio ingest-fotos ingest-propostas ingest-legislativo dbt-build  ## pipeline completo
+run: ingest ingest-historico ingest-socio ingest-fotos ingest-propostas ingest-legislativo dbt-build site  ## pipeline completo
 
 docs-status:  ## imprime o estado das Tasks
 	@cat docs/STATUS.md
