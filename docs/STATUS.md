@@ -182,29 +182,34 @@ correcoes de nome de urna (MA, MT, RJ) que teriam sumido sem rastro.
 | F-16 / [ADR-015](adr/ADR-015-atividade-legislativa.md) | Atividade legislativa dos deputados | ✅ **Entregue** — 296.962 proposicoes de 710 deputados, so' `proponente = 1` |
 | Indicadores IPCA e SELIC | Inflacao e juros para a pagina de presidenciaveis | ✅ **Entregue** — IPCA 1980-2025 (46 anos), Selic 1974-2025 (52 anos), so' `BR` |
 
-## Custo do pipeline e cota do GitHub Actions
+## Job que falha em 1 segundo, sem runner e sem log
 
-O repositorio e' **privado**, e minuto de Actions e' medido (2.000/mes na conta
-pessoal). Em 28/08/2026 o job de ingestao passou a falhar **sem receber runner** —
-`runner_id: null`, zero passos executados, o job comeca e termina no mesmo segundo,
-sem log nenhum. Essa e' a assinatura de cota estourada, nao de erro de codigo.
+Sintoma: `runner_id: null`, `steps: []`, o job comeca e termina no mesmo segundo,
+e `gh run view --log-failed` responde "log not found".
 
-**O que consumia:** a etapa socioeconomica rodava DIARIAMENTE, e dentro dela o
-SICONFI faz 594 consultas com pausa de 1,5s em dois anexos — cerca de 30 minutos.
-A DCA publica **uma vez por ano**.
+Parece cota de Actions estourada. **Nao era.** A causa em 28/08/2026 foi um grupo
+de `concurrency` declarado com o MESMO nome nos dois niveis — no workflow e no
+job. Grupos de concorrencia sao globais no repositorio: o run toma o grupo, e o
+proprio job dele nunca consegue adquirir, entao morre antes de receber maquina.
 
-**Correcao:** as fontes anuais (SIDRA, Ipeadata, SICONFI, IDEB, RTN) passaram para
-um cron **semanal**, aos domingos. O diario ficou so' com o que muda todo dia: TSE,
-fotos, propostas e legislativo.
+O grupo fica no JOB, e so' la'. O nivel de workflow ficaria errado de qualquer
+forma: cancelaria tambem o job `verificar`, que precisa rodar em todo PR.
 
-| | antes | depois |
-|---|---|---|
-| execucao diaria | ~35-50 min | ~10 min |
-| por mes | ~1.500 min | ~300 min + 4x40 min |
+Como distinguir de cota de verdade: cota aparece como erro de faturamento na aba
+Actions e afeta TODOS os jobs; o conflito de grupo derruba so' o job que disputa o
+grupo — aqui o `verificar` passava normalmente, em 56 segundos.
 
-**A saida definitiva e' tornar o repositorio PUBLICO**, que ja' e' o plano: Actions
-e' gratuito e ilimitado em repositorio publico, e o projeto e' feito para ser
-consultado. Enquanto for privado, a cota e' um teto real.
+## Custo do pipeline: fontes anuais sao semanais
+
+Independente do bug acima, a etapa socioeconomica nao deveria mesmo rodar todo
+dia. O SICONFI faz 594 consultas com pausa de 1,5s em dois anexos — cerca de 30
+minutos — e a DCA publica **uma vez por ano**. IDEB e' bienal, IDHM e' decenal.
+
+Desde 28/08/2026 essas fontes rodam num cron **semanal**, aos domingos. O diario
+ficou so' com o que muda de fato: TSE, fotos, propostas e legislativo — que e' o
+que sustenta o snapshot de candidaturas, a unica serie irreproduzivel do projeto.
+
+Estimativa: de ~35-50 min por dia para ~10 min, mais uma execucao semanal maior.
 
 ## Local e CI gravam nas MESMAS tabelas
 
