@@ -131,6 +131,13 @@ O pipeline diario ja' esta' no ar e a serie **ja' esta' acumulando**. Primeira
 mudanca capturada na segunda execucao, uma hora depois da primeira: tres
 correcoes de nome de urna (MA, MT, RJ) que teriam sumido sem rastro.
 
+## Propostas aguardando decisao
+
+| # | O que | Estado |
+|---|---|---|
+| F-13 / [ADR-012](adr/ADR-012-fotos-de-candidatos.md) | Foto oficial dos candidatos de 2026 em bucket publico | **Proposta** — SPEC 6 e Fase 4.5 escritos, nada implementado |
+| S14 / [L-17](LACUNAS.md) | Plataforma de governo | Nao existe em lote; so' 529 candidaturas (2,5%) tem. Fase propria |
+
 ## O caminho critico
 
 1. `make ingest-historico` — os 8 layouts ja' estao conferidos. E' isto que faz
