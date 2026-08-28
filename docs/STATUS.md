@@ -165,6 +165,30 @@ correcoes de nome de urna (MA, MT, RJ) que teriam sumido sem rastro.
 |---|---|---|
 | F-13 / [ADR-012](adr/ADR-012-fotos-de-candidatos.md) | Foto oficial dos candidatos de 2026 em bucket publico | ✅ **Entregue** — 20.765 fotos, 99,98% de cobertura |
 | F-14 / [ADR-013](adr/ADR-013-proposta-de-governo.md) | Proposta de governo dos majoritarios | ✅ **Entregue** — 206 apresentaram, 5 nao constam, 20.558 nao se aplica |
+| F-15 / [ADR-014](adr/ADR-014-ponte-legislativo.md) | Ponte de identidade com Camara e Senado | ✅ **Entregue** — 513 deputados por CPF, 81 senadores por nome+nascimento |
+| F-16 / [ADR-015](adr/ADR-015-atividade-legislativa.md) | Atividade legislativa dos deputados | ✅ **Entregue** — 296.962 proposicoes de 710 deputados, so' `proponente = 1` |
+| Indicadores IPCA e SELIC | Inflacao e juros para a pagina de presidenciaveis | ✅ **Entregue** — IPCA 1980-2025 (46 anos), Selic 1974-2025 (52 anos), so' `BR` |
+
+## Uma armadilha do CI que ja' quebrou quatro execucoes
+
+O `dbt build` pode passar na sua maquina e falhar no GitHub Actions **com o mesmo
+codigo**. Aconteceu quatro vezes em 28/08/2026, sempre com a mesma cara:
+
+```
+FAIL 484 relationships_stg_indicadores_cod_indicador__cod_indicador__ref_dim_indicador_
+```
+
+**Por que:** o `dim_indicador.csv` e' gerado de `ingest/layouts/indicadores.yml`, e
+o job `verificar` confere se os dois batem (`gerar_seeds.py --check`). Mas ninguem
+confere o repositorio contra o BIGQUERY. Se voce ingere um indicador novo e nao
+commita o par YAML + CSV, o BigQuery fica com dados de um indicador que o seed do
+CI desconhece, e o teste de relacionamento acusa orfaos.
+
+O guarda funciona — ele so' dispara no CI, nunca localmente, porque localmente o
+seed nao commitado ja' esta' carregado.
+
+**Regra pratica:** indicador novo = `indicadores.yml` + `dim_indicador.csv` no
+MESMO commit da carga. Rodar `python scripts/gerar_seeds.py` antes de commitar.
 
 ## O caminho critico
 

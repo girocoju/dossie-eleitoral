@@ -172,18 +172,74 @@ nenhum calculo.
 
 - **Serie curta para desemprego.** A PNAD Continua comeca em 2012; mandatos
   anteriores nao tem esse indicador.
-- **IDHM** tem tres pontos em vinte anos. Nao descreve um mandato e por isso nao
-  entra em `fct_mandato_indicador` como variacao — aparece so' como corte de
-  contexto.
-- **Mortalidade infantil por UF** ainda nao entrou: a unica serie do Ipeadata e'
-  nacional. Ver [LACUNAS.md](LACUNAS.md).
-- **Votos** (S4) ainda nao foram ingeridos; `votos_nominais` esta' sempre NULL.
+- **IDHM para em 2010.** Tres pontos decenais (1991, 2000, 2010), por UF, vindos
+  do Ipeadata. O mais recente e' anterior a TODOS os mandatos que o painel cobre,
+  entao ele nao descreve mandato nenhum — serve para dizer de onde o estado
+  partiu. Nao produz variacao em `fct_mandato_indicador`, e isso nao depende de
+  filtro: a janela de mandato tem no maximo seis anos e os pontos distam dez, logo
+  nenhuma janela contem dois. Conferido em 28/08/2026.
+- **Mortalidade infantil** cobre 2000-2016 por UF (SIDRA t/3834). Mandatos
+  posteriores a 2016 nao tem esse indicador.
 - **Deputados e senadores** nao aparecem no modulo "Durante o mandato", por
   decisao explicita do escopo: o vinculo entre um parlamentar e um indicador
-  estadual e' fraco demais para ser exibido sem induzir leitura errada.
-- **Reais correntes.** Nenhum valor monetario e' deflacionado no MVP.
+  estadual e' fraco demais para ser exibido sem induzir leitura errada. O que eles
+  tem e' atividade legislativa (seccao 12), que e' ato proprio.
+- **Reais correntes**, com UMA excecao. Nenhum valor monetario e' deflacionado,
+  exceto `RENDIMENTO_MEDIO`, que ja' vem real da PNAD Continua. Nao desconte
+  inflacao dele de novo, e nao o compare diretamente com PIB ou receita, que sao
+  nominais.
+- **Serie de indicadores comeca em 1980.** `stg_indicadores` corta ai'. A Selic
+  existe desde 1974 no Ipeadata, mas os seis primeiros anos ficam de fora para nao
+  criar um periodo em que so' um indicador tem dado.
 
-## 10. Reprodutibilidade
+## 10. Inflacao e juros: leitura com cuidado extra
+
+`IPCA` e `SELIC` existem so' no nivel `BR` — nao ha' versao por UF, e isso e'
+intencional, nao lacuna. Sao series da pagina de presidenciaveis.
+
+**IPCA.** A fonte e' mensal e acumulada no ano, entao o valor anual e' o de
+**dezembro**, nunca a media dos meses: a media de valores acumulados nao significa
+nada (janeiro acumula um mes, dezembro acumula doze) e daria cerca de metade da
+inflacao real. Ano incompleto nao entra — em agosto de 2026 o acumulado ate' julho
+existe, mas nao e' "a inflacao de 2026".
+
+**Selic.** A taxa e' definida pelo COPOM, e desde a **LC 179/2021** o Banco Central
+tem autonomia formal, com mandatos de presidente e diretores **descasados** do
+mandato presidencial. Atribuir juros a quem estava na Presidencia e' menos
+defensavel do que qualquer outro indicador do projeto — inclusive menos do que o
+PIB. Entra como contexto do periodo, e a tela diz isso.
+
+Por isso `direcao_desejavel` da Selic e' `neutro`: juro alto nao e' "ruim" nem juro
+baixo "bom" — depende inteiramente da inflacao do momento. Colorir tendencia ali
+seria editorializar.
+
+## 11. Atividade legislativa: por que nao ha' um numero so'
+
+`fct_atividade_legislativa` **nao tem** linha "total de proposicoes do deputado".
+O grao inclui `classe_proposicao`, de proposito.
+
+O numero unico que circula na imprensa e' enganoso por tres motivos, todos medidos
+nesta base em 2025:
+
+| Problema | Medicao |
+|---|---|
+| Assinatura contada como autoria | 21,4% das linhas de autoria sao apoio; o maior requerimento do ano tem 264 assinaturas |
+| Tipos somados como iguais | 7.695 projetos de lei · 31.479 requerimentos de retirada de pauta · 15.501 pareceres de relator |
+| Destino ausente | 53% das proposicoes vem com situacao em branco na fonte |
+
+As cinco classes: `normativa` (propos norma), `fiscalizacao` (pediu contas ao
+Executivo), `relatoria` (analisou o texto de outro — **nao e' autoria**),
+`procedimental` (rito, homenagem, emenda) e `outra` (residuo, 5,8%).
+
+**Nao existe taxa de aprovacao** neste projeto. Aprovar depende de estar na base do
+governo, nao do merito do texto: a taxa puniria a oposicao por ser oposicao, em
+qualquer governo, e viraria placar. Ha' `qt_virou_norma` em numero absoluto ao lado
+do total.
+
+**`qt_destino_desconhecido` e' separado de `qt_em_tramitacao`.** Ausencia de
+informacao nao e' andamento.
+
+## 12. Reprodutibilidade
 
 ```bash
 make bootstrap

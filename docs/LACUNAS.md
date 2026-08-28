@@ -69,34 +69,65 @@ periodo.
 
 ---
 
-## L-04 · IDHM tem tres pontos em vinte anos
+## L-04 · IDHM tem tres pontos decenais e para em 2010
 
-**O que falta:** nada a obter — e' a natureza da fonte (2000, 2010, 2021).
+**O que falta:** nada a obter nesta serie — e' a natureza da fonte. Ingerida em
+28/08/2026 pelo Ipeadata (`ADH_IDHM`): **1991, 2000 e 2010**, por UF e Brasil.
 
-**Impacto:** o IDHM **nao** entra em `fct_mandato_indicador` como variacao de
-mandato. Dois pontos separados por dez anos nao descrevem uma janela de quatro.
-Ele aparece so' como corte de contexto.
+A redacao anterior desta lacuna dizia "(2000, 2010, 2021)". Estava errada em duas
+pontas: falta 1991, que existe, e **nao ha' 2021** — a atualizacao do Atlas com o
+Censo 2022 nao esta' nesta serie do Ipeadata.
 
-**Como fechar:** nao fecha. E' um limite da fonte, documentado em METODOLOGIA secao 9.
+**Impacto:** o ponto mais recente e' ANTERIOR a todos os mandatos que o painel
+cobre. O IDHM nao entra em `fct_mandato_indicador` como variacao — e nao por
+regra escrita, mas por aritmetica: a janela de mandato vai de `ano_inicio - 1` a
+`ano_fim`, no maximo seis anos, e os pontos distam dez. Nenhuma janela contem
+dois. Ele aparece so' como linha de base historica.
+
+**Como fechar:** so' com a serie do Censo 2022, quando o Ipeadata publica-la.
+Enquanto isso e' limite da fonte, documentado em METODOLOGIA secao 9.
 
 ---
 
-## L-05 · IDEB e IDHM — hosts inacessiveis
+## L-05 · IDEB nao ingerido (IDHM foi FECHADA por outra fonte)
 
-**O que falta:** `download.inep.gov.br` (IDEB) e `atlasbrasil.org.br` (IDHM)
-**resetam a conexao** deste ambiente — conferido em 28/08/2026.
+**Situacao:** IDHM **fechada** em 28/08/2026 · IDEB **aberta**
 
-Nao e' o mesmo caso do WAF do TSE (L-18): ali o servidor respondia 403 a
-requisicao mal formada e o cabecalho completo resolveu. Aqui a conexao cai no
-handshake TLS, antes de qualquer resposta HTTP. Pode ser bloqueio de rede
-temporario, restricao geografica ou politica do host.
+O diagnostico anterior desta lacuna estava errado e foi corrigido. Ele dizia que
+os dois hosts "resetam a conexao no handshake TLS". A medicao de 28/08/2026 mostra
+duas causas distintas, e nenhuma delas e' reset:
 
-**Impacto:** os dois indicadores seguem no catalogo com `verificado: false` e
-`provedor: arquivo`, fora da carga.
+| Host | Causa real |
+|---|---|
+| `www.atlasbrasil.org.br` | Certificado Let's Encrypt **vencido em 24/08/2026** |
+| `download.inep.gov.br` | Certificado **valido**, emitido pela "RNP ICPEdu GR46 OV TLS CA 2025" — uma CA academica brasileira **ausente do bundle do certifi**. O Windows confia nela e a mesma URL responde HTTP normalmente por la' |
 
-**Como fechar:** retestar de outra rede. Se persistir, procurar os mesmos
-indicadores em fonte alternativa — foi o que resolveu a mortalidade infantil
-(L-03), encontrada no IBGE depois de o DATASUS se mostrar inviavel.
+### IDHM — fechada, e o Atlas nem era necessario
+
+A mesma serie do Atlas do Desenvolvimento Humano esta' publicada no **Ipeadata**
+(`ADH_IDHM`), que o projeto ja' consome. Ingerida com zero codigo novo: **84
+observacoes**, 28 unidades, 1991/2000/2010. Valores conferidos contra o Atlas
+(Brasil 2010 = 0,727; SP = 0,783; MA = 0,639).
+
+**Limite que fica:** para em 2010, antes de todos os mandatos do painel. Serve de
+linha de base historica, nunca de indicador de mandato. Ver METODOLOGIA secao 9.
+
+### IDEB — continua aberto, e vale a pena
+
+**Por que vale mais que o IDHM:** e' bienal desde 2005, por UF. Seria a serie com
+MELHOR encaixe em janela de mandato de todo o projeto — duas a tres medicoes
+dentro de um mandato de governador, num tema em que o estado tem competencia
+direta. Quase nenhum outro indicador do projeto reune as duas coisas.
+
+**O que falta, concretamente:**
+
+1. **Fixar a raiz da RNP no repositorio** e usa-la como CA bundle so' para
+   `download.inep.gov.br`. Nao basta `truststore` para pegar a loja do Windows: o
+   CI roda em Ubuntu, que tambem nao tem essa CA.
+2. **Descobrir as URLs dos arquivos por ano.** A pagina de resultados do INEP monta
+   os links por JavaScript — quatro padroes de URL tentados a mao devolveram 404.
+
+Nenhum dos dois e' dificil; sao duas tarefas pequenas e independentes.
 
 ---
 
@@ -344,3 +375,44 @@ O filtro declarativo (`filtrar` no layout) descartou 1,8 milhao de linhas so' em
 **Continua fora:** votos por municipio para cargos proporcionais. Sao dezenas de
 milhares de candidatos a deputado espalhados por centenas de municipios cada, e o
 mapa municipal de uma eleicao proporcional e' ruido, nao informacao.
+
+---
+
+## L-20 · O Senado nao tem atividade legislativa no projeto
+
+**Situacao:** ABERTA · registrada em 28/08/2026
+
+A F-16 cobre **so' a Camara**. Os 81 senadores tem a ponte de identidade (F-15) e
+aparecem em `dim_parlamentar`, mas nao ha' nenhuma proposicao, relatoria ou voto
+deles em `fct_atividade_legislativa`.
+
+**Por que:** a Camara publica arquivos anuais em bloco com a marca `proponente`,
+que e' exatamente o filtro que separa autoria de assinatura de apoio. O Senado
+publica por API, sem equivalente em bloco, e o campo de autoria tem outra
+estrutura. Replicar o mesmo rigor exigiria uma sondagem propria.
+
+**O risco de fechar mal:** montar uma contagem de proposicoes do Senado sem
+equivalente ao filtro `proponente` produziria numeros que PARECEM comparaveis aos
+da Camara e nao sao. Um senador com 200 assinaturas de apoio apareceria ao lado de
+um deputado com 200 projetos proprios, na mesma coluna, com o mesmo rotulo. Melhor
+a ausencia explicita do que a comparacao falsa.
+
+**Como a tela deve se comportar enquanto isso:** a pagina de Senado nao mostra
+contagem de atividade — nem zerada. Zero e' uma afirmacao; ausencia de secao nao e'.
+
+---
+
+## L-21 · Metade das proposicoes nao tem situacao publicada
+
+**Situacao:** ABERTA (limite da fonte) · registrada em 28/08/2026
+
+Em 2025, **58.385 de 109.582** proposicoes com deputado proponente (53%) vem com
+`ultimoStatus_descricaoSituacao` em branco no arquivo da Camara.
+
+**Impacto:** para mais da metade das proposicoes nao da' para dizer se esta' em
+tramitacao, arquivada ou virou lei.
+
+**O que o projeto faz:** `qt_destino_desconhecido` e' uma coluna separada de
+`qt_em_tramitacao` em `fct_atividade_legislativa`. Ausencia de informacao nunca e'
+contada como andamento — a diferenca entre "ainda tramita" e "nao sabemos" e'
+justamente o que um painel apressado apagaria.

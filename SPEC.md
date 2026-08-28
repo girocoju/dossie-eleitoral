@@ -176,6 +176,40 @@ Formato: **F-xx — nome** · *Prioridade* · Critérios de aceite (todos verifi
 
 ---
 
+**F-15 — Ponte de identidade com Câmara e Senado** · P1 · **Implementada em 28/08/2026**
+
+> Fonte nova (S15, S16). Ver [ADR-014](docs/adr/ADR-014-ponte-legislativo.md).
+
+**Por que entra:** 93% das candidaturas de 2026 são para cargos legislativos, e a
+ficha dessas pessoas hoje só tem perfil declarado e trajetória eleitoral. Sem esta
+ponte, nada do que o parlamentar fez no mandato chega ao painel.
+
+**Alcance real:** 513 deputados casados por CPF (100%) e 81 senadores casados por
+nome + data de nascimento, marcados com `casamento_confiavel = false` porque o
+Senado não publica CPF. Homônimo com a mesma data de nascimento **não** recebe
+`id_pessoa` — vira `metodo_id_pessoa = 'ambiguo'`.
+
+---
+
+**F-16 — Atividade legislativa na Câmara** · P1 · **Implementada em 28/08/2026**
+
+> Fonte nova (S17). Ver [ADR-015](docs/adr/ADR-015-atividade-legislativa.md).
+
+**Por que entra:** é a única prestação de contas defensável para um deputado. O
+vínculo entre um parlamentar e um indicador socioeconômico regional é fraco demais
+para ser mostrado (SPEC §2.2), mas o que ele propôs é ato próprio dele.
+
+**O que NÃO entra, de propósito:** taxa de aprovação. Aprovar depende de estar na
+base do governo, não do mérito do texto — a taxa puniria a oposição por ser
+oposição, em qualquer governo, e viraria placar (Constituição §0.1).
+
+**Alcance real:** 296.962 proposições de 710 deputados na legislatura 2023-2026,
+já filtradas por `proponente = 1` (21,4% das linhas de autoria eram apoio) e
+separadas em cinco classes, porque projeto de lei e requerimento de retirada de
+pauta não são a mesma coisa.
+
+---
+
 **F-14 — Proposta de governo dos candidatos majoritários** · P1 · **Implementada em 28/08/2026**
 
 > Fonte nova (S14). O SPEC §2.2 excluía "propostas de governo (texto livre)"; esta
@@ -259,6 +293,19 @@ Critérios de aceite:
 - T-462 `stg_tse__propostas`; `fct_candidatura` ganha os cinco campos da F-14.
 - T-463 Dois testes dbt novos + medida e rótulo de três estados no Power BI.
 - **Aceite:** F-14.
+
+### Fase 4.7 — Legislativo (F-15, F-16) — concluída em 28/08/2026
+
+- T-471 `ingest/legislativo.py`: coleta os 513 deputados e 81 senadores em
+  exercício e carrega `raw_legislativo.parlamentares` com as duas chaves de
+  identidade.
+- T-472 `ingest/proposicoes.py`: arquivos anuais em bloco da Câmara, filtrados por
+  `proponente = 1` e classificados por tipo, em `raw_legislativo.proposicoes`.
+- T-473 `stg_camara__parlamentares`, `stg_camara__proposicoes`, `dim_parlamentar`
+  (resolve `id_pessoa` contra o TSE) e `fct_atividade_legislativa`.
+- T-474 Três testes dbt novos: cobertura da ponte por Casa, recusa de homônimo
+  ambíguo e teto para a classe residual.
+- **Aceite:** F-15, F-16.
 
 ### Fase 5 — Pós-eleição (fase 2 do produto)
 - F-11, F-12.
