@@ -112,6 +112,45 @@ def _legenda(c: Candidato) -> str:
             f'<dl class="campos">{"".join(partes)}</dl></section>')
 
 
+def _atividade(c: Candidato) -> str:
+    """Atividade na Camara de quem ja' foi deputado federal.
+
+    Separada por CLASSE, sem total. Somar projeto de lei com requerimento de
+    retirada de pauta produz o numero que circula na imprensa e nao significa
+    nada: em 2025 foram 7.695 projetos de lei contra 31.479 requerimentos de
+    retirada de pauta. E nao ha' taxa de aprovacao — aprovar depende de estar na
+    base do governo, nao do merito do texto (ADR-015).
+    """
+    if not c.atividade:
+        return ""
+    rotulos = {
+        "normativa": "Propôs criar ou mudar lei",
+        "fiscalizacao": "Pediu contas ao Executivo",
+        "relatoria": "Relatou proposta de outro",
+        "procedimental": "Rito, homenagem, emenda",
+        "outra": "Outros tipos",
+    }
+    linhas = "".join(
+        f"<tr><td>{rotulos.get(a['classe'], a['classe'])}</td>"
+        f"<td class='num'>{a['total']:,}</td>"
+        f"<td class='num'>{a['norma'] or '—'}</td></tr>".replace(",", ".")
+        for a in c.atividade
+    )
+    anos = f"{min(a['a1'] for a in c.atividade)}–{max(a['a2'] for a in c.atividade)}"
+    return f"""<section class="bloco">
+      <h2>Atividade na Câmara dos Deputados — {anos}</h2>
+      <div class="rolagem"><table>
+        <thead><tr><th>Tipo de proposição</th><th>Apresentadas</th>
+        <th>Viraram norma</th></tr></thead><tbody>{linhas}</tbody></table></div>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        Só entram proposições em que a pessoa é <b>proponente</b> — assinatura de
+        apoio não conta. Os tipos aparecem separados porque somá-los não significa
+        nada: um projeto de lei e um requerimento de retirada de pauta custam
+        coisas muito diferentes. <b>Não há taxa de aprovação</b>: aprovar depende de
+        estar na base do governo, não do mérito do texto.</p>
+    </section>"""
+
+
 def _indicadores(c: Candidato) -> str:
     """Bloco socioeconomico — so' para quem ja' teve mandato executivo."""
     if not c.indicadores:
@@ -166,6 +205,8 @@ def _ficha(c: Candidato, quando: str) -> str:
 
     <section class="bloco"><h2>Perfil declarado ao TSE</h2>
     <dl class="campos">
+      <div style="grid-column:1/-1"><dt>Partido</dt>
+        <dd><b>{e(c.partido_completo)}</b></dd></div>
       <div><dt>Idade na posse</dt><dd>{c.idade if c.idade else '—'}</dd></div>
       <div><dt>Gênero</dt><dd>{e(c.genero) or '—'}</dd></div>
       <div><dt>Cor/raça</dt><dd>{e(c.cor_raca) or '—'}</dd></div>
@@ -237,6 +278,7 @@ def _ficha(c: Candidato, quando: str) -> str:
         apenas o estado atual — esta série não pode ser refeita depois de 04/10/2026.</p>
     </section>""")
 
+    partes.append(_atividade(c))
     partes.append(_indicadores(c))
     partes.append("</div></div>")
     desc = (f"{c.nome_urna}, candidatura a {c.cargo_nome} por {c.sg_uf} em 2026. "
@@ -280,6 +322,10 @@ def _listagem_proporcional(chave: str, nome: str, por_uf: dict[str, list[dict]],
     corpo = f"""<h1>{e(nome)}</h1>
 <p class="sub">{total:,} candidaturas registradas em 2026.
 Escolha o estado para começar.</p>
+<p class="aviso">As duas últimas colunas só têm número para quem <b>já é deputado
+federal</b> e busca reeleição: são as proposições em que a pessoa é proponente na
+legislatura atual. Para quem nunca teve mandato na Câmara, aparecem vazias — e vazio
+aqui significa "não se aplica", não "não fez nada".</p>
 <p class="aviso">Cargos proporcionais não têm ficha própria: o TSE exige plano de governo apenas
 de Prefeito, Governador e Presidente, e o perfil declarado cabe na própria listagem. Publicar
 {total:,} páginas quase idênticas seria conteúdo raso, e prejudicaria a indexação
@@ -291,8 +337,9 @@ do site inteiro.</p>
 </div>
 <p class="contagem" id="contagem">nenhum estado selecionado</p>
 <div class="rolagem" style="max-height:none"><table>
-  <thead><tr><th>Nome de urna</th><th>Partido</th><th>Situação</th>
-  <th>Idade</th><th>Instrução</th><th>Ocupação</th></tr></thead>
+  <thead><tr><th>Nome de urna</th><th>Partido</th><th>Coligação</th><th>Situação</th>
+  <th>Idade</th><th>Ocupação</th><th title="projetos de lei, PEC e afins como proponente"
+  >PLs na Câmara</th><th>Viraram norma</th></tr></thead>
   <tbody id="linhas"></tbody></table></div>
 <script>
 const BASE = "{BASE_URL}/dados/{chave}";
@@ -305,9 +352,10 @@ function desenhar() {{
   $("contagem").textContent = vis.length.toLocaleString("pt-BR") + " de " +
     dados.length.toLocaleString("pt-BR") + " candidaturas neste estado";
   $("linhas").innerHTML = vis.map(d => `<tr>
-    <td>${{d.nome ?? ""}}</td><td>${{d.partido ?? ""}}</td><td>${{d.situacao ?? ""}}</td>
-    <td class="num">${{d.idade ?? "—"}}</td><td>${{d.instrucao ?? ""}}</td>
-    <td>${{d.ocupacao ?? ""}}</td></tr>`).join("");
+    <td>${{d.nome ?? ""}}</td><td>${{d.partido ?? ""}}</td>
+    <td>${{d.coligacao ?? ""}}</td><td>${{d.situacao ?? ""}}</td>
+    <td class="num">${{d.idade ?? "—"}}</td><td>${{d.ocupacao ?? ""}}</td>
+    <td class="num">${{d.pl ?? "—"}}</td><td class="num">${{d.norma ?? "—"}}</td></tr>`).join("");
 }}
 $("uf").addEventListener("change", () => {{
   const uf = $("uf").value;

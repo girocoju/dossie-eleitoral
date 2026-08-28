@@ -93,6 +93,7 @@ class Candidato:
     nome_completo: str | None
     sg_uf: str
     sigla_partido: str | None
+    nome_partido: str | None
     nr_candidato: int | None
     coligacao: str | None
     composicao: str | None
@@ -113,6 +114,17 @@ class Candidato:
     trajetoria: list[dict] = field(default_factory=list)
     mudancas: list[dict] = field(default_factory=list)
     indicadores: list[dict] = field(default_factory=list)
+    atividade: list[dict] = field(default_factory=list)
+
+    @property
+    def partido_completo(self) -> str:
+        """'Democracia Crista (DC)'. Quando o TSE publica nome igual a' sigla —
+        AGIR, AVANTE — repetir ficaria bobo, entao sai so' a sigla."""
+        if not self.sigla_partido:
+            return "—"
+        if self.nome_partido and self.nome_partido.upper() != self.sigla_partido.upper():
+            return f"{self.nome_partido} ({self.sigla_partido})"
+        return self.sigla_partido
 
     @property
     def caminho(self) -> str:
@@ -143,7 +155,8 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     sql = f"""
         select
             d.sk_candidatura, d.sq_candidato, d.cod_cargo, d.nome_urna, d.nome_completo,
-            d.sg_uf, d.sigla_partido, d.nr_candidato, d.url_foto, d.genero, d.cor_raca,
+            d.sg_uf, d.sigla_partido, pt.nome_partido, d.nr_candidato, d.url_foto,
+            d.genero, d.cor_raca,
             d.grau_instrucao,
             d.ocupacao, d.sg_uf_nascimento,
             d.idade_na_posse_valida as idade,
@@ -153,6 +166,8 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
             d.id_pessoa
         from `{p}.marts.dim_candidato` d
         join `{p}.marts.fct_candidatura` f using (sk_candidatura)
+        left join `{p}.marts.dim_partido` pt
+               on pt.sigla_partido = d.sigla_partido and pt.ano_eleicao = d.ano_eleicao
         where d.ano_eleicao = 2026 and d.cod_cargo in (1, 3, 5)
         order by d.cod_cargo, d.sg_uf, d.nome_urna
         {lim}
@@ -162,7 +177,8 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
         c = Candidato(
             sk=r.sk_candidatura, sq=str(r.sq_candidato), cod_cargo=r.cod_cargo,
             nome_urna=r.nome_urna or "SEM NOME", nome_completo=r.nome_completo,
-            sg_uf=r.sg_uf, sigla_partido=r.sigla_partido, nr_candidato=r.nr_candidato,
+            sg_uf=r.sg_uf, sigla_partido=r.sigla_partido, nome_partido=r.nome_partido,
+            nr_candidato=r.nr_candidato,
             coligacao=r.nome_coligacao, composicao=r.composicao_coligacao,
             federacao=r.sg_federacao,
             situacao=r.situacao_julgamento, url_foto=r.url_foto, idade=r.idade,
@@ -180,6 +196,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     _anexar_trajetoria(cliente, ids)
     _anexar_mudancas(cliente, {c.sk: c for c in saida})
     _anexar_indicadores(cliente, ids)
+    _anexar_atividade(cliente, ids)
     return saida
 
 
@@ -286,15 +303,61 @@ def _anexar_indicadores(cliente, por_pessoa: dict[str, list[Candidato]]) -> None
     log.info("%d linhas de indicador de mandato anexadas", n)
 
 
+def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """Atividade na Camara de quem ja' foi deputado federal.
+
+    Vale para 43 dos 317 candidatos a senador e 5 dos 197 a governador — os que
+    passaram pela Camara antes. Nao existe equivalente para o SENADO: a fonte nao
+    publica marca de proponente, e uma contagem sem esse filtro pareceria
+    comparavel a' da Camara sem ser (L-20).
+
+    A classe faz parte da chave de proposito: somar projeto de lei com requerimento
+    de retirada de pauta produz um numero sem significado.
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    lista = "','".join(por_pessoa)
+    sql = f"""
+        select id_pessoa, classe_proposicao,
+               sum(qt_proposicoes) as total,
+               sum(qt_virou_norma) as virou_norma,
+               min(ano) as a1, max(ano) as a2
+        from `{p}.marts.fct_atividade_legislativa`
+        where id_pessoa in ('{lista}') and ligado_ao_tse
+        group by 1, 2
+        order by total desc
+    """
+    n = 0
+    for r in cliente.query(sql).result():
+        for c in por_pessoa.get(r.id_pessoa, []):
+            c.atividade.append({
+                "classe": r.classe_proposicao, "total": r.total,
+                "norma": r.virou_norma, "a1": r.a1, "a2": r.a2,
+            })
+            n += 1
+    log.info("%d linhas de atividade legislativa anexadas", n)
+
+
 def carregar_proporcionais(cliente) -> dict[str, list[dict]]:
     """Base das listagens filtraveis. Um JSON por cargo, filtrado no navegador."""
     p = cliente.project
     sql = f"""
+        with ativ as (
+          select id_pessoa,
+                 sum(if(classe_proposicao='normativa', qt_proposicoes, 0)) as normativa,
+                 sum(if(classe_proposicao='fiscalizacao', qt_proposicoes, 0)) as fiscalizacao,
+                 sum(qt_virou_norma) as virou_norma
+          from `{p}.marts.fct_atividade_legislativa`
+          where ligado_ao_tse group by 1
+        )
         select d.cod_cargo, d.sq_candidato, d.nome_urna, d.sg_uf, d.sigla_partido,
                f.situacao_julgamento, d.url_foto, d.genero, d.grau_instrucao, d.ocupacao,
-               d.idade_na_posse_valida as idade
+               d.idade_na_posse_valida as idade, f.nome_coligacao,
+               a.normativa, a.fiscalizacao, a.virou_norma
         from `{p}.marts.dim_candidato` d
         join `{p}.marts.fct_candidatura` f using (sk_candidatura)
+        left join ativ a on a.id_pessoa = d.id_pessoa
         where d.ano_eleicao = 2026 and d.cod_cargo in (6, 7, 8)
         order by d.sg_uf, d.nome_urna
     """
@@ -305,7 +368,8 @@ def carregar_proporcionais(cliente) -> dict[str, list[dict]]:
             "sq": str(r.sq_candidato), "nome": r.nome_urna, "uf": r.sg_uf,
             "partido": r.sigla_partido, "situacao": r.situacao_julgamento,
             "foto": r.url_foto, "genero": r.genero, "instrucao": r.grau_instrucao,
-            "ocupacao": r.ocupacao, "idade": r.idade,
+            "ocupacao": r.ocupacao, "idade": r.idade, "coligacao": r.nome_coligacao,
+            "pl": r.normativa, "fisc": r.fiscalizacao, "norma": r.virou_norma,
         })
     for k, v in por_cargo.items():
         log.info("%s: %d candidaturas", k, len(v))
