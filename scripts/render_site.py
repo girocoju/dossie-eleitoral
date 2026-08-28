@@ -162,9 +162,8 @@ def _ficha(c: Candidato, quando: str) -> str:
   </div>
   <div>
     <h1>{e(c.nome_urna)}</h1>
-    <p class="sub">{e(c.nome_completo or '')}</p>
+    <p class="sub" style="margin-bottom:28px">{e(c.nome_completo or '')}</p>
 
-    {_legenda(c)}
     <section class="bloco"><h2>Perfil declarado ao TSE</h2>
     <dl class="campos">
       <div><dt>Idade na posse</dt><dd>{c.idade if c.idade else '—'}</dd></div>
@@ -174,6 +173,7 @@ def _ficha(c: Candidato, quando: str) -> str:
       <div><dt>Ocupação</dt><dd>{e(c.ocupacao) or '—'}</dd></div>
       <div><dt>Estado de nascimento</dt><dd>{e(c.uf_nascimento) or '—'}</dd></div>
     </dl></section>
+    {_legenda(c)}
 """]
 
     # trajetoria

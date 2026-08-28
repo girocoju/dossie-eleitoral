@@ -54,8 +54,13 @@ ingest-legislativo:  ## parlamentares em exercicio e atividade legislativa (F-15
 site:  ## gera o Dossie Eleitoral em site/ (F-07, ADR-018)
 	$(BIN)/python -m scripts.gerar_site --saida site
 
+site-local:  ## gera com links para localhost e sobe um servidor em :8000
+	$(BIN)/python -m scripts.gerar_site --saida site --base http://localhost:8000
+	@echo "abra http://localhost:8000"
+	cd site && $(BIN)/python -m http.server 8000
+
 site-rapido:  ## gera so' 20 fichas, para conferir layout sem esperar
-	$(BIN)/python -m scripts.gerar_site --saida site --limite 20
+	$(BIN)/python -m scripts.gerar_site --saida site --limite 20 --base http://localhost:8000
 
 verify-layout:  ## confere o header real do TSE contra ingest/layouts/tse_$(ANO).yml
 	$(BIN)/python -m ingest.tse verify-layout --ano $(ANO)

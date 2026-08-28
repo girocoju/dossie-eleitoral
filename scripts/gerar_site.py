@@ -48,6 +48,9 @@ from ingest.common.log import get_logger
 
 log = get_logger("site")
 
+# Prefixo de todo link interno e de toda URL canonica. Em producao e' o endereco
+# publico; para conferir no navegador local, `--base http://localhost:8000` faz o
+# site inteiro funcionar sem servidor de producao.
 BASE_URL = "https://datadubaintel.com/dossie"
 
 CARGOS = {
@@ -317,12 +320,21 @@ def extraido_em(cliente) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    global BASE_URL  # noqa: PLW0603 — rebind por --base, ver abaixo
     ap = argparse.ArgumentParser(prog="gerar_site", description=__doc__)
     ap.add_argument("--saida", default="site", help="diretorio de saida (padrao: site)")
     ap.add_argument("--limite", type=int, help="gera so' N fichas — para testar rapido")
+    ap.add_argument("--base", help="prefixo dos links (padrao: %(default)s)",
+                    default=BASE_URL)
     args = ap.parse_args(argv)
 
-    from scripts.render_site import escrever_site  # noqa: PLC0415
+    from scripts import render_site  # noqa: PLC0415
+
+    # As f-strings do render leem BASE_URL na hora da chamada, entao trocar aqui
+    # muda todo link interno de uma vez.
+    BASE_URL = args.base.rstrip("/")
+    render_site.BASE_URL = BASE_URL
+    escrever_site = render_site.escrever_site
 
     cliente = _cliente()
     quando = extraido_em(cliente)
