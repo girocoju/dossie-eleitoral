@@ -20,16 +20,16 @@ with por_uf as (
     select
         ano_eleicao,
         cd_eleicao,
-        cod_cargo,
+        {{ inteiro('cod_cargo') }}          as cod_cargo,
         sq_candidato,
-        nr_turno,
+        {{ inteiro('nr_turno') }}           as nr_turno,
         /*
           A unidade DISPUTADA, que compoe a `sk_candidatura`. A fonte registra
           onde o voto foi DEPOSITADO — para presidente, as 27 UFs mais `ZZ`
           (exterior). Numa eleicao geral todo cargo e' disputado no ambito da UF,
           menos a presidencia, que e' nacional.
         */
-        if(cod_cargo = 1, 'BR', sg_uf)       as sg_ue,
+        if({{ inteiro('cod_cargo') }} = 1, 'BR', sg_uf)       as sg_ue,
         -- a coluna populada varia por ano; a regra fica explicita, nao escondida
         if(
             coalesce(qt_votos_nominais, 0) > 0,

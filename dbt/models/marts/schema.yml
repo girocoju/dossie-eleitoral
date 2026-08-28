@@ -303,3 +303,24 @@ models:
                 inclusive: true
       - name: aviso_temporal
         tests: [not_null]
+
+  - name: fct_votacao_uf
+    description: >
+      Votos por candidatura, turno e UF de deposito. Responde "onde este candidato
+      foi mais votado". Sem quebra por municipio — ver docs/LACUNAS.md, L-19.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [sk_candidatura, nr_turno, sg_uf]
+    columns:
+      - name: sk_candidatura
+        tests: [not_null]
+      - name: sg_uf
+        description: >
+          Onde a urna estava, NAO a unidade disputada. Para presidente inclui `ZZ`
+          (exterior) e, em 2010, `VT` (voto em transito).
+        tests: [not_null]
+      - name: votos_nominais
+        tests: [not_null]
+      - name: pct_do_total_do_candidato
+        description: "Participacao daquela UF no total do candidato naquele turno."

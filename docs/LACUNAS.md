@@ -25,17 +25,27 @@ conforme o `leiame.pdf`; marcar `verificado: true`.
 
 ---
 
-## L-02 · Votos por candidato (S4) nao ingeridos
+## L-02 · Votos por candidato — FECHADA em 28/08/2026
 
-**O que falta:** `votacao_candidato_munzona_{ano}` (1998–2022). A coluna
-`votos_nominais` de `fct_candidatura` existe e esta' sempre NULL.
+142.086 linhas em `raw_tse.votacao`, sete eleicoes (1998–2022), agregadas na
+ingestao a partir de ~2 GB e dezenas de milhoes de linhas de municipio x zona.
 
-**Impacto:** nao ha' votacao nominal no produto. Nao afeta `fct_mandato`, que
-depende de `DS_SIT_TOT_TURNO` e nao da contagem de votos.
+Validado contra a historia: FHC 35.936.382 no 1o turno de 1998; o vencedor de 2022
+com 117.605.503 votos somando os dois turnos.
 
-**Como fechar:** declarar o dataset `votacao` em `tse_base.yml` e agregar para
-(ano, sq_candidato, UF, cargo, turno) **durante** a ingestao — o pacote tem GBs e
-nao pode subir cru para o BigQuery (SPEC S4, ADR-002).
+Tres achados que a ingestao expos:
+
+1. **A coluna de votos troca de lugar entre anos.** Em 1998 `QT_VOTOS_NOMINAIS`
+   vem ZERADO e o valor esta' em `_VALIDOS`; nos anos recentes e' o inverso. As
+   duas sao somadas e a regra de escolha esta' explicita em `stg_tse__votacao`.
+2. **`SG_UE` muda de significado.** Em 1998 e' a UF; em 2002 e 2010 e' o CODIGO DO
+   MUNICIPIO. Agregar por ele fez 2002 saltar de 16 mil para 1,37 milhao de
+   grupos. A agregacao usa `SG_UF`, consistente entre anos, e a unidade disputada
+   e' derivada no dbt.
+3. **O `_BRASIL` aqui e' o arquivo CERTO** — o oposto do `consulta_cand`. O DF nao
+   tem arquivo proprio na votacao de 1998: existe so' dentro do BRASIL.
+
+Restou aberta a quebra por municipio — ver L-19.
 
 ---
 
@@ -292,3 +302,25 @@ foram provavelmente a mesma coisa.
 **Estado:** resolvido em `ingest/common/http.py`, com pausa de 2s entre downloads.
 Fica registrado porque, se o TSE apertar a regra de novo, o sintoma sera' 403 e a
 primeira suspeita deve ser esta — nao o IP.
+
+---
+
+## L-19 · Votos sem quebra por municipio
+
+**O que falta:** a votacao chega ao warehouse agregada por candidatura x turno x
+UF. A fonte (`votacao_candidato_munzona`) tem grao municipio x zona x voto em
+transito, e os arquivos estao baixados (~2 GB, sete eleicoes).
+
+**Por que foi agregado:** sao ~10 milhoes de linhas por eleicao, ~70 milhoes no
+total. Subir isso cru contraria a Constituicao secao 5 (custo perto de zero) e o
+ADR-002 (Power BI em Import mode sobre tabelas agregadas).
+
+**Impacto:** da' para responder "onde o candidato foi mais votado" **por estado**
+(`fct_votacao_uf`), mas nao por municipio. Um mapa municipal da eleicao
+presidencial, por exemplo, nao e' possivel hoje.
+
+**Como fechar:** um fato adicional com grao municipio, restrito aos cargos
+MAJORITARIOS (1, 3, 5). O volume cai de ~70 milhoes para a ordem de 1,7 milhao de
+linhas — os proporcionais e' que sao caros, porque sao dezenas de milhares de
+candidatos. Exige decisao de escopo, porque acrescenta uma tabela grande ao
+modelo do Power BI.

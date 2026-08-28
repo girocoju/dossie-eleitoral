@@ -59,7 +59,7 @@ Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 
 | Task | Estado | Nota |
 |---|---|---|
 | T-201 ADR: Base dos Dados vs. CSV bruto | ✅ | [ADR-004](adr/ADR-004-fonte-do-historico.md): CSV do TSE; BdD so' para conferencia |
-| T-202 Ingestao do historico + resultados por UF | ✅ | 8 anos carregados: 180.718 candidaturas, 509.136 bens. Votos (S4) seguem fora ([L-02](LACUNAS.md)) |
+| T-202 Ingestao do historico + resultados por UF | ✅ | 8 anos: 180.718 candidaturas, 509.136 bens, **142.086 linhas de votacao** (L-02 fechada) |
 | T-203 Mapa de colunas por ano em `layouts/tse_{ano}.yml` | ✅ | **8 anos conferidos** contra os arquivos reais (L-01 fechada) |
 | T-204 `fct_mandato` + teste de cobertura | ✅ | 11.777 mandatos, 1999–2026. 7 por eleicao suplementar, 7 interrompidos |
 | T-205 Vinculacao de pessoa + relatorio de taxa de match | 🟡 | `analyses/relatorio_vinculacao_pessoa.sql` escrito; medicao pendente ([L-10](LACUNAS.md)) |
