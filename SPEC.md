@@ -372,11 +372,12 @@ radar-brasil/
 | ADR-005 | `cpf_hash` como chave de pessoa | Vincula anos sem expor CPF | Aceita |
 | ADR-006 a ADR-011 | Ver `docs/adr/` | — | Aceitas |
 | ADR-012 | Fotos em bucket público, não no BigQuery | Binário não pertence a um warehouse; a ficha lê por URL | Aceita |
-| ADR-013 | Proposta de governo: existência + link, sem re-hospedar PDF | Credibilidade da fonte, cópia envelhece, e o download exigiria engenharia reversa | Aceita |
+| ADR-013 | Proposta de governo: existência + link, sem re-hospedar PDF | Credibilidade da fonte, cópia envelhece | **Emendada pela ADR-019** — o download não exigia engenharia reversa, e o link do TSE quebrou |
 | ADR-014 | Ponte de identidade com Câmara e Senado | Câmara publica CPF (casamento exato); Senado não, e a diferença viaja no dado | Aceita |
 | ADR-015 | Atividade legislativa por classe, sem taxa de aprovação | Aprovação depende de estar na base do governo, não do mérito — seria placar | Aceita |
 | ADR-016 | Intermediário TLS do INEP versionado em `certs/` | O servidor omite um elo da cadeia; a raiz sempre foi confiável. Destrava o IDEB | Aceita |
 | ADR-017 | Orçamento federal pelo RTN, não pela DCA | A receita da DCA inclui operações de crédito (45% da União em 2020); o resultado tendia a zero por identidade contábil | Aceita |
+| ADR-019 | Texto integral dos planos de governo | O endpoint certo do TSE estava no bundle do próprio app; 201 de 206 planos transcrevem, 19,3 mi de caracteres | Aceita |
 | ADR-018 | Site estático gerado do lake, em vez de ferramenta de BI | *Publish to web* não tem layout mobile, URL por candidato nem indexação; e 20 mil candidatos que mudam 1x/dia são geração estática, não consulta ao vivo | Aceita |
 
 ---

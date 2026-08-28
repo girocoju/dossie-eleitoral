@@ -310,9 +310,24 @@ def _ficha(c: Candidato, quando: str) -> str:
       desde 1998</span></section>""")
 
     # bens e plano
-    if c.proposta_obrigatoria and c.tem_proposta and c.url_proposta:
-        plano = (f'<a href="{e(c.url_proposta)}" rel="nofollow noopener">'
-                 f'Documento oficial no TSE ↗</a>')
+    if c.proposta_obrigatoria and c.plano_texto:
+        palavras = len(c.plano_texto.split())
+        plano = (
+            f'<p style="margin:0 0 8px"><a href="{BASE_URL}/{c.caminho}/plano/">'
+            f'<b>Ler o plano de governo na íntegra →</b></a></p>'
+            f'<p style="margin:0;font-size:13px;color:var(--ink-3)">'
+            f'{c.plano_paginas} páginas, {palavras:,} palavras. '
+            f'Transcrição do PDF oficial.</p>'.replace(",", "."))
+    elif c.proposta_obrigatoria and c.tem_proposta and c.plano_motivo:
+        extra = (f' <a href="{e(c.plano_url_pdf)}" rel="nofollow noopener">'
+                 f'Abrir o PDF original ↗</a>' if c.plano_url_pdf else '')
+        plano = ('<span class="marca-dado m-ausente">apresentou, mas não foi '
+                 'possível transcrever</span>'
+                 f'<p style="margin:8px 0 0;font-size:13px;color:var(--ink-3)">'
+                 f'{e(c.plano_motivo)}.{extra}</p>')
+    elif c.proposta_obrigatoria and c.tem_proposta:
+        plano = ('<span class="marca-dado m-ausente">apresentou — '
+                 'transcrição pendente</span>')
     elif c.proposta_obrigatoria:
         plano = ('<span class="marca-dado m-ausente">exigido para este cargo, não consta</span>')
     else:
@@ -360,6 +375,39 @@ def _ficha(c: Candidato, quando: str) -> str:
             f"Perfil declarado ao TSE, trajetória eleitoral e plano de governo.")
     return _pagina(f"{c.nome_urna} — {c.cargo_nome} {c.sg_uf}", desc,
                    "".join(partes), quando, c.url, CARGOS[c.cod_cargo][0])
+
+
+def _pagina_plano(c: Candidato, quando: str) -> str:
+    """Plano de governo em pagina propria, com URL propria.
+
+    Nao cabe na ficha: a mediana e' 111 mil caracteres, e enfiar isso num bloco
+    empurraria todo o resto para fora da tela. Em pagina propria vira o conteudo
+    mais substantivo do site — e o unico lugar onde alguem que busca "o que fulano
+    propoe sobre saude" tem onde chegar.
+
+    O texto sai em paragrafos, sem nenhuma edicao. Cabecalho de pagina e quebra
+    tortas do PDF aparecem como estao: e' transcricao, nao diagramacao.
+    """
+    blocos = (c.plano_texto or "").split("\n\n")
+    paragrafos = "".join(
+        f"<p>{e(b.strip())}</p>" for b in blocos if b.strip()
+    )
+    palavras = f"{len((c.plano_texto or '').split()):,}".replace(",", ".")
+    original = (f'<a href="{e(c.plano_url_pdf)}" rel="nofollow noopener">'
+                f'Abrir o PDF original no TSE ↗</a>' if c.plano_url_pdf else "")
+    corpo = f"""<a href="{BASE_URL}/{c.caminho}/" style="font-size:13.5px">← {e(c.nome_urna)}</a>
+<h1>Plano de governo — {e(c.nome_urna)}</h1>
+<p class="sub">{e(c.cargo_nome)} · {e(_UF_NOME.get(c.sg_uf, c.sg_uf))} ·
+{e(c.partido_completo)}</p>
+<p class="aviso"><b>Transcrição automática do PDF oficial</b> entregue ao TSE:
+{c.plano_paginas} páginas, {palavras} palavras. O texto está <b>íntegro e sem
+edição</b> — não foi resumido, corrigido nem reorganizado. Quebras de linha e
+cabeçalhos de página aparecem como saíram do arquivo. {original}</p>
+<article class="plano">{paragrafos}</article>"""
+    desc = (f"Plano de governo de {c.nome_urna}, candidatura a {c.cargo_nome} por "
+            f"{c.sg_uf} em 2026. Texto integral entregue ao TSE.")
+    return _pagina(f"Plano de governo de {c.nome_urna}", desc, corpo, quando,
+                   f"{c.url}plano/", CARGOS[c.cod_cargo][0])
 
 
 def _cartao(c: Candidato) -> str:
@@ -525,6 +573,7 @@ def _sitemap(majoritarios: list[Candidato], quando: str) -> str:
     urls += [f"{BASE_URL}/{s}/" for s, _, _ in CARGOS.values()]
     urls += [f"{BASE_URL}/{s}/" for s, _ in PROPORCIONAIS.values()]
     urls += [c.url for c in majoritarios]
+    urls += [f"{c.url}plano/" for c in majoritarios if c.plano_texto]
     corpo = "".join(f"  <url><loc>{e(u)}</loc></url>\n" for u in urls)
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
@@ -546,6 +595,8 @@ def escrever_site(destino: Path, majoritarios: list[Candidato],
 
     for c in majoritarios:
         grava(f"{c.caminho}/index.html", _ficha(c, quando))
+        if c.plano_texto:
+            grava(f"{c.caminho}/plano/index.html", _pagina_plano(c, quando))
 
     for chave, nome in PROPORCIONAIS.values():
         registros = proporcionais.get(chave, [])

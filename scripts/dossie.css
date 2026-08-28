@@ -86,3 +86,8 @@ font-family:var(--mono);font-size:10px;color:var(--ink-3);cursor:help;vertical-a
 .nota-lei{font-size:13px;color:var(--ink-3);margin:0 0 22px;padding-left:11px;
 border-left:2px solid var(--rule)}
 .cartao[hidden]{display:none}
+
+/* texto integral do plano: leitura longa, entao coluna estreita e linha alta */
+.plano{max-width:62ch;margin-top:26px}
+.plano p{margin:0 0 14px;font-size:16px;line-height:1.68;color:var(--ink-2)}
+.plano p:first-child{font-size:17px;color:var(--ink)}

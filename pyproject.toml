@@ -14,6 +14,10 @@ dependencies = [
   "google-cloud-bigquery>=3.25",
   "google-cloud-storage>=2.18",
   "PyYAML>=6.0",
+  # Extracao do texto dos planos de governo (ADR-019). E' a unica dependencia do
+  # nucleo que nao fala com nuvem: ler PDF em stdlib exigiria implementar o
+  # formato, e uma transcricao errada deturpa a proposta de uma pessoa real.
+  "pypdf>=5.0",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +40,7 @@ radar-propostas = "ingest.propostas:main"
 radar-siconfi = "ingest.siconfi:main"
 radar-ideb = "ingest.ideb:main"
 radar-rtn = "ingest.rtn:main"
+radar-planos = "ingest.planos:main"
 
 [build-system]
 requires = ["hatchling"]

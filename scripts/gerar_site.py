@@ -111,6 +111,10 @@ class Candidato:
     proposta_obrigatoria: bool
     tem_proposta: bool
     url_proposta: str | None
+    plano_texto: str | None = None
+    plano_paginas: int | None = None
+    plano_motivo: str | None = None
+    plano_url_pdf: str | None = None
     trajetoria: list[dict] = field(default_factory=list)
     mudancas: list[dict] = field(default_factory=list)
     indicadores: list[dict] = field(default_factory=list)
@@ -197,6 +201,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     _anexar_mudancas(cliente, {c.sk: c for c in saida})
     _anexar_indicadores(cliente, ids)
     _anexar_atividade(cliente, ids)
+    _anexar_planos(cliente, {c.sk: c for c in saida})
     return saida
 
 
@@ -338,6 +343,38 @@ def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
             })
             n += 1
     log.info("%d linhas de atividade legislativa anexadas", n)
+
+
+def _anexar_planos(cliente, por_sk: dict[str, Candidato]) -> None:
+    """Texto integral do plano de governo (ADR-019).
+
+    Vem de `raw_tse.planos`, tabela que so' existe porque o endpoint certo do TSE
+    foi encontrado no bundle do proprio app. Onde `texto` e' nulo ha' um `motivo`
+    legivel — PDF escaneado, protegido, ilegivel — e a tela diz qual, em vez de
+    mostrar um bloco vazio.
+    """
+    p = cliente.project
+    try:
+        linhas = list(cliente.query(f"""
+            select sk_candidatura, texto, n_paginas, motivo, url_pdf
+            from `{p}.raw_tse.planos`
+        """).result())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("raw_tse.planos indisponivel (%s) — o site sai sem os planos",
+                    str(exc)[:80])
+        return
+    com = 0
+    for r in linhas:
+        c = por_sk.get(r.sk_candidatura)
+        if not c:
+            continue
+        c.plano_texto = r.texto
+        c.plano_paginas = r.n_paginas
+        c.plano_motivo = r.motivo
+        c.plano_url_pdf = r.url_pdf
+        if r.texto:
+            com += 1
+    log.info("%d planos com texto integral anexados", com)
 
 
 def carregar_proporcionais(cliente) -> dict[str, list[dict]]:

@@ -202,6 +202,12 @@ jobs:
         if: steps.cred.outputs.temos == 'true'
         run: python -m ingest.propostas load --ano 2026
 
+      # Baixa o PDF e extrai o texto so' de quem ainda nao tem transcricao —
+      # 206 planos, mas a maioria ja' esta' no BigQuery na execucao seguinte.
+      - name: Texto integral dos planos (ADR-019)
+        if: steps.cred.outputs.temos == 'true'
+        run: python -m ingest.planos load
+
       # A ponte de identidade muda a cada licenca e suplencia, entao vale rodar
       # diariamente: sao ~600 requisicoes leves.
       - name: Parlamentares em exercicio (F-15)

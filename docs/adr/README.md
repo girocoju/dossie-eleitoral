@@ -24,3 +24,4 @@ junto com qualquer arquivo daqui.
 | [ADR-016](ADR-016-cadeia-tls-incompleta.md) | Intermediario TLS do INEP versionado no repositorio | Aceita |
 | [ADR-017](ADR-017-orcamento-federal-pelo-rtn.md) | Orcamento federal pelo RTN, nao pela DCA | Aceita |
 | [ADR-018](ADR-018-site-estatico-em-vez-de-bi.md) | Site estatico gerado do lake, em vez de ferramenta de BI | Aceita |
+| [ADR-019](ADR-019-texto-integral-dos-planos.md) | Texto integral dos planos de governo, transcrito do PDF oficial | Aceita |

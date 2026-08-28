@@ -46,6 +46,7 @@ ingest-fotos:  ## baixa as fotos de urna, envia ao bucket e registra as URLs (F-
 
 ingest-propostas:  ## consulta a proposta de governo dos majoritarios (F-14)
 	$(BIN)/python -m ingest.propostas load --ano $(ANO)
+	$(BIN)/python -m ingest.planos load
 
 ingest-legislativo:  ## parlamentares em exercicio e atividade legislativa (F-15, F-16)
 	$(BIN)/python -m ingest.legislativo load
