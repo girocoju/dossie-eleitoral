@@ -401,24 +401,34 @@ indicadores:
 
   IDEB:
     nome: "IDEB — anos finais do ensino fundamental (rede publica)"
-    fonte: "INEP"
+    fonte: "INEP — IDEB (planilha de divulgacao por UF)"
     unidade: "indice 0-10"
     periodicidade: bienal
     direcao_desejavel: cima
-    provedor: arquivo
-    verificado: false
+    provedor: inep
+    verificado: true
+    conferido_em: "2026-08-28"
     notas: >
-      NAO INGERIDO AINDA. Bienal desde 2005, por UF — seria a serie com MELHOR
-      encaixe em janela de mandato de todo o projeto: cinco a seis medicoes dentro
-      de um mandato de governador, num tema em que o estado tem competencia direta.
+      ONZE EDICOES, 2005 a 2025, por UF e Brasil. E' a serie com melhor encaixe em
+      janela de mandato de todo o projeto: um mandato de governador contem duas ou
+      tres medicoes, contra uma unica do IDHM em trinta anos.
 
-      O que trava, medido em 28/08/2026: o certificado de `download.inep.gov.br` e'
-      valido e emitido pela "RNP ICPEdu GR46 OV TLS CA 2025", uma CA academica
-      brasileira que NAO esta' no bundle do certifi (o Windows confia; o Python e o
-      Ubuntu do CI nao). Alem disso, as URLs dos arquivos por ano nao foram
-      descobertas — a pagina do INEP monta os links por JavaScript.
+      Rede PUBLICA, nao "Total": incluir a rede privada mistura politica publica
+      com escolha de familia, e a comparacao entre estados passaria a refletir
+      tambem o tamanho do setor privado em cada um.
 
-      Resolver exige fixar a raiz da RNP no repositorio E mapear as URLs. Ver L-05.
+      Anos finais (6o ao 9o ano) porque e' o que o SPEC 3 (S8) especifica. As abas
+      de anos iniciais e ENSINO MEDIO estao no mesmo arquivo e sao lidas pelo mesmo
+      codigo — falta so' uma entrada de catalogo. O ensino medio e' o mais proximo
+      da responsabilidade de um governador, por ser majoritariamente estadual; a
+      pergunta esta' aberta no SPEC 11.
+
+      Ate' 2021 o INEP publicava metas por ente federado. O projeto NAO ingere
+      meta: "atingiu a meta" e' avaliacao, nao descricao (Constituicao 0.1).
     parametros:
-      url: null
-      formato: xlsx
+      # O INEP publica UF e Brasil em arquivos separados, com nomes de aba
+      # diferentes para a mesma etapa. Os dois sao declarados aqui em vez de
+      # deduzidos: deduzir nome de aba e' como adivinhar nome de coluna do TSE.
+      aba: "UF e Regiões (AF)"
+      aba_brasil: "Brasil (Anos Finais)"
+      rede: "Pública"

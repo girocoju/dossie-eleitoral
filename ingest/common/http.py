@@ -20,12 +20,15 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import ssl
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zlib
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 from ingest.common.log import get_logger
@@ -122,6 +125,51 @@ def _write_manifest(dest: Path, art: Artifact) -> None:
     )
 
 
+# ── Cadeias de certificado incompletas ──────────────────────────────────────
+#
+# Alguns servidores publicos servem o certificado da folha sem o intermediario.
+# O navegador disfarca (busca o intermediario pela extensao AIA); o Python nao, e
+# a conexao morre com CERTIFICATE_VERIFY_FAILED antes de qualquer HTTP.
+#
+# `download.inep.gov.br` (IDEB) e' o caso. Diagnostico de 28/08/2026:
+#
+#   folha         CN=*.inep.gov.br, valida
+#   intermediario CN=RNP ICPEdu GR46 OV TLS CA 2025   <- NAO e' enviado
+#   raiz          CN=GlobalSign Root R46              <- ja' esta' no certifi
+#
+# Ou seja: nao falta CA confiavel, falta um elo. O intermediario e' publico e
+# esta' versionado em `certs/`. Nao e' segredo nem excecao de seguranca — a
+# verificacao continua completa, so' recebe a peca que o servidor omitiu.
+#
+# Foi o que desfez o diagnostico anterior da L-05, que atribuia a falha a
+# "bloqueio de rede". Nao era.
+CADEIAS_INCOMPLETAS = {
+    "download.inep.gov.br": "rnp-icpedu-gr46-ov-tls-ca-2025.pem",
+}
+
+_DIR_CERTS = Path(__file__).resolve().parents[2] / "certs"
+
+
+@lru_cache(maxsize=8)
+def _contexto(host: str) -> ssl.SSLContext | None:
+    """Contexto TLS com o intermediario que falta, ou None para o padrao."""
+    arquivo = CADEIAS_INCOMPLETAS.get(host)
+    if not arquivo:
+        return None
+    caminho = _DIR_CERTS / arquivo
+    if not caminho.exists():
+        raise DownloadError(
+            f"{host} precisa do intermediario {arquivo}, que nao esta' em {_DIR_CERTS}. "
+            "Sem ele a conexao falha na verificacao do certificado, nao na rede."
+        )
+    # Contexto PADRAO (stdlib, sem certifi — o nucleo da ingestao nao tem
+    # dependencia externa) mais o elo que falta. A raiz GlobalSign Root R46 ja'
+    # vem da loja do sistema, no Windows e no Ubuntu do CI.
+    ctx = ssl.create_default_context()
+    ctx.load_verify_locations(cafile=str(caminho))
+    return ctx
+
+
 def _open(
     url: str,
     *,
@@ -139,7 +187,8 @@ def _open(
     if offset:
         headers["Range"] = f"bytes={offset}-"
     req = urllib.request.Request(url, headers=headers, method="GET")
-    return urllib.request.urlopen(req, timeout=timeout)
+    host = urllib.parse.urlparse(url).hostname or ""
+    return urllib.request.urlopen(req, timeout=timeout, context=_contexto(host))
 
 
 def download(
@@ -244,6 +293,21 @@ def _decode_body(raw: bytes, encoding: str | None) -> bytes:
     if (encoding or "").lower() in {"deflate", "zlib"}:
         return zlib.decompress(raw, -zlib.MAX_WBITS)
     return raw
+
+
+def get_texto(url: str, *, timeout: float = 120.0, attempts: int = MAX_ATTEMPTS) -> str:
+    """Busca uma pagina como texto, com o mesmo retry de `get_json`."""
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            with _open(url, timeout=timeout, aceita_gzip=True) as resp:
+                raw = _decode_body(resp.read(), resp.headers.get("Content-Encoding"))
+            return raw.decode("utf-8", "replace")
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
+            last_error = exc
+            if attempt < attempts:
+                time.sleep(BACKOFF_BASE * attempt)
+    raise DownloadError(f"nao foi possivel obter {url}: {last_error}")
 
 
 def get_json(url: str, *, timeout: float = 120.0, attempts: int = MAX_ATTEMPTS):

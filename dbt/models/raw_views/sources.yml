@@ -127,3 +127,19 @@ sources:
           Proposicoes da legislatura 2023-2026 em que um deputado e PROPONENTE.
           Uma linha por (proposicao, proponente). Classificada em
           `classe_proposicao`: normativa, fiscalizacao, relatoria, procedimental.
+
+  - name: raw_inep
+    description: >
+      S8 — IDEB por UF e Brasil, 2005-2025 (11 edicoes bienais). E' a serie com
+      melhor encaixe em janela de mandato do projeto: um mandato de governador
+      contem duas ou tres medicoes.
+    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    schema: raw_inep
+    config:
+      loaded_at_field: _extracted_at
+      freshness:
+        warn_after: { count: 400, period: day }
+        error_after: { count: 800, period: day }
+    tables:
+      - name: indicadores
+        description: "Formato longo (cod_indicador, sg_uf, ano, valor), rede publica."

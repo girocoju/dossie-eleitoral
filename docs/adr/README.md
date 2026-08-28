@@ -21,3 +21,4 @@ junto com qualquer arquivo daqui.
 | [ADR-013](ADR-013-proposta-de-governo.md) | Proposta de governo: existencia + link, sem re-hospedar PDF | Aceita |
 | [ADR-014](ADR-014-ponte-legislativo.md) | Ponte de identidade entre TSE e Camara/Senado | Aceita |
 | [ADR-015](ADR-015-atividade-legislativa.md) | Atividade legislativa por classe, sem taxa de aprovacao | Aceita |
+| [ADR-016](ADR-016-cadeia-tls-incompleta.md) | Intermediario TLS do INEP versionado no repositorio | Aceita |

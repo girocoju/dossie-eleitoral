@@ -34,6 +34,7 @@ radar-ipea = "ingest.ipeadata:main"
 radar-fotos = "ingest.fotos:main"
 radar-propostas = "ingest.propostas:main"
 radar-siconfi = "ingest.siconfi:main"
+radar-ideb = "ingest.ideb:main"
 
 [build-system]
 requires = ["hatchling"]

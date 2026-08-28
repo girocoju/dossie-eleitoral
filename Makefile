@@ -38,6 +38,7 @@ ingest-socio:  ## baixa e carrega indicadores socioeconomicos (IBGE/SIDRA + Ipea
 	$(BIN)/python -m ingest.ibge_sidra load
 	$(BIN)/python -m ingest.ipeadata load
 	$(BIN)/python -m ingest.siconfi load
+	$(BIN)/python -m ingest.ideb load
 
 ingest-fotos:  ## baixa as fotos de urna, envia ao bucket e registra as URLs (F-13)
 	$(BIN)/python -m ingest.fotos load --ano $(ANO)

@@ -366,6 +366,9 @@ radar-brasil/
 | ADR-006 a ADR-011 | Ver `docs/adr/` | — | Aceitas |
 | ADR-012 | Fotos em bucket público, não no BigQuery | Binário não pertence a um warehouse; o Power BI lê por URL | Aceita |
 | ADR-013 | Proposta de governo: existência + link, sem re-hospedar PDF | Credibilidade da fonte, cópia envelhece, e o download exigiria engenharia reversa | Aceita |
+| ADR-014 | Ponte de identidade com Câmara e Senado | Câmara publica CPF (casamento exato); Senado não, e a diferença viaja no dado | Aceita |
+| ADR-015 | Atividade legislativa por classe, sem taxa de aprovação | Aprovação depende de estar na base do governo, não do mérito — seria placar | Aceita |
+| ADR-016 | Intermediário TLS do INEP versionado em `certs/` | O servidor omite um elo da cadeia; a raiz sempre foi confiável. Destrava o IDEB | Aceita |
 
 ---
 
@@ -373,7 +376,15 @@ radar-brasil/
 
 - O TSE 2026 já traz `cod_cargo` e layout iguais a 2022? (Verificar no leiame antes da T-101.)
 - Quais séries do Ipeadata têm granularidade UF anual completa desde 1999?
-- IDHM 2021 (atualização do Atlas) está disponível por UF em formato aberto?
+- ~~IDHM 2021 (atualização do Atlas) está disponível por UF em formato aberto?~~
+  **Respondida em 28/08/2026:** não nesta série. O Ipeadata publica `ADH_IDHM` com
+  1991, 2000 e 2010 — sem 2021. O IDHM entrou como linha de base histórica (L-04).
+- **O IDEB de ENSINO MÉDIO deve virar indicador próprio?** O arquivo do INEP já
+  traz as três etapas e o código lê qualquer uma — falta só uma entrada de
+  catálogo. O ensino médio é majoritariamente **estadual**, portanto o mais
+  próximo da responsabilidade de um governador; hoje o projeto ingere apenas anos
+  finais do fundamental, que é o que o §3 (S8) especificava. Idem anos iniciais,
+  que são majoritariamente municipais e servem melhor à página de Prefeito de 2028.
 - Publish to web do Power BI atende, ou vale embutir num site estático da DDI?
 
 ---

@@ -44,9 +44,19 @@ def test_derivado_e_arquivo_sem_url_nao_sao_ingeriveis():
     """
     catalogo = carregar_catalogo()
     assert catalogo["PIB_PER_CAPITA"].ingerivel is False   # nasce no dbt
-    assert catalogo["IDEB"].ingerivel is False             # provedor arquivo, sem URL
-    assert catalogo["IDHM"].ingerivel is True              # agora vem do Ipeadata
+    assert catalogo["IDHM"].ingerivel is True              # veio para o Ipeadata
+    assert catalogo["IDEB"].ingerivel is True              # veio para o INEP
     assert catalogo["PIB"].ingerivel is True
+
+    # A regra em si continua valendo, mesmo sem nenhum indicador a exercendo hoje:
+    # `arquivo` sem URL nao pode ser tentado pela carga.
+    from ingest.common.indicadores import Indicador
+
+    orfao = Indicador(
+        cod_indicador="X", nome="x", fonte="x", unidade="x", periodicidade="anual",
+        direcao_desejavel="neutro", provedor="arquivo", verificado=False,
+    )
+    assert orfao.ingerivel is False
 
 
 # ── UFs ────────────────────────────────────────────────────────────────

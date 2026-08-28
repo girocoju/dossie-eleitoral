@@ -89,45 +89,49 @@ Enquanto isso e' limite da fonte, documentado em METODOLOGIA secao 9.
 
 ---
 
-## L-05 · IDEB nao ingerido (IDHM foi FECHADA por outra fonte)
+## L-05 · FECHADA — IDEB e IDHM ingeridos por caminhos diferentes
 
-**Situacao:** IDHM **fechada** em 28/08/2026 · IDEB **aberta**
+**Situacao:** **fechada** em 28/08/2026 (as duas pontas)
 
-O diagnostico anterior desta lacuna estava errado e foi corrigido. Ele dizia que
-os dois hosts "resetam a conexao no handshake TLS". A medicao de 28/08/2026 mostra
-duas causas distintas, e nenhuma delas e' reset:
+O diagnostico original desta lacuna estava errado. Dizia que os dois hosts
+"resetam a conexao no handshake TLS". Eram duas causas distintas, e nenhuma delas
+era reset:
 
-| Host | Causa real |
-|---|---|
-| `www.atlasbrasil.org.br` | Certificado Let's Encrypt **vencido em 24/08/2026** |
-| `download.inep.gov.br` | Certificado **valido**, emitido pela "RNP ICPEdu GR46 OV TLS CA 2025" — uma CA academica brasileira **ausente do bundle do certifi**. O Windows confia nela e a mesma URL responde HTTP normalmente por la' |
+| Host | Causa real | Desfecho |
+|---|---|---|
+| `www.atlasbrasil.org.br` | Certificado Let's Encrypt **vencido em 24/08/2026** | Contornado: a serie estava no Ipeadata |
+| `download.inep.gov.br` | Certificado **valido**; faltava o **intermediario** na cadeia servida | Resolvido: intermediario versionado (ADR-016) |
 
-### IDHM — fechada, e o Atlas nem era necessario
+### IDHM — 84 observacoes, 1991/2000/2010
 
-A mesma serie do Atlas do Desenvolvimento Humano esta' publicada no **Ipeadata**
-(`ADH_IDHM`), que o projeto ja' consome. Ingerida com zero codigo novo: **84
-observacoes**, 28 unidades, 1991/2000/2010. Valores conferidos contra o Atlas
-(Brasil 2010 = 0,727; SP = 0,783; MA = 0,639).
+A mesma serie do Atlas esta' no Ipeadata (`ADH_IDHM`), que o projeto ja' consumia.
+Zero codigo novo. Valores conferidos contra o Atlas (Brasil 2010 = 0,727).
+Limite que fica: para em 2010, antes de todos os mandatos do painel — linha de
+base historica, nunca indicador de mandato. Ver L-04.
 
-**Limite que fica:** para em 2010, antes de todos os mandatos do painel. Serve de
-linha de base historica, nunca de indicador de mandato. Ver METODOLOGIA secao 9.
+### IDEB — 308 observacoes, 11 edicoes de 2005 a 2025
 
-### IDEB — continua aberto, e vale a pena
+Rede publica, anos finais do ensino fundamental, 27 UFs mais Brasil. E' a serie
+com MELHOR encaixe em janela de mandato de todo o projeto.
 
-**Por que vale mais que o IDHM:** e' bienal desde 2005, por UF. Seria a serie com
-MELHOR encaixe em janela de mandato de todo o projeto — duas a tres medicoes
-dentro de um mandato de governador, num tema em que o estado tem competencia
-direta. Quase nenhum outro indicador do projeto reune as duas coisas.
+Tres obstaculos, todos resolvidos e documentados na ADR-016:
 
-**O que falta, concretamente:**
+1. **Cadeia TLS incompleta.** O servidor nao envia o intermediario da RNP ICPEdu.
+   Versionado em `certs/`, injetado so' para esse host.
+2. **URLs invisiveis.** A pagina nao tem link nenhum no HTML; os arquivos vem de
+   um endpoint declarado em `data-url`. `python -m ingest.ideb verify` refaz a
+   descoberta e falha se o INEP renomear.
+3. **Defeito na planilha da fonte.** No arquivo do Brasil, a coluna do IDEB 2023
+   veio sem o codigo de maquina. Sem remendo, o Brasil perderia 2023 e 27 estados
+   ficariam sem comparador naquele ano.
 
-1. **Fixar a raiz da RNP no repositorio** e usa-la como CA bundle so' para
-   `download.inep.gov.br`. Nao basta `truststore` para pegar a loja do Windows: o
-   CI roda em Ubuntu, que tambem nao tem essa CA.
-2. **Descobrir as URLs dos arquivos por ano.** A pagina de resultados do INEP monta
-   os links por JavaScript — quatro padroes de URL tentados a mao devolveram 404.
+**O que continua fora:** as abas de anos iniciais e ENSINO MEDIO estao no mesmo
+arquivo e sao lidas pelo mesmo codigo — falta so' uma entrada de catalogo. O
+ensino medio interessa especialmente, por ser majoritariamente estadual e portanto
+o mais proximo da responsabilidade de um governador. Pergunta aberta no SPEC 11.
 
-Nenhum dos dois e' dificil; sao duas tarefas pequenas e independentes.
+**O que nunca entra:** as METAS do IDEB. "Atingiu a meta" e' avaliacao, nao
+descricao (Constituicao 0.1). O parser le' `VL_OBSERVADO` e ignora `VL_PROJECAO`.
 
 ---
 

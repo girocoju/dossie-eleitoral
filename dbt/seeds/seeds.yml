@@ -65,7 +65,7 @@ seeds:
         tests:
           - accepted_values:
               arguments:
-                values: [sidra, ipeadata, siconfi, arquivo, derivado]
+                values: [sidra, ipeadata, siconfi, inep, arquivo, derivado]
       - name: verificado
         description: "TRUE quando a chamada real da fonte ja' foi conferida nesta base de codigo."
         tests: [not_null]
