@@ -95,6 +95,65 @@ indicadores:
       agregacao: media_anual
       min_periodos: 4
 
+  RENDIMENTO_MEDIO:
+    nome: "Rendimento medio mensal real do trabalho"
+    fonte: "IBGE — PNAD Continua (SIDRA t/4566)"
+    unidade: "R$ constantes"
+    periodicidade: anual
+    direcao_desejavel: cima
+    provedor: sidra
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Rendimento medio de quem tem 14 anos ou mais e esta' ocupado, por UF,
+      2012-2025.
+
+      E' a serie REAL, ja' deflacionada — e por isso a unica do projeto em R$
+      CONSTANTES. PIB, receita, despesa e bens declarados sao todos nominais. Nao
+      misture: uma variacao de 10% aqui significa ganho de poder de compra; uma
+      variacao de 10% no PIB nominal pode ser so' inflacao.
+
+      Sobre atribuicao: e' o indicador mais SENSIVEL a politica FEDERAL de todo o
+      painel — salario minimo, inflacao e juros mexem nele muito mais do que
+      qualquer decisao estadual. Vale a mesma regra dos demais (Constituicao 0.2),
+      com um cuidado extra na pagina de Governadores.
+    parametros:
+      tabela: 4566
+      variavel: 5935
+      niveis: [n1, n3]
+      periodos: all
+
+  IPCA:
+    nome: "Inflacao acumulada no ano (IPCA)"
+    fonte: "IBGE — IPCA serie historica (SIDRA t/1737)"
+    unidade: "% no ano"
+    periodicidade: anual
+    direcao_desejavel: baixo
+    provedor: sidra
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Indice oficial de inflacao do pais, 1980-2025. A fonte e' MENSAL e a variavel
+      69 ja' vem ACUMULADA no ano, entao o valor anual e' o de dezembro — nao a
+      media dos meses. Media de valores acumulados nao significa nada: janeiro
+      acumula um mes e dezembro acumula doze, e a media daria cerca de metade da
+      inflacao real. Por isso `agregacao: ultimo_do_ano` com `min_periodos: 12`.
+
+      SERIE NACIONAL (n1), sem quebra por UF: o IPCA por regiao metropolitana
+      existe nesta tabela, mas nao cobre as 27 UFs, e um comparador que so' tem
+      metade dos estados nao serve de comparador.
+
+      LEIA JUNTO COM O RENDIMENTO_MEDIO: os dois sao as duas metades da mesma
+      pergunta. O rendimento ja' vem deflacionado, entao NAO desconte a inflacao
+      dele de novo.
+    parametros:
+      tabela: 1737
+      variavel: 69
+      niveis: [n1]
+      periodos: all
+      agregacao: ultimo_do_ano
+      min_periodos: 12
+
   # ── IPEA / Ipeadata (S7, S9) ─────────────────────────────────────────
   # SERCODIGO conferido por `python -m ingest.ipeadata verify`. Enquanto
   # `verificado: false`, o indicador NAO entra na carga automatica (--somente-verificados).
@@ -113,6 +172,36 @@ indicadores:
       (467.988 linhas, ate' municipio) — o loader fica so' com Estados e Brasil.
     parametros:
       sercodigo: "AVIOL12_THOMIC"
+
+  SELIC:
+    nome: "Taxa de juros nominal — Over/Selic"
+    fonte: "IPEA — Ipeadata macroeconomico (serie PAN_TJOVER)"
+    unidade: "% a.a."
+    periodicidade: anual
+    direcao_desejavel: neutro
+    provedor: ipeadata
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Taxa basica de juros, media do ano, 1974-2025. Serie MACROECONOMICA: nao tem
+      nivel territorial na resposta da API (`NIVNOME` vem vazio), e por isso o
+      catalogo declara `macroeconomica: true` para o loader trata-la como nacional.
+      So' existe `BR`, nunca UF.
+
+      CUIDADO ESPECIAL DE LEITURA, maior que o das outras series. A Selic e'
+      definida pelo COPOM, nao pelo Poder Executivo, e desde a LC 179/2021 o Banco
+      Central tem autonomia formal, com mandatos do presidente e dos diretores
+      DESCASADOS do mandato presidencial. Atribuir a taxa de juros a quem estava na
+      Presidencia e' menos defensavel do que qualquer outro indicador do projeto —
+      inclusive menos do que o PIB. Ela entra como CONTEXTO do periodo, e a tela
+      diz isso (Constituicao 0.2).
+
+      `direcao_desejavel: neutro` de proposito: juro alto nao e' "ruim" nem juro
+      baixo "bom" — depende inteiramente da inflacao do momento. Colorir tendencia
+      aqui seria editorializar.
+    parametros:
+      sercodigo: "PAN_TJOVER"
+      macroeconomica: true
       niveis: [Estados, Brasil]
 
   MORTALIDADE_INFANTIL:
@@ -285,19 +374,30 @@ indicadores:
 
   IDHM:
     nome: "Indice de Desenvolvimento Humano Municipal (agregado por UF)"
-    fonte: "Atlas do Desenvolvimento Humano (PNUD/IPEA/FJP)"
+    fonte: "IPEA — Atlas do Desenvolvimento Humano (Ipeadata, serie ADH_IDHM)"
     unidade: "indice 0-1"
     periodicidade: decenal
     direcao_desejavel: cima
-    provedor: arquivo
-    verificado: false
+    provedor: ipeadata
+    verificado: true
+    conferido_em: "2026-08-28"
     notas: >
-      Serie curta (2000, 2010, 2021) — o SPEC 3 (S8) manda usar com cautela.
-      Nao entra em `fct_mandato_indicador` como variacao anual; aparece so' como
-      corte de contexto, porque dois pontos em 20 anos nao descrevem um mandato.
+      Vem pelo IPEADATA, nao pelo atlasbrasil.org.br. A lacuna L-05 registrava o
+      Atlas como inalcancavel; a causa real, medida em 28/08/2026, e' que o
+      certificado TLS de `www.atlasbrasil.org.br` venceu em 24/08/2026. Nao
+      precisamos dele: a mesma serie do Atlas esta' publicada no Ipeadata, que o
+      projeto ja' consome — zero codigo novo.
+
+      TRES PONTOS, E O ULTIMO E' DE 2010: 1991, 2000 e 2010, por UF e Brasil. A
+      atualizacao de 2021 do Atlas NAO esta' nesta serie do Ipeadata.
+
+      ISSO LIMITA O USO A CONTEXTO HISTORICO. Nenhum mandato do escopo do projeto
+      e' descrito por estes numeros — o mais recente e' anterior a todos os
+      mandatos que o painel cobre. NAO entra em `fct_mandato_indicador` como
+      variacao: serve para dizer de onde o estado partiu, nunca para sugerir que
+      um governo levou o indice a algum lugar.
     parametros:
-      url: null    # preencher com a URL do CSV/XLSX publicado
-      formato: xlsx
+      sercodigo: "ADH_IDHM"
 
   IDEB:
     nome: "IDEB — anos finais do ensino fundamental (rede publica)"
@@ -307,7 +407,18 @@ indicadores:
     direcao_desejavel: cima
     provedor: arquivo
     verificado: false
-    notas: "Bienal; a janela de mandato costuma pegar 2 medicoes."
+    notas: >
+      NAO INGERIDO AINDA. Bienal desde 2005, por UF — seria a serie com MELHOR
+      encaixe em janela de mandato de todo o projeto: cinco a seis medicoes dentro
+      de um mandato de governador, num tema em que o estado tem competencia direta.
+
+      O que trava, medido em 28/08/2026: o certificado de `download.inep.gov.br` e'
+      valido e emitido pela "RNP ICPEdu GR46 OV TLS CA 2025", uma CA academica
+      brasileira que NAO esta' no bundle do certifi (o Windows confia; o Python e o
+      Ubuntu do CI nao). Alem disso, as URLs dos arquivos por ano nao foram
+      descobertas — a pagina do INEP monta os links por JavaScript.
+
+      Resolver exige fixar a raiz da RNP no repositorio E mapear as URLs. Ver L-05.
     parametros:
       url: null
       formato: xlsx

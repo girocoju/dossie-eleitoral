@@ -27,6 +27,7 @@ from ingest.common.indicadores import (
     carregar_catalogo,
     media_anual,
     por_provedor,
+    ultimo_do_ano,
 )
 from ingest.common.log import get_logger
 from ingest.common.textnorm import strip_accents
@@ -114,8 +115,9 @@ def parse_resposta(payload: list[dict[str, Any]], ind: Indicador, url: str) -> l
     min_periodos = int(ind.parametros.get("min_periodos", 1))
     extraido_em = utc_now()
 
-    # (sg_uf, ano) -> lista de valores; a media anual so' e' aplicada se pedida
-    bruto: dict[str, list[tuple[int, float]]] = {}
+    # sg_uf -> lista de (ano, periodo, valor). O periodo entra na tupla, e nao numa
+    # lista paralela, para nao existir alinhamento por posicao que possa quebrar.
+    bruto: dict[str, list[tuple[int, str, float]]] = {}
     unidade = ind.unidade
 
     for linha in linhas:
@@ -124,16 +126,21 @@ def parse_resposta(payload: list[dict[str, Any]], ind: Indicador, url: str) -> l
         valor = _valor(linha.get("V"))
         if sg_uf is None or ano is None or valor is None:
             continue
-        bruto.setdefault(sg_uf, []).append((ano, valor))
+        periodo = str(linha.get(f"{dim_periodo}C") or "")
+        bruto.setdefault(sg_uf, []).append((ano, periodo, valor))
         if linha.get("MN"):
             unidade = ind.unidade  # mantem a unidade declarada no catalogo
 
     observacoes: list[Observacao] = []
-    for sg_uf, pares in bruto.items():
+    for sg_uf, medidas in bruto.items():
         if agregacao == "media_anual":
-            por_ano = media_anual(pares, min_periodos=min_periodos)
+            por_ano = media_anual(
+                [(ano, valor) for ano, _, valor in medidas], min_periodos=min_periodos
+            )
+        elif agregacao == "ultimo_do_ano":
+            por_ano = ultimo_do_ano(medidas, min_periodos=min_periodos)
         else:
-            por_ano = {ano: (valor, 1) for ano, valor in pares}
+            por_ano = {ano: (valor, 1) for ano, _, valor in medidas}
         for ano, (valor, n) in sorted(por_ano.items()):
             observacoes.append(
                 Observacao(

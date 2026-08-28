@@ -82,8 +82,15 @@ def parse_valores(
     observacoes: list[Observacao] = []
     ignorados = 0
 
+    # Serie macroeconomica (Selic, cambio) nao tem nivel territorial: `NIVNOME`
+    # vem vazio. Ela e' nacional por natureza, entao vira `BR` — mas so' quando o
+    # catalogo declara isso, para uma serie regional com nivel faltando nao virar
+    # Brasil por acidente.
+    macro = bool(ind.parametros.get("macroeconomica"))
     for item in valores:
         nivel = _sem_acento(item.get("NIVNOME"))
+        if macro and not nivel:
+            nivel = "brasil"
         if nivel not in NIVEIS_ACEITOS:
             ignorados += 1
             continue

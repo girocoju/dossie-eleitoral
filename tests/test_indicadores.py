@@ -37,9 +37,15 @@ def test_indicador_verificado_registra_a_data_da_conferencia():
 
 
 def test_derivado_e_arquivo_sem_url_nao_sao_ingeriveis():
+    """Indicador sem fonte resolvida nao pode ser tentado pela carga.
+
+    O IDHM ocupava esta posicao ate' 28/08/2026, quando passou a vir do Ipeadata.
+    Quem ficou sem URL foi o IDEB — ver L-05.
+    """
     catalogo = carregar_catalogo()
     assert catalogo["PIB_PER_CAPITA"].ingerivel is False   # nasce no dbt
-    assert catalogo["IDHM"].ingerivel is False             # ainda sem URL
+    assert catalogo["IDEB"].ingerivel is False             # provedor arquivo, sem URL
+    assert catalogo["IDHM"].ingerivel is True              # agora vem do Ipeadata
     assert catalogo["PIB"].ingerivel is True
 
 

@@ -135,6 +135,40 @@ def por_provedor(provedor: str, path: str | None = None) -> list[Indicador]:
     return [i for i in carregar_catalogo(path).values() if i.provedor == provedor]
 
 
+def ultimo_do_ano(
+    observacoes: Iterable[tuple[int, str, float]], *, min_periodos: int = 1
+) -> dict[int, tuple[float, int]]:
+    """Serie ACUMULADA no ano: o valor do ano e' o do ultimo periodo, nao a media.
+
+    O IPCA acumulado em dezembro JA E' a inflacao do ano. Tirar media dos doze
+    meses acumulados daria um numero sem significado — cerca de metade do valor
+    correto, porque janeiro acumula um mes e dezembro acumula doze.
+
+    Recebe TRIPLAS `(ano, periodo, valor)`, e nao duas listas paralelas. A primeira
+    versao recebia valores e periodos separados, alinhados por posicao: bastaria um
+    `continue` entre os dois `append` do chamador para o IPCA passar a pegar o mes
+    errado, sem erro nenhum. O periodo anda junto do valor porque escolher o
+    periodo certo E' o trabalho desta funcao.
+    """
+    ultimo: dict[int, tuple[str, float]] = {}
+    contagem: dict[int, int] = {}
+    for ano, periodo, valor in observacoes:
+        contagem[ano] = contagem.get(ano, 0) + 1
+        atual = ultimo.get(ano)
+        # Comparacao textual: o SIDRA usa periodo de largura fixa ("202512"),
+        # entao ordem lexicografica e cronologica coincidem.
+        if atual is None or periodo > atual[0]:
+            ultimo[ano] = (periodo, valor)
+    # Ano incompleto fica de fora. Em 08/2026 o IPCA acumulado ate' julho existe,
+    # mas nao e' "a inflacao de 2026" — publicar seria comparar sete meses com os
+    # doze de todos os outros anos.
+    return {
+        ano: (valor, contagem[ano])
+        for ano, (_, valor) in ultimo.items()
+        if contagem[ano] >= min_periodos
+    }
+
+
 def media_anual(
     valores_por_periodo: Iterable[tuple[int, float]], *, min_periodos: int = 1
 ) -> dict[int, tuple[float, int]]:
