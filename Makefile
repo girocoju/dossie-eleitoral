@@ -45,6 +45,10 @@ ingest-fotos:  ## baixa as fotos de urna, envia ao bucket e registra as URLs (F-
 ingest-propostas:  ## consulta a proposta de governo dos majoritarios (F-14)
 	$(BIN)/python -m ingest.propostas load --ano $(ANO)
 
+ingest-legislativo:  ## parlamentares em exercicio e atividade legislativa (F-15, F-16)
+	$(BIN)/python -m ingest.legislativo load
+	$(BIN)/python -m ingest.proposicoes load
+
 verify-layout:  ## confere o header real do TSE contra ingest/layouts/tse_$(ANO).yml
 	$(BIN)/python -m ingest.tse verify-layout --ano $(ANO)
 
@@ -72,7 +76,7 @@ lint:  ## ruff check
 fmt:  ## ruff format
 	$(BIN)/python -m ruff format ingest tests
 
-run: ingest ingest-historico ingest-socio ingest-fotos ingest-propostas dbt-build  ## pipeline completo
+run: ingest ingest-historico ingest-socio ingest-fotos ingest-propostas ingest-legislativo dbt-build  ## pipeline completo
 
 docs-status:  ## imprime o estado das Tasks
 	@cat docs/STATUS.md

@@ -1,6 +1,6 @@
 name: pipeline
 
-# F-10 — ingestao + dbt semanal ate' a eleicao, e verificacao em todo PR.
+# F-10 — ingestao + dbt DIARIO ate' a eleicao, e verificacao em todo PR.
 #
 # Dois jobs de proposito:
 #   `verificar` roda SEMPRE e nao precisa de nenhum segredo — e' o portao de merge.
@@ -12,12 +12,22 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    # DIARIO as 09:00 UTC (06:00 em Brasilia) — e' o que sustenta o snapshot da
-    # situacao das candidaturas. O TSE republica o pacote todo dia ate' 04/10/2026
-    # e publica sempre o estado atual: um dia sem rodar e' um dia de historico
-    # perdido para sempre. Depois do 2o turno (25/10/2026) da' para voltar a
-    # semanal — ver docs/STATUS.md.
-    - cron: "0 9 * * *"
+    # DIARIO as 11:00 em Brasilia. O cron do GitHub Actions so' entende UTC, e o
+    # Brasil nao tem mais horario de verao desde 2019 (Decreto 9.772/2019), entao
+    # UTC-3 vale o ano inteiro e 11:00 BRT = 14:00 UTC, sem excecao em nenhum mes.
+    #
+    # POR QUE DIARIO: o TSE republica o pacote todo dia ate' 04/10/2026 e publica
+    # sempre o ESTADO ATUAL, sem historico. Um dia sem rodar e' um dia de historico
+    # perdido para sempre — nao da' para recuperar depois. E' isso que sustenta o
+    # snapshot da situacao das candidaturas.
+    #
+    # Depois do 2o turno (25/10/2026) da' para voltar a semanal — ver docs/STATUS.md.
+    #
+    # AVISO do GitHub: agendamento em horario "redondo" e' o horario de pico da
+    # plataforma e a fila pode atrasar a execucao em dezenas de minutos. Nao e'
+    # problema aqui — o que importa e' rodar uma vez por dia, nao rodar as 11:00
+    # em ponto.
+    - cron: "0 14 * * *"
   workflow_dispatch:
     inputs:
       anos:
@@ -156,6 +166,19 @@ jobs:
       - name: Proposta de governo dos majoritarios (F-14)
         if: steps.cred.outputs.temos == 'true'
         run: python -m ingest.propostas load --ano 2026
+
+      # A ponte de identidade muda a cada licenca e suplencia, entao vale rodar
+      # diariamente: sao ~600 requisicoes leves.
+      - name: Parlamentares em exercicio (F-15)
+        if: steps.cred.outputs.temos == 'true'
+        run: python -m ingest.legislativo load
+
+      # Os arquivos anuais da Camara sao grandes (~500 MB na legislatura inteira),
+      # mas o download e' idempotente por sha256: so' rebaixa o do ano corrente,
+      # que e' o unico que muda.
+      - name: Atividade legislativa da Camara (F-16)
+        if: steps.cred.outputs.temos == 'true'
+        run: python -m ingest.proposicoes load
 
       - name: dbt build
         if: steps.cred.outputs.temos == 'true'
