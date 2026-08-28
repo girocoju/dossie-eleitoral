@@ -16,7 +16,7 @@ alguem perceber e revoga-la.
 
 Workload Identity Federation. O GitHub emite um token OIDC de curta duracao a cada
 execucao; o GCP o troca por uma credencial temporaria da service account
-`radar-pipeline@radar-brasil-ddi`. **Nenhuma chave e' criada em momento algum.**
+a service account do pipeline. **Nenhuma chave e' criada em momento algum.**
 
 A confianca e' amarrada a um repositorio especifico por condicao de atributo:
 

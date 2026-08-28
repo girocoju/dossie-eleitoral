@@ -3,7 +3,8 @@
 > Atualizado em **2026-08-27**. Fonte da verdade sobre o que esta' feito.
 > Convencao: ✅ feito e verificado · 🟡 codigo pronto, execucao pendente · ⬜ nao iniciado
 >
-> O BigQuery esta' configurado: projeto `radar-brasil-ddi`, modo sandbox, datasets
+> O BigQuery esta' configurado (o identificador do projeto vive em `.env` e nas
+> variaveis do Actions, nao aqui), modo sandbox, datasets
 > em `US`. As credenciais locais sao ADC (`gcloud auth application-default login`) —
 > nao ha' chave de service account em disco. A configuracao local fica em `.env`
 > (gitignored), incluindo o `RADAR_CPF_SALT`.
@@ -13,7 +14,7 @@
 | Task | Estado | Nota |
 |---|---|---|
 | T-001 Repo, estrutura, `CLAUDE.md`, `.gitignore`, `pyproject.toml` | ✅ | Repo Git proprio inicializado na pasta do projeto |
-| T-002 Projeto GCP, datasets, credenciais | ✅ | Projeto `radar-brasil-ddi` com faturamento ativo, orcamento de R$ 20 com alertas. Credencial local via ADC, sem chave de service account. Secrets do Actions ainda pendentes |
+| T-002 Projeto GCP, datasets, credenciais | ✅ | Projeto com faturamento ativo, orcamento de R$ 20 com alertas. Credencial local via ADC, sem chave de service account |
 | T-003 dbt inicializado, `profiles.yml` por env var | ✅ | `dbt parse` limpo, 13 modelos, 107 testes, 0 deprecacoes |
 | T-004 `dim_uf` e `dim_cargo` como seeds | ✅ | Gerados de `ingest/common/ufs.py` e do catalogo; teste impede divergencia |
 
@@ -213,7 +214,7 @@ Estimativa: de ~35-50 min por dia para ~10 min, mais uma execucao semanal maior.
 
 ## Local e CI gravam nas MESMAS tabelas
 
-Nao ha' ambiente de desenvolvimento separado: `radar-brasil-ddi` e' um so'. Uma
+Nao ha' ambiente de desenvolvimento separado: o projeto GCP e' um so'. Uma
 carga local e uma execucao do Actions escrevem nas mesmas tabelas, e a ultima a
 terminar vence.
 
@@ -231,15 +232,26 @@ Duas defesas desde entao:
 1. `concurrency: cancel-in-progress` no workflow — uma execucao por vez.
 2. Ao carregar local com um run em voo, cancele o run antes (`gh run cancel`).
 
+## Identificadores de infraestrutura ficam fora da documentacao
+
+O ID do projeto GCP, o e-mail da service account e o caminho do provider WIF NAO
+aparecem neste repositorio. Nao sao credenciais — sao identificadores, e sozinhos
+nao dao acesso a nada, porque a confianca esta' presa ao repositorio em duas
+camadas (condicao do provider e permissao de personificacao). Mas tambem nao
+servem para nada aqui, e superficie de ataque que nao existe nao precisa ser
+defendida.
+
+Onde eles vivem: `.env` (nao versionado) e variaveis do GitHub Actions.
+
 ## Permissoes da service account do pipeline (nao estao em codigo)
 
-O `radar-pipeline@radar-brasil-ddi.iam.gserviceaccount.com` roda o CI por
+A service account do pipeline roda o CI por
 Workload Identity Federation (ADR-011). O que ele precisa nao esta' versionado em
 lugar nenhum — vive so' no IAM do GCP — entao fica registrado aqui:
 
 | Recurso | Papel | Por que |
 |---|---|---|
-| projeto `radar-brasil-ddi` | BigQuery Data Editor + Job User | criar dataset, carregar tabela, rodar dbt |
+| projeto GCP | BigQuery Data Editor + Job User | criar dataset, carregar tabela, rodar dbt |
 | bucket `radar-brasil-fotos` | `roles/storage.objectViewer` | listar o que ja' subiu, para nao reenviar |
 | bucket `radar-brasil-fotos` | `roles/storage.objectCreator` | subir foto nova |
 
@@ -276,6 +288,6 @@ MESMO commit da carga. Rodar `python scripts/gerar_seeds.py` antes de commitar.
 1. `make ingest-historico` — os 8 layouts ja' estao conferidos. E' isto que faz
    `fct_mandato` e o modulo "Durante o mandato" deixarem de ser vazios.
 2. Montar os visuais no Power BI Desktop sobre o modelo TMDL ja' escrito,
-   apontando `ProjetoGCP = radar-brasil-ddi` e `DatasetMarts = marts`.
+   apontando `ProjetoGCP` (ver `.env`) e `DatasetMarts = marts`.
 3. Secrets do GitHub Actions (`RADAR_GCP_SA_JSON`, `RADAR_CPF_SALT`) para o
    pipeline agendado — o alvo `ci` usa service account, nao ADC.

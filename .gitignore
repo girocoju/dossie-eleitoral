@@ -12,6 +12,11 @@ data/
 !dbt/seeds/*.csv
 !tests/**/*.csv
 
+# ── Configuracao local do Claude Code ──
+# Permissoes pessoais da maquina, incluindo operacoes destrutivas de git. Nao vao
+# para um repositorio publico.
+.claude/settings.local.json
+
 # ── Segredos ──
 .env
 *.json.key
