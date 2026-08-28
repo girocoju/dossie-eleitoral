@@ -41,19 +41,42 @@ fotos as (
 
 ),
 
-com_chave as (
+/*
+  A chave por nome, calculada SEMPRE — inclusive para quem tem CPF.
+
+  Existe para casar com fontes que nao publicam CPF. O Senado e' o caso: o
+  `id_pessoa` de um senador aqui e' o cpf_hash, porque o TSE tem CPF; do lado do
+  Senado so' da' para calcular o hash de nome + nascimento. Duas chaves corretas
+  que nunca se encontram — na primeira medicao, 1 senador de 81 casou.
+
+  Fica num CTE proprio para que `id_pessoa` seja DERIVADA dela, e nao uma segunda
+  copia da mesma expressao. Com as duas escritas lado a lado, bastava alguem
+  ajustar a normalizacao de uma e esquecer a outra para a ponte do Senado quebrar
+  de novo, sem erro nenhum.
+*/
+com_chave_nome as (
 
     select
         *,
         case
-            when cpf_hash is not null then cpf_hash
             when nome_completo is not null and data_nascimento is not null
                 then to_hex(sha256(concat(
                     {{ sem_acento('nome_completo') }}, '|', cast(data_nascimento as string)
                 )))
-        end                                                       as id_pessoa,
-        cpf_hash is not null                                      as link_confiavel
+        end                                                       as chave_nome_nascimento
     from candidaturas
+
+),
+
+com_chave as (
+
+    select
+        *,
+        -- CPF quando a fonte publica; senao a chave por nome. A regra nao aparece
+        -- escrita duas vezes em lugar nenhum.
+        coalesce(cpf_hash, chave_nome_nascimento)                 as id_pessoa,
+        cpf_hash is not null                                      as link_confiavel
+    from com_chave_nome
 
 )
 
@@ -62,6 +85,7 @@ select
     c.sq_candidato,
     c.ano_eleicao,
     c.id_pessoa,
+    c.chave_nome_nascimento,
     link_confiavel,
     cpf_hash,
     nome_completo,

@@ -349,3 +349,87 @@ models:
         description: >
           Participacao do candidato no total daquele municipio, cargo e turno. E'
           o numero que torna municipios de tamanhos diferentes comparaveis num mapa.
+
+  - name: dim_parlamentar
+    description: >
+      Parlamentar em exercicio resolvido contra o cadastro do TSE (F-15). Uma linha
+      por (casa, id_casa). A resolucao tenta `cpf_hash` primeiro e so' cai para
+      nome + data de nascimento quando a fonte nao publica CPF, que e' o caso do
+      Senado inteiro.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [casa, id_casa]
+    columns:
+      - name: casa
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [camara, senado]
+      - name: id_casa
+        tests: [not_null]
+      - name: metodo_id_pessoa
+        description: >
+          Como a identidade foi estabelecida. `cpf` e' afirmacao da fonte;
+          `nome_nascimento` e' deducao nossa; `ambiguo` e `sem_correspondencia`
+          nao produzem `id_pessoa`.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [cpf, nome_nascimento, ambiguo, sem_correspondencia]
+      - name: casamento_confiavel
+        description: >
+          TRUE so' quando veio por CPF. A tela usa isso para marcar que a
+          identidade de um senador foi inferida, e nao confirmada pela fonte.
+        tests: [not_null]
+      - name: id_ambiguo
+        tests: [not_null]
+
+  - name: fct_atividade_legislativa
+    description: >
+      Atividade legislativa por deputado, ano e CLASSE de proposicao (F-16). A
+      classe faz parte do grao de proposito: nao existe linha "total do deputado",
+      porque somar projeto de lei com requerimento de retirada de pauta produz um
+      numero sem significado. So' entra quem e' proponente — assinatura de apoio
+      foi descartada na ingestao.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [id_deputado, ano, classe_proposicao]
+    columns:
+      - name: id_deputado
+        tests: [not_null]
+      - name: ano
+        tests: [not_null]
+      - name: classe_proposicao
+        description: >
+          `normativa` propos norma; `fiscalizacao` pediu contas ao Executivo;
+          `relatoria` analisou o texto de outro (NAO e' autoria); `procedimental`
+          e' rito e homenagem; `outra` e' residuo.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [normativa, fiscalizacao, relatoria, procedimental, outra]
+      - name: qt_proposicoes
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: qt_destino_desconhecido
+        description: >
+          Proposicoes com situacao em branco na fonte. NAO sao "em tramitacao" —
+          o destino simplesmente nao foi publicado, e a tela nao pode contar
+          ausencia de informacao como andamento.
+        tests: [not_null]
+      - name: ligado_ao_tse
+        description: >
+          FALSE para quem nao esta' mais em exercicio: a legislatura 2023-2026
+          passou por 710 deputados por suplencias e licencas, e a ponte cobre os
+          513 de hoje. A linha continua valida como atividade da Camara, mas nao
+          chega a' ficha de nenhum candidato.
+        tests: [not_null]

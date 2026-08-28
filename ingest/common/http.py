@@ -122,8 +122,18 @@ def _write_manifest(dest: Path, art: Artifact) -> None:
     )
 
 
-def _open(url: str, *, offset: int = 0, timeout: float = 120.0, aceita_gzip: bool = False):
+def _open(
+    url: str,
+    *,
+    offset: int = 0,
+    timeout: float = 120.0,
+    aceita_gzip: bool = False,
+    json_apenas: bool = False,
+):
     headers = dict(BASE_HEADERS)
+    if json_apenas:
+        # A API da Camara devolve XML quando o Accept e' o de navegador.
+        headers["Accept"] = "application/json"
     if aceita_gzip:
         headers["Accept-Encoding"] = "gzip, deflate"
     if offset:
@@ -245,7 +255,7 @@ def get_json(url: str, *, timeout: float = 120.0, attempts: int = MAX_ATTEMPTS):
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
-            with _open(url, timeout=timeout, aceita_gzip=True) as resp:
+            with _open(url, timeout=timeout, aceita_gzip=True, json_apenas=True) as resp:
                 raw = _decode_body(resp.read(), resp.headers.get("Content-Encoding"))
             return json.loads(raw.decode("utf-8-sig"))
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:

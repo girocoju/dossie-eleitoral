@@ -100,3 +100,30 @@ sources:
     tables:
       - name: indicadores
         description: "S7 — formato longo vindo do Ipeadata (Atlas da Violencia)."
+
+  - name: raw_legislativo
+    description: >
+      F-15 e F-16 — Camara dos Deputados e Senado Federal.
+
+      `parlamentares` e a ponte de identidade: liga quem esta em exercicio hoje a
+      pessoa que o projeto conhece do TSE. A Camara publica CPF e o casamento e
+      exato; o Senado nao publica, e o casamento por nome + data de nascimento
+      viaja marcado em `casamento_confiavel = false`.
+
+      `proposicoes` e a atividade legislativa da Camara, ja filtrada por
+      `proponente = 1` na ingestao — assinatura de apoio nunca entra.
+    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    schema: raw_legislativo
+    config:
+      loaded_at_field: _extracted_at
+      freshness:
+        warn_after: { count: 45, period: day }
+        error_after: { count: 120, period: day }
+    tables:
+      - name: parlamentares
+        description: "513 deputados + 81 senadores em exercicio, com o metodo de casamento."
+      - name: proposicoes
+        description: >
+          Proposicoes da legislatura 2023-2026 em que um deputado e PROPONENTE.
+          Uma linha por (proposicao, proponente). Classificada em
+          `classe_proposicao`: normativa, fiscalizacao, relatoria, procedimental.

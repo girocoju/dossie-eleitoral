@@ -198,3 +198,33 @@ models:
       - name: n_linhas_agregadas
         description: "Quantas linhas de municipio x zona entraram nesta soma."
         tests: [not_null]
+
+  - name: stg_camara__parlamentares
+    description: >
+      Parlamentares em exercicio nas duas Casas, com as DUAS chaves possiveis de
+      identidade (`cpf_hash` e `chave_nome_nascimento`). Nao resolve `id_pessoa` —
+      quem resolve e' `dim_parlamentar`, que enxerga o cadastro do TSE.
+    columns:
+      - name: id_casa
+        tests: [not_null]
+      - name: chave_nome_nascimento
+        description: >
+          Hash de nome sem acento + data de nascimento, calculado SEMPRE, mesmo
+          quando ha' CPF. E' a unica chave que casa com o Senado, que nao publica
+          CPF.
+
+  - name: stg_camara__proposicoes
+    description: >
+      Proposicoes da Camara em que um deputado e' PROPONENTE. O filtro acontece na
+      ingestao: em 2025, 21,4% das linhas de autoria eram apoio, e num requerimento
+      com 264 assinaturas 263 eram apoio.
+    columns:
+      - name: id_proposicao
+        tests: [not_null]
+      - name: id_deputado
+        tests: [not_null]
+      - name: total_assinantes
+        description: >
+          Fica visivel de proposito: um projeto com 1 assinante e um com 264 nao
+          dizem a mesma coisa sobre quem propos.
+        tests: [not_null]
