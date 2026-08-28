@@ -278,12 +278,17 @@ models:
       atual, nunca o historico.
     columns:
       - name: sk_candidatura
-        tests:
-          - not_null
-          - relationships:
-              arguments:
-                to: ref('fct_candidatura')
-                field: sk_candidatura
+        description: >
+          NAO tem relacionamento obrigatorio com `fct_candidatura`: uma candidatura
+          pode ter sido capturada aqui e depois sumido da publicacao do TSE. Quem
+          marca isso e' `consta_na_lista_atual`, e o volume e' vigiado pelo
+          `assert_sumico_de_candidatura_e_raro`.
+        tests: [not_null]
+      - name: consta_na_lista_atual
+        description: >
+          FALSE = a candidatura desapareceu da ultima publicacao do TSE. E' o evento
+          que este modelo existe para registrar, nao um defeito.
+        tests: [not_null]
       - name: data_observacao
         description: >
           Dia em que o pipeline VIU a mudanca — nao o dia do ato do TSE. Com

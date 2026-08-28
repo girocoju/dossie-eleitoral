@@ -464,3 +464,52 @@ Gerando insights de exemplo, conferindo um numero contra a realidade. Passou por
 
 Virou regra: **antes de publicar um indicador, comparar ao menos um ano com um
 valor conhecido de fora do pipeline.**
+
+---
+
+## L-23 · Candidaturas somem da publicacao do TSE
+
+**Situacao:** ABERTA (comportamento da fonte) · registrada em 28/08/2026
+
+**Correcao do diagnostico inicial.** A primeira leitura foi "o pacote de fotos
+esta' adiantado em relacao ao de candidatos". Errado: as candidaturas em questao
+JA' ESTIVERAM no `consulta_cand` — o snapshot as capturou nas versoes 2 e 3 — e
+depois **desapareceram** da publicacao. Nao e' foto adiantada, e' candidatura
+retirada.
+
+O que se via em 28/08/2026, com as duas cargas do mesmo dia:
+
+```
+pacote de fotos     20.784 candidaturas   (extraido 16:01 UTC)
+consulta_cand       20.765 candidaturas   (extraido 15:34 UTC)
+                        19 fotos sem candidato correspondente (0,09%)
+                         4 dessas ja' tinham historico no snapshot
+```
+
+As mesmas chaves aparecem nos dois sintomas — `10002554293` e `10002554295` (AC),
+`90002554305` (GO), `120002554294` (MS). Recarregar o `consulta_cand` NAO as
+trouxe de volta: elas nao estao mais la'.
+
+**Por que isso importa mais do que parece.** O TSE publica sempre o ESTADO ATUAL,
+sem historico. Quem le' a publicacao de hoje nunca fica sabendo que aquelas
+candidaturas existiram. O snapshot diario e' a unica coisa que guarda esse fato, e
+ele e' **irreproduzivel depois de 04/10/2026**.
+
+**O que mudou por causa disto:**
+
+1. `fct_mudanca_candidatura` ganhou `consta_na_lista_atual`. FALSE = existiu e
+   sumiu. A tela precisa dizer "nao consta mais na lista do TSE" em vez de exibir
+   a candidatura como se fosse atual.
+2. O teste de relacionamento com `fct_candidatura` saiu — tratava um evento real
+   como quebra de integridade. No lugar entrou
+   `assert_sumico_de_candidatura_e_raro`, com teto de 2%.
+3. `assert_foto_sem_candidatura` passou de ZERO orfas para teto de **1%**. Foto
+   orfa e' inofensiva na tela (`dim_candidato` faz LEFT JOIN, entao ela nao
+   aparece), e exigir zero deixaria o pipeline diario vermelho ate' 04/10/2026 —
+   e pipeline que vive vermelho para de ser lido.
+
+Os dois tetos continuam protegendo o caso grave: erro de `sk_candidatura`, ou
+carga truncada, nao produz 0,1% de divergencia — produz dezenas de por cento.
+
+**Como fechar:** nao fecha. E' o comportamento da fonte, e capturá-lo e' um dos
+motivos de o projeto existir.

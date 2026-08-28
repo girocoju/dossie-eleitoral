@@ -128,6 +128,38 @@ orcamento as (
 
 ),
 
+nacional_somado as (
+
+    /*
+      O "Brasil" do orcamento ESTADUAL e' a soma dos 27 estados, e nao um numero
+      publicado: o SICONFI nao divulga um consolidado estadual. E' o comparador de
+      um governador — quanto o conjunto dos estados arrecadou e gastou.
+
+      NAO se confunde com o orcamento federal, que vem do RTN e mede outro ente
+      (ver L-22 e ADR-017). Os dois nunca se somam.
+    */
+    select
+        cod_indicador,
+        'BR'                                                as sg_uf,
+        ano,
+        sum(valor)                                          as valor,
+        any_value(unidade)                                  as unidade,
+        'Tesouro Nacional — SICONFI/DCA (soma dos 27 estados)' as fonte,
+        1                                                   as n_periodos,
+        max(_extracted_at)                                  as _extracted_at,
+        any_value(_source_url)                              as _source_url
+    from (
+        select * from observado
+        union all
+        select * from orcamento
+    )
+    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL', 'RESULTADO_ORCAMENTARIO')
+      and sg_uf != 'BR'
+    group by cod_indicador, ano
+    having count(*) = 27   -- so' agrega ano completo; ano parcial nao vira "Brasil"
+
+),
+
 completo as (
 
     select * from observado

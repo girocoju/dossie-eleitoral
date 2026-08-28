@@ -103,8 +103,27 @@ select
     coalesce(foi_substituido, false)
         and not coalesce(foi_substituido_anterior, false)               as virou_substituido,
 
-    'Data da captura pelo pipeline, nao a data do ato do TSE.' as aviso_temporal
+    'Data da captura pelo pipeline, nao a data do ato do TSE.' as aviso_temporal,
+
+    /*
+      A candidatura ainda consta na ULTIMA publicacao do TSE?
+
+      FALSE significa que ela existiu, foi capturada aqui, e depois DESAPARECEU da
+      lista — registro cancelado, retirado, ou corrigido pelo TSE. Nao e' erro: e'
+      exatamente o evento que este modelo existe para registrar, e que some sem
+      rastro para quem so' le' a publicacao de hoje.
+
+      Medido em 28/08/2026: 4 candidaturas (AC, GO, MS e outra), todas com foto no
+      pacote de imagens e ausentes do `consulta_cand` do mesmo dia.
+
+      A tela precisa dizer "esta candidatura nao consta mais na lista do TSE" em
+      vez de exibi-la como se fosse atual.
+    */
+    atual.sk_candidatura is not null                                   as consta_na_lista_atual
 
 from com_anterior
+left join (
+    select sk_candidatura from {{ ref('fct_candidatura') }}
+) as atual using (sk_candidatura)
 -- a versao 1 e' a primeira observacao, nao uma mudanca
 where versao > 1
