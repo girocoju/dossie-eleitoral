@@ -153,3 +153,22 @@ models:
               arguments:
                 min_value: 1
                 inclusive: true
+
+  - name: stg_tse__propostas
+    description: "S14 — existencia da proposta de governo por candidatura majoritaria."
+    columns:
+      - name: sk_candidatura
+        tests: [not_null, unique]
+      - name: tem_proposta_governo
+        tests: [not_null]
+      - name: url_proposta_oficial
+        tests: [not_null]
+      - name: cod_cargo
+        description: >
+          So' Presidente (1) e Governador (3) — os cargos que a Lei 9.504/97 obriga.
+          Senador nao entra: medido em 28/08/2026, 0 de 318 tem proposta.
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 3]
+                quote: false

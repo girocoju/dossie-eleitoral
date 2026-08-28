@@ -149,6 +149,12 @@ jobs:
         if: steps.cred.outputs.temos == 'true'
         run: python -m ingest.fotos load --ano 2026
 
+      # Reconsulta so' registros com mais de 7 dias, entao na maioria dos dias
+      # esta etapa faz zero requisicoes ao DivulgaCandContas.
+      - name: Proposta de governo dos majoritarios (F-14)
+        if: steps.cred.outputs.temos == 'true'
+        run: python -m ingest.propostas load --ano 2026
+
       - name: dbt build
         if: steps.cred.outputs.temos == 'true'
         working-directory: dbt

@@ -87,6 +87,18 @@ pessoas as (
 
 ),
 
+propostas as (
+
+    select
+        sk_candidatura,
+        tem_proposta_governo,
+        n_arquivos_proposta,
+        nome_arquivo_proposta,
+        url_proposta_oficial
+    from {{ ref('stg_tse__propostas') }}
+
+),
+
 -- mandatos em curso no ano da eleicao, usados so' para derivar `is_reeleicao`
 mandatos_vigentes as (
 
@@ -135,11 +147,33 @@ select
 
     cast(null as int64)                                   as votos_nominais,
 
+    /*
+      F-14 — proposta de governo. Sao TRES estados, e a tela precisa distinguir
+      os tres; campo vazio se le como omissao do candidato, o que seria injusto
+      com 93% deles:
+
+        proposta_obrigatoria = false  -> "nao se aplica a este cargo"
+        obrigatoria e tem            -> link para a pagina oficial
+        obrigatoria e nao tem        -> "nao consta"
+
+      `proposta_obrigatoria` vem da LEI, nao do dado: Lei 9.504/97, art. 11,
+      par. 1o, IX, que cita Prefeito, Governador e Presidente. SENADOR NAO ESTA
+      NA LISTA, embora o cargo seja majoritario — e a medicao de 28/08/2026
+      confirma (0 de 318 senadores tem proposta, contra 193 de 198 governadores).
+      Marcar senador como "nao consta" seria acusa-lo de uma omissao inexistente.
+    */
+    c.cod_cargo in (1, 3)                                 as proposta_obrigatoria,
+    coalesce(pr.tem_proposta_governo, false)              as tem_proposta_governo,
+    coalesce(pr.n_arquivos_proposta, 0)                   as n_arquivos_proposta,
+    pr.nome_arquivo_proposta,
+    pr.url_proposta_oficial,
+
     c._extracted_at
 
 from por_candidatura as c
 left join bens     as b using (sk_candidatura)
 left join pessoas  as p using (sk_candidatura)
+left join propostas as pr using (sk_candidatura)
 left join mandatos_vigentes as m
   on  m.id_pessoa  = p.id_pessoa
   and m.cod_cargo  = c.cod_cargo

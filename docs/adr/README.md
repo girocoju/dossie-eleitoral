@@ -18,3 +18,4 @@ junto com qualquer arquivo daqui.
 | [ADR-010](ADR-010-particao-por-ano.md) | Volta da particao por ano com substituicao cirurgica | Aceita |
 | [ADR-011](ADR-011-autenticacao-sem-chave.md) | GitHub Actions sem chave de service account (OIDC/WIF) | Aceita |
 | [ADR-012](ADR-012-fotos-de-candidatos.md) | Fotos em bucket publico, nao no BigQuery | Aceita |
+| [ADR-013](ADR-013-proposta-de-governo.md) | Proposta de governo: existencia + link, sem re-hospedar PDF | Aceita |

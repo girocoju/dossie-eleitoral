@@ -32,6 +32,7 @@ radar-tse = "ingest.tse:main"
 radar-sidra = "ingest.ibge_sidra:main"
 radar-ipea = "ingest.ipeadata:main"
 radar-fotos = "ingest.fotos:main"
+radar-propostas = "ingest.propostas:main"
 
 [build-system]
 requires = ["hatchling"]

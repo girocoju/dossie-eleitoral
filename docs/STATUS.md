@@ -136,7 +136,7 @@ correcoes de nome de urna (MA, MT, RJ) que teriam sumido sem rastro.
 | # | O que | Estado |
 |---|---|---|
 | F-13 / [ADR-012](adr/ADR-012-fotos-de-candidatos.md) | Foto oficial dos candidatos de 2026 em bucket publico | ✅ **Entregue** — 20.765 fotos, 99,98% de cobertura |
-| S14 / [L-17](LACUNAS.md) | Plataforma de governo | Nao existe em lote; so' 529 candidaturas (2,5%) tem. Fase propria |
+| F-14 / [ADR-013](adr/ADR-013-proposta-de-governo.md) | Proposta de governo dos majoritarios | ✅ **Entregue** — 206 apresentaram, 5 nao constam, 20.558 nao se aplica |
 
 ## O caminho critico
 

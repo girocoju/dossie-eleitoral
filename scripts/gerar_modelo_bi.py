@@ -267,6 +267,21 @@ TABELAS: list[Tabela] = [
             Coluna("total_bens_declarados", "double", resumo="sum", formato="#,0"),
             Coluna("n_bens", "int64", resumo="sum"),
             Coluna("declarou_algum_bem", "boolean"),
+            Coluna(
+                "proposta_obrigatoria",
+                "boolean",
+                descricao="TRUE para Presidente, Governador e Senador. Vem da lei, nao do dado.",
+            ),
+            Coluna("tem_proposta_governo", "boolean"),
+            Coluna("nome_arquivo_proposta"),
+            Coluna(
+                "url_proposta_oficial",
+                categoria="WebUrl",
+                descricao=(
+                    "Link para a pagina do candidato no DivulgaCandContas. O projeto "
+                    "nao hospeda o PDF (ADR-013) — o leitor confere na fonte."
+                ),
+            ),
             Coluna("votos_nominais", "int64", resumo="sum", oculta=True),
             Coluna("_extracted_at", "dateTime", oculta=True),
         ],
@@ -306,6 +321,27 @@ TABELAS: list[Tabela] = [
                 "PERCENTILE.INC(fct_candidatura[total_bens_declarados], 0.75)",
                 "#,0",
                 pasta="Bens",
+            ),
+            Medida(
+                "Proposta de governo",
+                'IF(SELECTEDVALUE(fct_candidatura[proposta_obrigatoria]) = FALSE,'
+                ' "Nao se aplica a este cargo",'
+                ' IF(SELECTEDVALUE(fct_candidatura[tem_proposta_governo]) = TRUE,'
+                ' "Proposta apresentada ao TSE", "Nao consta proposta no TSE"))',
+                descricao=(
+                    "Tres estados, nunca vazio: campo em branco se le como omissao do "
+                    "candidato, e 93% deles nao tem essa obrigacao (F-14)."
+                ),
+                pasta="Proposta",
+            ),
+            Medida(
+                "% dos majoritarios com proposta",
+                "DIVIDE(CALCULATE([Candidaturas],"
+                " fct_candidatura[tem_proposta_governo] = TRUE),"
+                " CALCULATE([Candidaturas], fct_candidatura[proposta_obrigatoria] = TRUE))",
+                "0.0%",
+                "Denominador e' quem tem a obrigacao legal, nao o total de candidatos.",
+                "Proposta",
             ),
             Medida(
                 "Extraido em",

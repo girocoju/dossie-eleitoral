@@ -41,6 +41,10 @@ sources:
         columns:
           - name: url_foto
             description: "URL publica no Cloud Storage. Caminho deterministico e estavel."
+      - name: propostas
+        description: >
+          S14 — existencia da proposta de governo por candidatura majoritaria,
+          consultada no DivulgaCandContas. Guarda link, nunca PDF (ADR-013).
       - name: complementar
         description: >
           S3 — consulta_cand_complementar. Em 2026 o TSE moveu para ca' situacao de

@@ -35,6 +35,17 @@ table fct_candidatura
 		lineageTag: 826c8a42-b683-da49-5bae-689c7fc85548
 		displayFolder: Bens
 
+	/// Tres estados, nunca vazio: campo em branco se le como omissao do candidato, e 93% deles nao tem essa obrigacao (F-14).
+	measure 'Proposta de governo' = IF(SELECTEDVALUE(fct_candidatura[proposta_obrigatoria]) = FALSE, "Nao se aplica a este cargo", IF(SELECTEDVALUE(fct_candidatura[tem_proposta_governo]) = TRUE, "Proposta apresentada ao TSE", "Nao consta proposta no TSE"))
+		lineageTag: 5d3e42dd-1da1-8d4c-21fb-8a00187eb2ce
+		displayFolder: Proposta
+
+	/// Denominador e' quem tem a obrigacao legal, nao o total de candidatos.
+	measure '% dos majoritarios com proposta' = DIVIDE(CALCULATE([Candidaturas], fct_candidatura[tem_proposta_governo] = TRUE), CALCULATE([Candidaturas], fct_candidatura[proposta_obrigatoria] = TRUE))
+		formatString: 0.0%
+		lineageTag: 165fb801-47ca-b3dd-3819-541a81a9c2d9
+		displayFolder: Proposta
+
 	/// Rodape obrigatorio de toda pagina (Constituicao 0.3).
 	measure 'Extraido em' = FORMAT(MAX(fct_candidatura[_extracted_at]), "dd/MM/yyyy HH:mm") & " UTC"
 		lineageTag: 61cd243f-cec8-3b7e-30f6-a0ea813b2ef6
@@ -207,6 +218,41 @@ table fct_candidatura
 		lineageTag: 6e9c1c0b-46d0-a579-de34-466908e5d184
 		summarizeBy: none
 		sourceColumn: declarou_algum_bem
+
+		annotation SummarizationSetBy = Automatic
+
+	/// TRUE para Presidente, Governador e Senador. Vem da lei, nao do dado.
+	column proposta_obrigatoria
+		dataType: boolean
+		lineageTag: 37181391-e1a5-a596-6050-9d24ae4bb78f
+		summarizeBy: none
+		sourceColumn: proposta_obrigatoria
+
+		annotation SummarizationSetBy = Automatic
+
+	column tem_proposta_governo
+		dataType: boolean
+		lineageTag: 5d729240-0c4a-8d8e-4294-97c78b788f6f
+		summarizeBy: none
+		sourceColumn: tem_proposta_governo
+
+		annotation SummarizationSetBy = Automatic
+
+	column nome_arquivo_proposta
+		dataType: string
+		lineageTag: c0be2f63-aeee-6604-b6a0-13cbd6ae5a8c
+		summarizeBy: none
+		sourceColumn: nome_arquivo_proposta
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Link para a pagina do candidato no DivulgaCandContas. O projeto nao hospeda o PDF (ADR-013) — o leitor confere na fonte.
+	column url_proposta_oficial
+		dataType: string
+		dataCategory: WebUrl
+		lineageTag: f5f5be60-c946-2a57-1666-09773a4623aa
+		summarizeBy: none
+		sourceColumn: url_proposta_oficial
 
 		annotation SummarizationSetBy = Automatic
 

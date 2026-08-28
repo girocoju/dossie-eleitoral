@@ -176,6 +176,33 @@ Formato: **F-xx — nome** · *Prioridade* · Critérios de aceite (todos verifi
 
 ---
 
+**F-14 — Proposta de governo dos candidatos majoritários** · P1 · **Implementada em 28/08/2026**
+
+> Fonte nova (S14). O SPEC §2.2 excluía "propostas de governo (texto livre)"; esta
+> feature **não** traz o texto — traz a existência e o link para a fonte oficial.
+> Ver [ADR-013](docs/adr/ADR-013-proposta-de-governo.md).
+
+**Por que entra:** a página do candidato precisa dizer se ele apresentou proposta.
+Sem isso, a ficha de um candidato a governador fica igual à de um a deputado, que
+não tem essa obrigação.
+
+**Alcance real:** a Lei 9.504/97 (art. 11, §1º, IX) exige a proposta de candidatos
+a **Prefeito, Governador e Presidente**. Senador é majoritário mas **não** consta
+da lista — e a medição confirma: 0 de 318 senadores têm proposta, contra 193 de
+198 governadores. Em 2026 a obrigação alcança **211 de 20.769 candidaturas (1,0%)**.
+
+Critérios de aceite:
+
+- `fct_candidatura` distingue **três** estados, e a tela também: `não se aplica a
+  este cargo` (proporcionais), `apresentou` e `não consta`. Campo em branco é
+  proibido — vazio se lê como omissão do candidato.
+- `proposta_obrigatoria` é derivada do cargo (a lei), não do dado.
+- Teste dbt: nenhuma candidatura sem obrigação legal com `tem_proposta_governo = true`.
+- Teste dbt: nenhuma candidatura com proposta sem `url_proposta_oficial`.
+- Nenhum PDF é baixado ou re-hospedado (ADR-013).
+
+---
+
 ## 7. Plano por fases e Tasks
 
 ### Fase 0 — Setup (1–2 dias)
@@ -224,6 +251,14 @@ Formato: **F-xx — nome** · *Prioridade* · Critérios de aceite (todos verifi
 - T-453 `dim_candidato` ganha `url_foto` e `tem_foto`; dois testes dbt novos.
 - T-454 Power BI: coluna marcada como *Image URL*, exibida na página principal.
 - **Aceite:** F-13.
+
+### Fase 4.6 — Proposta de governo (F-14) — concluída em 28/08/2026
+
+- T-461 `ingest/propostas.py`: consulta a API do DivulgaCandContas por candidatura
+  majoritária, identifica os arquivos `codTipo = 5` e carrega em `raw_tse.propostas`.
+- T-462 `stg_tse__propostas`; `fct_candidatura` ganha os cinco campos da F-14.
+- T-463 Dois testes dbt novos + medida e rótulo de três estados no Power BI.
+- **Aceite:** F-14.
 
 ### Fase 5 — Pós-eleição (fase 2 do produto)
 - F-11, F-12.
@@ -283,6 +318,7 @@ radar-brasil/
 | ADR-005 | `cpf_hash` como chave de pessoa | Vincula anos sem expor CPF | Aceita |
 | ADR-006 a ADR-011 | Ver `docs/adr/` | — | Aceitas |
 | ADR-012 | Fotos em bucket público, não no BigQuery | Binário não pertence a um warehouse; o Power BI lê por URL | Aceita |
+| ADR-013 | Proposta de governo: existência + link, sem re-hospedar PDF | Credibilidade da fonte, cópia envelhece, e o download exigiria engenharia reversa | Aceita |
 
 ---
 
