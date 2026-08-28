@@ -6,6 +6,10 @@
 e' isso que o CI e o pytest usam para impedir que `ingest/common/ufs.py` e
 `dbt/seeds/dim_uf.csv` (ou o catalogo de indicadores e `dim_indicador.csv`)
 divirjam sem ninguem perceber.
+
+Os arquivos sao escritos com `newline=""` e comparados apos normalizar CRLF: o
+seed tem de sair byte-identico gerado no Windows ou no Linux, senao o `--check`
+acusa diferenca que nao existe. Foi o que fez o primeiro run do CI falhar.
 """
 
 from __future__ import annotations
@@ -34,14 +38,14 @@ def _csv(cabecalho: list[str], linhas: list[list[object]]) -> str:
 
 
 def seed_dim_uf() -> str:
-    linhas = [[uf.sg_uf, uf.nome, uf.regiao, uf.cod_ibge] for uf in UFS]
+    linhas: list[list[object]] = [[uf.sg_uf, uf.nome, uf.regiao, uf.cod_ibge] for uf in UFS]
     linhas.append(["BR", "Brasil", "Brasil", "1"])  # comparador nacional (SPEC 5)
     return _csv(["sg_uf", "nome", "regiao", "cod_ibge"], linhas)
 
 
 def seed_dim_indicador() -> str:
     catalogo = carregar_catalogo()
-    linhas = [
+    linhas: list[list[object]] = [
         [
             ind.cod_indicador,
             ind.nome,
@@ -79,6 +83,18 @@ GERADORES = {
 }
 
 
+def _ler(destino: Path) -> str | None:
+    if not destino.exists():
+        return None
+    return destino.read_text(encoding="utf-8").replace("\r\n", "\n")
+
+
+def _escrever(destino: Path, conteudo: str) -> None:
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    with destino.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(conteudo)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="so' confere, nao escreve")
@@ -88,16 +104,14 @@ def main(argv: list[str] | None = None) -> int:
     for nome, gerador in GERADORES.items():
         destino = SEEDS / nome
         novo = gerador()
-        atual = destino.read_text(encoding="utf-8") if destino.exists() else None
-        if atual == novo:
+        if _ler(destino) == novo:
             print(f"ok        {nome}")
             continue
         if args.check:
             desatualizados.append(nome)
             print(f"DESATUAL. {nome}")
             continue
-        destino.parent.mkdir(parents=True, exist_ok=True)
-        destino.write_text(novo, encoding="utf-8")
+        _escrever(destino, novo)
         print(f"gerado    {nome}")
 
     if desatualizados:

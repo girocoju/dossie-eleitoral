@@ -8,6 +8,7 @@
 *.pbip   text eol=crlf
 
 # Dados nunca deveriam entrar, mas se entrarem nao passam por normalizacao.
-*.csv    -text
+# Os CSV de `dbt/seeds/` sao excecao: sao modelo versionado e seguem o padrao
+# do repo (LF), para que o `--check` do CI de' o mesmo resultado em qualquer SO.
 *.ndjson -text
 *.zip    binary

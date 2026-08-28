@@ -1,0 +1,29 @@
+sg_uf,nome,regiao,cod_ibge
+RO,Rondonia,Norte,11
+AC,Acre,Norte,12
+AM,Amazonas,Norte,13
+RR,Roraima,Norte,14
+PA,Para,Norte,15
+AP,Amapa,Norte,16
+TO,Tocantins,Norte,17
+MA,Maranhao,Nordeste,21
+PI,Piaui,Nordeste,22
+CE,Ceara,Nordeste,23
+RN,Rio Grande do Norte,Nordeste,24
+PB,Paraiba,Nordeste,25
+PE,Pernambuco,Nordeste,26
+AL,Alagoas,Nordeste,27
+SE,Sergipe,Nordeste,28
+BA,Bahia,Nordeste,29
+MG,Minas Gerais,Sudeste,31
+ES,Espirito Santo,Sudeste,32
+RJ,Rio de Janeiro,Sudeste,33
+SP,Sao Paulo,Sudeste,35
+PR,Parana,Sul,41
+SC,Santa Catarina,Sul,42
+RS,Rio Grande do Sul,Sul,43
+MS,Mato Grosso do Sul,Centro-Oeste,50
+MT,Mato Grosso,Centro-Oeste,51
+GO,Goias,Centro-Oeste,52
+DF,Distrito Federal,Centro-Oeste,53
+BR,Brasil,Brasil,1

@@ -1,0 +1,14 @@
+cod_cargo,descricao,esfera,duracao_mandato_anos,titular,no_escopo_mvp,modulo_durante_mandato,observacao
+1,Presidente,federal,4,true,true,true,Mandato de 4 anos iniciando em 1o de janeiro do ano seguinte a eleicao
+2,Vice-Presidente,federal,4,false,true,false,Eleito na mesma chapa do cargo 1
+3,Governador,estadual,4,true,true,true,Mandato de 4 anos iniciando em 1o de janeiro do ano seguinte a eleicao
+4,Vice-Governador,estadual,4,false,true,false,Eleito na mesma chapa do cargo 3
+5,Senador,federal,8,true,true,false,Mandato de 8 anos; renovacao alternada de 1/3 e 2/3 do Senado
+6,Deputado Federal,federal,4,true,true,false,
+7,Deputado Estadual,estadual,4,true,true,false,
+8,Deputado Distrital,distrital,4,true,true,false,Exclusivo do Distrito Federal
+9,1o Suplente,federal,8,false,true,false,Suplente de Senador; acompanha o mandato de 8 anos
+10,2o Suplente,federal,8,false,true,false,Suplente de Senador; acompanha o mandato de 8 anos
+11,Prefeito,municipal,4,true,false,false,Fora do escopo: nao esta em disputa em 2026 (SPEC 2.2)
+12,Vice-Prefeito,municipal,4,false,false,false,Fora do escopo: nao esta em disputa em 2026 (SPEC 2.2)
+13,Vereador,municipal,4,true,false,false,Fora do escopo: nao esta em disputa em 2026 (SPEC 2.2)

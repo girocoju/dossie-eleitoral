@@ -7,6 +7,11 @@ data/
 *.parquet
 *.xlsx
 
+# Excecoes: estes CSV/XLSX sao MODELO, nao dado. Sem eles um clone limpo nao
+# roda `dbt seed` — foi exatamente o que quebrou o primeiro run do CI.
+!dbt/seeds/*.csv
+!tests/**/*.csv
+
 # ── Segredos ──
 .env
 *.json.key
