@@ -289,6 +289,17 @@ indicadores:
       R$ 10,2 bi (Acre, 2023) diferem por duas ordens de grandeza, e um "Brasil"
       que misturasse os dois nao serviria de comparador para ninguem.
       Use esta na pagina de Presidencia; RECEITA_ESTADUAL na de Governadores.
+
+      ATENCAO — NAO E' RESULTADO FISCAL (L-22). A receita da DCA inclui
+      OPERACOES DE CREDITO: em 2020 foram R$ 1.648 bi, 45% do que esta' registrado
+      aqui. Divida tomada para cobrir o deficit entra como se fosse arrecadacao,
+      e por isso receita menos despesa tende a zero por identidade contabil.
+
+      O resultado primario do Governo Central em 2020 foi da ordem de -743 bi; a
+      serie daqui da' -48 bi. Nao e' divergencia, sao conceitos diferentes.
+
+      Os ESTADOS nao tem esse problema: operacoes de credito sao 0,1% a 1,1% da
+      receita estadual. A distorcao e' especifica da Uniao.
     parametros:
       anexo: "DCA-Anexo I-C"
       ente: 1

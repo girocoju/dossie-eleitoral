@@ -420,3 +420,53 @@ tramitacao, arquivada ou virou lei.
 `qt_em_tramitacao` em `fct_atividade_legislativa`. Ausencia de informacao nunca e'
 contada como andamento — a diferenca entre "ainda tramita" e "nao sabemos" e'
 justamente o que um painel apressado apagaria.
+
+---
+
+## L-22 · O resultado orcamentario da UNIAO nao e' resultado fiscal
+
+**Situacao:** ABERTA e URGENTE — encontrada em 28/08/2026 ao gerar insights
+
+`RECEITA_UNIAO` e `RESULTADO_ORCAMENTARIO_UNIAO` **nao podem ser lidos como
+superavit ou deficit**. A receita da DCA inclui **operacoes de credito**, ou seja,
+emissao de titulos do Tesouro — o dinheiro tomado emprestado para cobrir o
+deficit entra como se fosse arrecadacao.
+
+Medido no anexo I-C da Uniao em 2020:
+
+```
+TOTAL DAS RECEITAS                   R$ 3.754,5 bi
+  Receitas de Capital                R$ 2.135,6 bi
+    Operacoes de Credito             R$ 1.647,9 bi   <- divida, contada como receita
+  Receitas Correntes                 R$ 1.586,4 bi
+```
+
+Operacoes de credito foram **45% da receita** que o projeto registrou para a Uniao
+naquele ano. Por isso `RESULTADO_ORCAMENTARIO_UNIAO` deu **-48 bi em 2020**,
+enquanto o resultado primario do Governo Central no mesmo ano foi da ordem de
+**-743 bi**. Nao sao numeros discordantes: sao coisas diferentes. Receita que
+inclui o financiamento do proprio deficit tende a zero por identidade contabil.
+
+**Os estados NAO tem esse problema.** Medido em 2023: operacoes de credito sao
+1,1% da receita em SP, 0,1% no RJ e 0,2% no MA. `RECEITA_ESTADUAL`,
+`DESPESA_ESTADUAL` e `RESULTADO_ORCAMENTARIO` seguem validos — a distorcao e'
+especifica da Uniao, que se financia por divida em escala incomparavel.
+
+**Risco concreto:** um painel exibindo "Uniao: superavit de R$ 635 bi em 2025"
+estaria errado no sentido em que qualquer leitor entenderia a frase. E' o tipo de
+erro que a Constituicao 0.2 nao pega, porque o numero esta' corretamente extraido
+da fonte — o que esta' errado e' o ROTULO.
+
+**Como fechar (nao feito ainda, precisa de decisao):**
+
+1. Subtrair `2.1.0.0.00.0.0 - Operacoes de Credito` da receita da Uniao, ou
+2. Usar so' `1.0.0.0.00.0.0 - Receitas Correntes`, ou
+3. Trocar a fonte pelo Resultado do Tesouro Nacional (RTN), que publica o
+   resultado primario ja' calculado e e' o numero que a imprensa usa.
+
+A opcao 3 e' a mais honesta para uma tela publica, porque entrega o mesmo conceito
+que o leitor tem na cabeca. As tres mudam o significado da serie e por isso viram
+ADR antes de codigo.
+
+**Enquanto nao fecha:** a serie NAO vai para a pagina de presidenciaveis com
+rotulo de superavit/deficit.
