@@ -208,6 +208,12 @@ indicadores:
       e despesa coexistem. NAO e' nota de gestao: um deficit pode vir de decisao
       deliberada de investimento, e um superavit de contingenciamento. A tela
       mostra o numero com o comparador, nunca um juizo.
+
+      ATENCAO AO VISUAL: este e' o unico indicador do projeto que muda de SINAL.
+      Variacao percentual sobre base negativa e' indefinida, e o modelo devolve
+      NULL nesses casos de proposito — um estado que sai de -800 milhoes para
+      +400 milhoes nao "cresceu X%". Use `variacao_abs` para este indicador; a
+      percentual so' faz sentido quando as duas pontas sao positivas.
     parametros:
       formula: "RECEITA_ESTADUAL - DESPESA_ESTADUAL"
       depende_de: [RECEITA_ESTADUAL, DESPESA_ESTADUAL]

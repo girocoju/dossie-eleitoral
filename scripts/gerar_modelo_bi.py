@@ -470,6 +470,17 @@ TABELAS: list[Tabela] = [
                 pasta="Durante o mandato",
             ),
             Medida(
+                "Variacao no periodo (absoluta)",
+                "AVERAGE(fct_mandato_indicador[variacao_abs])",
+                "#,0.00",
+                (
+                    "Use esta, e nao a percentual, para RESULTADO_ORCAMENTARIO: e' o "
+                    "unico indicador que muda de sinal, e variacao percentual sobre "
+                    "base negativa e' indefinida (o modelo devolve NULL de proposito)."
+                ),
+                "Durante o mandato",
+            ),
+            Medida(
                 "Diferenca vs. Brasil (p.p.)",
                 "AVERAGE(fct_mandato_indicador[delta_vs_brasil])",
                 "#,0.0",

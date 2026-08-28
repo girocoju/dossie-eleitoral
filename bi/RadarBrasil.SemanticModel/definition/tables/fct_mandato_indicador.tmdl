@@ -13,6 +13,12 @@ table fct_mandato_indicador
 		lineageTag: 131838f7-c8cf-5368-a523-145684ecf712
 		displayFolder: Durante o mandato
 
+	/// Use esta, e nao a percentual, para RESULTADO_ORCAMENTARIO: e' o unico indicador que muda de sinal, e variacao percentual sobre base negativa e' indefinida (o modelo devolve NULL de proposito).
+	measure 'Variacao no periodo (absoluta)' = AVERAGE(fct_mandato_indicador[variacao_abs])
+		formatString: #,0.00
+		lineageTag: 7c94109a-781f-28c3-9e20-62caed14d00b
+		displayFolder: Durante o mandato
+
 	/// Contraste descritivo entre duas variacoes. Nao e' placar.
 	measure 'Diferenca vs. Brasil (p.p.)' = AVERAGE(fct_mandato_indicador[delta_vs_brasil])
 		formatString: #,0.0

@@ -73,9 +73,22 @@ Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 
 | T-303 `fct_mandato_indicador` com comparadores | ✅ | 818 linhas: 197 mandatos de Presidente/Governador x 5 indicadores |
 | T-304 Paginas "Durante o Mandato" e "Contexto Socioeconomico" | 🟡 | Tabelas e medidas no modelo; visuais faltam |
 
-**Dados socioeconomicos ja' extraidos** (`data/staging/indicadores/`): 1.596 observacoes
-do SIDRA (PIB 2002–2023, populacao 2001–2025, desocupacao 2012–2025) e 1.260 do
-Ipeadata (homicidios 1980–2024). Todas com 27 UFs + Brasil.
+**Indicadores em `fct_indicador_uf_ano`** — 9 series, 4.307 linhas:
+
+| Indicador | Periodo | Fonte |
+|---|---|---|
+| PIB | 2002–2023 | IBGE t/5938 |
+| PIB per capita | 2002–2022 | derivado |
+| Populacao (estimativa) | 2001–2025 | IBGE t/6579 |
+| Populacao (Censo) | 2022 | IBGE t/4709 |
+| Desocupacao | 2012–2025 | PNAD Continua |
+| Homicidios | 1980–2024 | Atlas da Violencia |
+| **Receita estadual** | **2015–2025** | **SICONFI/DCA** |
+| **Despesa estadual** | **2015–2025** | **SICONFI/DCA** |
+| **Resultado orcamentario** | **2015–2025** | **derivado** |
+
+`fct_mandato_indicador`: 1.067 linhas, 8 indicadores. **Zero linhas sem comparador
+nacional.**
 
 ## Fase 4 — Polimento e publicacao
 

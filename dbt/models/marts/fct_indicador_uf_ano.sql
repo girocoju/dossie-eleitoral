@@ -78,6 +78,23 @@ derivado as (
 
 ),
 
+-- receita e despesa lado a lado, para a subtracao ficar num passo separado da
+-- agregacao (o BigQuery recusa agregacao dentro de agregacao)
+pivo_orcamento as (
+
+    select
+        sg_uf,
+        ano,
+        max(if(cod_indicador = 'RECEITA_ESTADUAL', valor, null))  as receita,
+        max(if(cod_indicador = 'DESPESA_ESTADUAL', valor, null))  as despesa,
+        max(_extracted_at)                                        as _extracted_at,
+        max(_source_url)                                          as _source_url
+    from observado
+    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL')
+    group by sg_uf, ano
+
+),
+
 orcamento as (
 
     /*
@@ -91,18 +108,52 @@ orcamento as (
         'RESULTADO_ORCAMENTARIO'                            as cod_indicador,
         sg_uf,
         ano,
-        max(if(cod_indicador = 'RECEITA_ESTADUAL', valor, null))
-            - max(if(cod_indicador = 'DESPESA_ESTADUAL', valor, null))  as valor,
+        receita - despesa                                   as valor,
         'R$ correntes'                                      as unidade,
         'Calculado: SICONFI receita liquida menos despesa empenhada' as fonte,
         1                                                   as n_periodos,
+        _extracted_at,
+        _source_url
+    from pivo_orcamento
+    where receita is not null
+      and despesa is not null
+
+),
+
+/*
+  O SICONFI publica por ente: 27 estados, sem agregado nacional. Sem um `BR`, a
+  regra do comparador obrigatorio (Constituicao 0.2) ficaria sem o lado nacional
+  justamente nos indicadores fiscais.
+
+  A soma dos 27 estados E' um agregado legitimo — e' o conjunto das financas
+  estaduais —, mas NAO e' "o Brasil" no sentido de orcamento da Uniao. Por isso a
+  `fonte` diz explicitamente "soma dos 27 estados": quem ler a linha sabe o que
+  esta' vendo.
+
+  So' vale para valores somaveis. Somar taxa de desocupacao ou de homicidios seria
+  absurdo, e por isso a lista de indicadores aqui e' fixa.
+*/
+nacional_somado as (
+
+    select
+        cod_indicador,
+        'BR'                                                as sg_uf,
+        ano,
+        sum(valor)                                          as valor,
+        any_value(unidade)                                  as unidade,
+        'Tesouro Nacional — SICONFI/DCA (soma dos 27 estados)' as fonte,
+        1                                                   as n_periodos,
         max(_extracted_at)                                  as _extracted_at,
-        max(_source_url)                                    as _source_url
-    from observado
-    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL')
-    group by sg_uf, ano
-    having max(if(cod_indicador = 'RECEITA_ESTADUAL', valor, null)) is not null
-       and max(if(cod_indicador = 'DESPESA_ESTADUAL', valor, null)) is not null
+        any_value(_source_url)                              as _source_url
+    from (
+        select * from observado
+        union all
+        select * from orcamento
+    )
+    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL', 'RESULTADO_ORCAMENTARIO')
+      and sg_uf != 'BR'
+    group by cod_indicador, ano
+    having count(*) = 27   -- so' agrega ano completo; ano parcial nao vira "Brasil"
 
 ),
 
@@ -113,6 +164,8 @@ completo as (
     select * from derivado
     union all
     select * from orcamento
+    union all
+    select * from nacional_somado
 
 ),
 
