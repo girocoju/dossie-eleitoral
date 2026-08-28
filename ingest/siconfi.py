@@ -60,6 +60,17 @@ CONTA_DESPESA = "TotalDespesas"
 
 FONTE = "Tesouro Nacional — SICONFI/DCA"
 
+# A Uniao tambem declara no SICONFI, com esfera 'U' e cod_ibge 1. Sao SERIES
+# SEPARADAS das estaduais, de proposito: o orcamento federal (R$ 4,4 tri em 2023)
+# e o de um estado (R$ 50 bi) nao sao comparaveis, e misturar os dois num mesmo
+# indicador produziria um "Brasil" que nao serve de comparador para ninguem.
+#
+#   RECEITA_ESTADUAL / DESPESA_ESTADUAL   -> 27 UFs, e o BR e' a SOMA delas.
+#                                            E' o comparador de um GOVERNADOR.
+#   RECEITA_UNIAO / DESPESA_UNIAO         -> so' BR, o orcamento federal.
+#                                            E' o que responde por um PRESIDENTE.
+ENTE_UNIAO = "1"
+
 
 def _rotulo(texto: Any) -> str:
     return strip_accents(str(texto or "")).strip().upper()
@@ -116,6 +127,33 @@ def despesa_empenhada(itens: list[dict[str, Any]]) -> float | None:
     return None
 
 
+def coletar_uniao(ano_inicio: int, ano_fim: int, extraido_em: str) -> list[Observacao]:
+    """Orcamento federal. E' o nivel de governo pelo qual um presidente responde."""
+    obs: list[Observacao] = []
+    for ano in range(ano_inicio, ano_fim + 1):
+        rec = receita_liquida(consultar(ano, ANEXO_RECEITA, ENTE_UNIAO))
+        time.sleep(PAUSA)
+        des = despesa_empenhada(consultar(ano, ANEXO_DESPESA, ENTE_UNIAO))
+        time.sleep(PAUSA)
+        for cod, valor in (("RECEITA_UNIAO", rec), ("DESPESA_UNIAO", des)):
+            if valor is None:
+                continue
+            obs.append(
+                Observacao(
+                    cod_indicador=cod,
+                    sg_uf="BR",
+                    ano=ano,
+                    valor=valor,
+                    unidade="R$ correntes",
+                    fonte=f"{FONTE} — Uniao",
+                    extracted_at=extraido_em,
+                    source_url=API,
+                )
+            )
+    log.info("Uniao: %d observacoes", len(obs))
+    return obs
+
+
 def coletar(ano_inicio: int, ano_fim: int, *, dry_run: bool = False) -> list[Observacao]:
     extraido_em = utc_now()
     obs: list[Observacao] = []
@@ -151,7 +189,11 @@ def coletar(ano_inicio: int, ano_fim: int, *, dry_run: bool = False) -> list[Obs
                 log.info("%d/%d consultas, %d observacoes", feitas, total, len(obs))
 
     if dry_run:
-        log.info("[dry-run] faria %d consultas (x2 anexos) em %s", total, API)
+        consultas = total + (ano_fim - ano_inicio + 1)
+        log.info("[dry-run] faria %d consultas (x2 anexos) em %s", consultas, API)
+        return obs
+
+    obs.extend(coletar_uniao(ano_inicio, ano_fim, extraido_em))
     return obs
 
 

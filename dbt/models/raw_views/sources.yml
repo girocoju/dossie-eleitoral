@@ -41,6 +41,11 @@ sources:
         columns:
           - name: url_foto
             description: "URL publica no Cloud Storage. Caminho deterministico e estavel."
+      - name: votacao
+        description: >
+          S4 — votos por candidatura e turno, JA AGREGADOS na ingestao. A fonte tem
+          grao municipio x zona (~10 milhoes de linhas por eleicao); somar antes de
+          subir e' o que mantem o custo perto de zero (Constituicao 0.5).
       - name: propostas
         description: >
           S14 — existencia da proposta de governo por candidatura majoritaria,

@@ -87,10 +87,14 @@ pivo_orcamento as (
         ano,
         max(if(cod_indicador = 'RECEITA_ESTADUAL', valor, null))  as receita,
         max(if(cod_indicador = 'DESPESA_ESTADUAL', valor, null))  as despesa,
+        max(if(cod_indicador = 'RECEITA_UNIAO', valor, null))      as receita_uniao,
+        max(if(cod_indicador = 'DESPESA_UNIAO', valor, null))      as despesa_uniao,
         max(_extracted_at)                                        as _extracted_at,
         max(_source_url)                                          as _source_url
     from observado
-    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL')
+    where cod_indicador in (
+        'RECEITA_ESTADUAL', 'DESPESA_ESTADUAL', 'RECEITA_UNIAO', 'DESPESA_UNIAO'
+    )
     group by sg_uf, ano
 
 ),
@@ -117,6 +121,30 @@ orcamento as (
     from pivo_orcamento
     where receita is not null
       and despesa is not null
+
+),
+
+orcamento_uniao as (
+
+    /*
+      Mesma conta, outro nivel de governo. Serie separada de proposito: o
+      orcamento federal e o de um estado diferem por duas ordens de grandeza, e
+      um "Brasil" que misturasse os dois nao serviria de comparador para ninguem.
+      Esta e' a serie que responde por um PRESIDENTE.
+    */
+    select
+        'RESULTADO_ORCAMENTARIO_UNIAO'                      as cod_indicador,
+        sg_uf,
+        ano,
+        receita_uniao - despesa_uniao                       as valor,
+        'R$ correntes'                                      as unidade,
+        'Calculado: SICONFI Uniao, receita liquida menos despesa empenhada' as fonte,
+        1                                                   as n_periodos,
+        _extracted_at,
+        _source_url
+    from pivo_orcamento
+    where receita_uniao is not null
+      and despesa_uniao is not null
 
 ),
 
@@ -164,6 +192,8 @@ completo as (
     select * from derivado
     union all
     select * from orcamento
+    union all
+    select * from orcamento_uniao
     union all
     select * from nacional_somado
 

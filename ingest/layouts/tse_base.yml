@@ -154,6 +154,62 @@ datasets:
       qt_vagas:     [QT_VAGA, QT_VAGAS]   # 2026 usa QT_VAGA (singular) — conferido 27/08/2026
       dt_posse:     [DT_POSSE]
 
+  # S4 — votacao por candidato, municipio e zona. E' a maior fonte do projeto:
+  # ~2 GB somando as sete eleicoes, e 10 milhoes de linhas por pleito. Vai para o
+  # BigQuery AGREGADA por candidatura (SPEC S4: "agregar para UF antes de subir").
+  votacao:
+    pacote: "votacao_candidato_munzona/votacao_candidato_munzona_{ano}.zip"
+    # ATENCAO: aqui o `_BRASIL` e' o arquivo CERTO, ao contrario de todos os
+    # outros datasets. Conferido em 1998: o pacote traz 26 arquivos por UF mais um
+    # `_BRASIL`, e o DISTRITO FEDERAL nao tem arquivo proprio — existe so' dentro
+    # do BRASIL. Ler os 26 perderia o DF inteiro; ler os 27 duplicaria tudo.
+    # O BRASIL contem as 27 UFs e os seis cargos.
+    arquivo_regex: '^votacao_candidato_munzona_{ano}_BRASIL\.csv$'
+    # O grao de saida nao carrega `sg_uf`, entao a contagem de unidades nao se
+    # aplica aqui — a integridade e' garantida pela chave, nao pela contagem.
+    ue_esperadas: 0
+    leiame: "votacao_candidato_munzona/leiame-votacao_candidato_munzona.pdf"
+    # Grao de SAIDA: candidatura x turno x UF onde o voto foi depositado.
+    #
+    # Usa `sg_uf`, e NAO `sg_ue`, porque o significado de SG_UE muda entre anos:
+    # em 1998 e' a UF; em 2002 e' o CODIGO DO MUNICIPIO para todo cargo que nao
+    # seja presidente (conferido: 5.566 valores distintos, e a agregacao explodiu
+    # de 14 mil para 1,37 milhao de grupos). `SG_UF` e' consistente nos dois.
+    #
+    # A unidade DISPUTADA — que e' o que compoe a `sk_candidatura` — e' derivada
+    # no dbt: `BR` para presidente, a propria UF para os demais cargos. E' la'
+    # tambem que os votos de um presidenciavel, espalhados por 27 UFs mais `ZZ`
+    # (exterior), viram uma linha so'.
+    agregar_por: ["ano_eleicao", "cd_eleicao", "sg_uf", "cod_cargo",
+                  "sq_candidato", "nr_turno"]
+    somar: ["qt_votos_nominais", "qt_votos_nominais_validos"]
+    chave: ["ano_eleicao", "cd_eleicao", "sg_uf", "cod_cargo", "sq_candidato", "nr_turno"]
+    obrigatorios:
+      - ano_eleicao
+      - sq_candidato
+      - nr_turno
+      - cod_cargo
+      - sg_uf
+    campos:
+      ano_eleicao:               [ANO_ELEICAO]
+      cd_eleicao:                [CD_ELEICAO]
+      ds_eleicao:                [DS_ELEICAO]
+      nr_turno:                  [NR_TURNO]
+      sg_uf:                     [SG_UF]
+      sg_ue:                     [SG_UE]
+      nm_ue:                     [NM_UE]
+      cod_cargo:                 [CD_CARGO]
+      ds_cargo:                  [DS_CARGO]
+      sq_candidato:              [SQ_CANDIDATO]
+      nr_candidato:              [NR_CANDIDATO]
+      nome_urna:                 [NM_URNA_CANDIDATO]
+      sigla_partido:             [SG_PARTIDO]
+      situacao_turno:            [DS_SIT_TOT_TURNO]
+      # 1998 traz QT_VOTOS_NOMINAIS ZERADO e o valor em _VALIDOS (conferido no AC:
+      # 0 contra 762.844). Os dois sao somados e o dbt escolhe — ver stg_tse__votacao.
+      qt_votos_nominais:         [QT_VOTOS_NOMINAIS]
+      qt_votos_nominais_validos: [QT_VOTOS_NOMINAIS_VALIDOS]
+
   coligacoes:
     pacote: "consulta_coligacao/consulta_coligacao_{ano}.zip"
     arquivo_regex: '^consulta_coligacao_{ano}_(?P<ue>[A-Z]{2})\.csv$'

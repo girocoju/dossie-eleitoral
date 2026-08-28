@@ -46,6 +46,7 @@ log = get_logger("tse")
 csv.field_size_limit(10 * 1024 * 1024)
 
 CLUSTERING = {
+    "votacao": ("sg_uf", "cod_cargo"),
     "candidatos": ("sg_uf", "cod_cargo", "sigla_partido"),
     "bens": ("sg_uf",),
     "vagas": ("sg_uf", "cod_cargo"),
@@ -174,6 +175,43 @@ def _linhas(
                     return
 
 
+def _agregar(ds: DatasetLayout, linhas: Iterator[Any]) -> Iterator[dict[str, Any]]:
+    """Soma as colunas declaradas em `somar` dentro do grao de `agregar_por`.
+
+    A votacao por municipio e zona tem ~10 milhoes de linhas por eleicao, e o
+    projeto so' precisa do total por candidatura. Agregar AQUI, e nao no BigQuery,
+    e' o que mantem a tabela na casa das centenas de milhares — e o que respeita a
+    Constituicao 0.5 (custo proximo de zero).
+
+    O acumulador cresce com o numero de GRUPOS, nao de linhas: ~200 mil chaves para
+    2 milhoes de linhas lidas. Cabe em memoria com folga.
+    """
+    acumulado: dict[tuple[str, ...], dict[str, Any]] = {}
+    for linha, _, _ in linhas:
+        if linha is None:
+            continue
+        chave = tuple(str(linha.get(c)) for c in ds.agregar_por)
+        alvo = acumulado.get(chave)
+        if alvo is None:
+            alvo = {c: linha.get(c) for c in ds.agregar_por}
+            for c in ds.somar:
+                alvo[c] = 0
+            for meta in ("ano_eleicao", "data_particao", "_extracted_at", "_source_url",
+                         "_source_sha256"):
+                alvo[meta] = linha.get(meta)
+            alvo["_source_file"] = "(agregado de varios arquivos)"
+            alvo["n_linhas_agregadas"] = 0
+            acumulado[chave] = alvo
+        for c in ds.somar:
+            try:
+                alvo[c] += int(str(linha.get(c) or 0).strip() or 0)
+            except ValueError:
+                pass
+        alvo["n_linhas_agregadas"] += 1
+    log.info("agregado: %d grupos", len(acumulado))
+    yield from acumulado.values()
+
+
 def processar(
     ano: int,
     nome_dataset: str,
@@ -209,8 +247,30 @@ def processar(
     vistas: set[tuple[str, ...]] = set()
     duplicadas = 0
 
+    fonte = _linhas(_zip_path(ano, ds), ds, art, limite=limite)
+    if ds.agrega:
+        ds.valida_agregacao()
+        # a agregacao consome o gerador inteiro antes de escrever
+        with NdjsonWriter(destino) as writer:
+            for linha in _agregar(ds, fonte):
+                writer.write(linha)
+                if linha.get("sg_uf"):
+                    por_uf[str(linha["sg_uf"])] += 1
+                if linha.get("cod_cargo"):
+                    por_cargo[str(linha["cod_cargo"])] += 1
+            linhas = writer.rows
+        arquivos = {"(agregado)"}
+        resultado = Resultado(
+            dataset=nome_dataset, ano=ano, linhas=linhas, arquivos=len(arquivos),
+            ndjson=destino, por_uf=dict(por_uf), por_cargo=dict(por_cargo),
+            campos_ausentes=[], extras=[],
+        )
+        _grava_qa(resultado)
+        log.info("%s", resultado.resumo())
+        return resultado
+
     with NdjsonWriter(destino) as writer:
-        for linha, resolucao, _ in _linhas(_zip_path(ano, ds), ds, art, limite=limite):
+        for linha, resolucao, _ in fonte:
             if linha is None:
                 divergente += 1
                 continue
@@ -240,7 +300,7 @@ def processar(
     # Duas travas contra o erro mais caro desta ingestao: ler o mesmo registro
     # duas vezes. O pacote do TSE traz um CSV por unidade eleitoral E um
     # `_BRASIL` consolidado; casar os dois duplica tudo em silencio.
-    esperadas = load_layout(ano).ue_esperadas
+    esperadas = ds.ue_esperadas
     if esperadas and len(por_uf) not in (0, esperadas):
         raise LayoutError(
             f"{nome_dataset} {ano}: li {len(por_uf)} unidades eleitorais, esperava "
@@ -300,8 +360,18 @@ def carregar_bigquery(ano: int, nome_dataset: str, resultado: Resultado) -> int:
     rodar num runner limpo sem apagar o historico.
     """
     ds = load_layout(ano).dataset(nome_dataset)
-    campos = ds.colunas_saida() + ["_extras"]
-    schema = build_schema(campos, inteiros=["ano_eleicao"], particao=True)
+    if ds.agrega:
+        # O dataset agregado tem schema proprio: so' as colunas do grao de saida,
+        # os somatorios como INT64 e o contador de linhas de origem.
+        campos = [c for c in ds.agregar_por if c != "ano_eleicao"]
+        schema = build_schema(
+            campos,
+            inteiros=["ano_eleicao", *ds.somar, "n_linhas_agregadas"],
+            particao=True,
+        )
+    else:
+        campos = ds.colunas_saida() + ["_extras"]
+        schema = build_schema(campos, inteiros=["ano_eleicao"], particao=True)
 
     ensure_datasets()
     return load_ano(

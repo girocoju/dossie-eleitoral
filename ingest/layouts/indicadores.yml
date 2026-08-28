@@ -173,6 +173,41 @@ indicadores:
       conta: TotalDespesas
       ano_inicio: 2015
 
+  RECEITA_UNIAO:
+    nome: "Receita orcamentaria liquida da Uniao"
+    fonte: "Tesouro Nacional — SICONFI/DCA (Uniao)"
+    unidade: "R$ correntes"
+    periodicidade: anual
+    direcao_desejavel: neutro
+    provedor: siconfi
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Orcamento FEDERAL — o nivel de governo pelo qual um presidente responde.
+      Serie SEPARADA da estadual de proposito: R$ 4,38 tri (Uniao, 2023) e
+      R$ 10,2 bi (Acre, 2023) diferem por duas ordens de grandeza, e um "Brasil"
+      que misturasse os dois nao serviria de comparador para ninguem.
+      Use esta na pagina de Presidencia; RECEITA_ESTADUAL na de Governadores.
+    parametros:
+      anexo: "DCA-Anexo I-C"
+      ente: 1
+      ano_inicio: 2015
+
+  DESPESA_UNIAO:
+    nome: "Despesa orcamentaria empenhada da Uniao"
+    fonte: "Tesouro Nacional — SICONFI/DCA (Uniao)"
+    unidade: "R$ correntes"
+    periodicidade: anual
+    direcao_desejavel: neutro
+    provedor: siconfi
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: "Orcamento federal. Ver RECEITA_UNIAO."
+    parametros:
+      anexo: "DCA-Anexo I-D"
+      ente: 1
+      ano_inicio: 2015
+
   # ── Derivados (calculados no dbt, nao ingeridos) ─────────────────────
   # Existem no catalogo para aparecerem na `dim_indicador` com fonte e unidade
   # corretas. `provedor: derivado` significa: nenhum download, o valor nasce de
@@ -217,6 +252,24 @@ indicadores:
     parametros:
       formula: "RECEITA_ESTADUAL - DESPESA_ESTADUAL"
       depende_de: [RECEITA_ESTADUAL, DESPESA_ESTADUAL]
+
+  RESULTADO_ORCAMENTARIO_UNIAO:
+    nome: "Resultado orcamentario da Uniao"
+    fonte: "Calculado: SICONFI Uniao, receita liquida menos despesa empenhada"
+    unidade: "R$ correntes"
+    periodicidade: anual
+    direcao_desejavel: cima
+    provedor: derivado
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Superavit ou deficit federal. Mesma ressalva do estadual: NAO e' nota de
+      gestao, e a variacao percentual e' indefinida quando o sinal muda — use a
+      variacao absoluta. Conferido: 2019 superavit de R$ 352 bi; 2023 deficit de
+      R$ 213 bi.
+    parametros:
+      formula: "RECEITA_UNIAO - DESPESA_UNIAO"
+      depende_de: [RECEITA_UNIAO, DESPESA_UNIAO]
 
   IDHM:
     nome: "Indice de Desenvolvimento Humano Municipal (agregado por UF)"

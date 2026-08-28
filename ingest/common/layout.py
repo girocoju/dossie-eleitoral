@@ -75,6 +75,34 @@ class DatasetLayout:
     descartar: frozenset[str] = frozenset()
     hash_map: dict[str, str] = field(default_factory=dict)
     indisponivel: str | None = None
+    # Agregacao na ingestao: `agregar_por` sao as colunas do grao de saida e
+    # `somar` as que sao acumuladas. Existe para fontes grandes demais para irem
+    # cruas ao warehouse — a votacao por municipio e zona tem ~10 milhoes de
+    # linhas por eleicao, e o projeto so' precisa do total por candidatura.
+    agregar_por: tuple[str, ...] = ()
+    somar: tuple[str, ...] = ()
+    ue_esperadas: int | None = None
+
+    @property
+    def agrega(self) -> bool:
+        return bool(self.agregar_por and self.somar)
+
+    def valida_agregacao(self) -> None:
+        """A chave declarada tem de caber dentro do grao de agregacao.
+
+        Se sobrar coluna na chave que nao esta' em `agregar_por`, a saida tem
+        duplicatas POR CONSTRUCAO — e a trava de chave duplicada nao roda no
+        caminho agregado, entao o erro passaria em silencio.
+        """
+        if not self.agrega:
+            return
+        faltando = [c for c in self.chave if c not in self.agregar_por]
+        if faltando:
+            raise LayoutError(
+                f"{self.nome}: a chave {list(self.chave)} nao cabe no grao de "
+                f"agregacao {list(self.agregar_por)} — faltam {faltando}. "
+                f"Do jeito que esta', a saida teria duplicatas por construcao."
+            )
 
     def colunas_saida(self) -> list[str]:
         """Colunas que de fato chegam ao BigQuery, na ordem do schema.
@@ -197,6 +225,9 @@ class Layout:
             descartar=frozenset(privacidade.get("descartar", ()) or ()),
             hash_map=dict(privacidade.get("hash", {}) or {}),
             indisponivel=spec.get("indisponivel"),
+            agregar_por=tuple(spec.get("agregar_por", ()) or ()),
+            somar=tuple(spec.get("somar", ()) or ()),
+            ue_esperadas=spec.get("ue_esperadas") or self.ue_esperadas,
         )
 
 

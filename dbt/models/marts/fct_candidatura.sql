@@ -23,9 +23,8 @@
   mandato do mesmo cargo na mesma unidade eleitoral. `reeleicao_declarada` guarda
   o que a fonte disse, para quem quiser auditar a diferenca.
 
-  `votos_nominais` fica NULL enquanto a ingestao de `votacao_candidato_munzona`
-  (S4) nao for habilitada — ver docs/LACUNAS.md. A coluna existe desde ja' para
-  que o modelo do Power BI nao mude quando o dado chegar.
+  `votos_nominais` vem de `votacao_candidato_munzona` (S4), agregado na ingestao.
+  E' NULL para 2026 porque a eleicao ainda nao ocorreu — e nao por falta de dado.
 */
 
 with candidaturas as (
@@ -87,6 +86,18 @@ pessoas as (
 
 ),
 
+votos as (
+
+    select
+        sk_candidatura,
+        sum(votos_nominais)                                   as votos_nominais,
+        max(if(nr_turno = 1, votos_nominais, null))           as votos_1o_turno,
+        max(if(nr_turno = 2, votos_nominais, null))           as votos_2o_turno
+    from {{ ref('stg_tse__votacao') }}
+    group by sk_candidatura
+
+),
+
 propostas as (
 
     select
@@ -145,7 +156,16 @@ select
     b.sk_candidatura is not null                          as declarou_algum_bem,
     c.despesa_max_campanha,
 
-    cast(null as int64)                                   as votos_nominais,
+    /*
+      Votos nominais somados dos dois turnos. `votos_1o_turno` e `votos_2o_turno`
+      ficam separados porque somar os dois e' correto para "quantos votos recebeu
+      no total", mas errado para comparar desempenho entre candidatos que
+      disputaram numeros diferentes de turnos.
+      NULL quando a eleicao ainda nao ocorreu — e' o caso de 2026 inteiro.
+    */
+    v.votos_nominais,
+    v.votos_1o_turno,
+    v.votos_2o_turno,
 
     /*
       F-14 — proposta de governo. Sao TRES estados, e a tela precisa distinguir
@@ -173,6 +193,7 @@ select
 from por_candidatura as c
 left join bens     as b using (sk_candidatura)
 left join pessoas  as p using (sk_candidatura)
+left join votos    as v  using (sk_candidatura)
 left join propostas as pr using (sk_candidatura)
 left join mandatos_vigentes as m
   on  m.id_pessoa  = p.id_pessoa
