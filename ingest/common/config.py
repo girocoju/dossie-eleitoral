@@ -19,6 +19,7 @@ from pathlib import Path
 DATASET_RAW_TSE = "raw_tse"
 DATASET_RAW_IBGE = "raw_ibge"
 DATASET_RAW_IPEA = "raw_ipea"
+DATASET_RAW_TESOURO = "raw_tesouro"
 DATASET_STG = "stg"
 DATASET_MARTS = "marts"
 
@@ -26,6 +27,7 @@ ALL_DATASETS = (
     DATASET_RAW_TSE,
     DATASET_RAW_IBGE,
     DATASET_RAW_IPEA,
+    DATASET_RAW_TESOURO,
     DATASET_STG,
     DATASET_MARTS,
 )

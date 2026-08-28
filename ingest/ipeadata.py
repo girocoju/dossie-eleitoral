@@ -180,6 +180,19 @@ def cmd_load(args: argparse.Namespace) -> int:
                 writer.write(obs.to_row())
             total += len(observacoes)
 
+    # A carga substitui a TABELA INTEIRA. Com `--indicador`, o NDJSON contem so'
+    # um subconjunto e a carga apagaria os demais indicadores — foi o que
+    # aconteceu em 28/08/2026, quando um `--indicador POPULACAO_CENSO` deixou a
+    # tabela com 28 linhas no lugar de 1.624. Por isso a carga parcial e' barrada:
+    # ou se carrega o catalogo todo, ou nao se toca no BigQuery.
+    if args.indicador and args.target != "local":
+        log.error(
+            "carga parcial nao vai ao BigQuery: `--indicador` gera so' um subconjunto "
+            "e a carga substitui a tabela inteira, apagando os demais. Rode sem "
+            "`--indicador`, ou use `--target local` para inspecionar o NDJSON."
+        )
+        return 1
+
     if args.dry_run or args.target == "local":
         log.info("%d observacoes em %s", total, destino)
         return 0

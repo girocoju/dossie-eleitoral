@@ -48,6 +48,32 @@ indicadores:
       niveis: [n1, n3]
       periodos: all
 
+  POPULACAO_CENSO:
+    nome: "Populacao residente (Censo)"
+    fonte: "IBGE — Censo Demografico 2022 (SIDRA t/4709)"
+    unidade: "pessoas"
+    periodicidade: decenal
+    direcao_desejavel: neutro
+    provedor: sidra
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      A tabela de ESTIMATIVAS (t/6579) nao publica anos de Censo — faltam 2007,
+      2010 e 2022 (ver L-12). Sem populacao nesses anos, o PIB per capita ficava
+      truncado em 2021, deixando incompleta a janela de todos os governadores
+      eleitos em 2018. Esta serie preenche 2022 com o dado censitario.
+      Fica como indicador SEPARADO de propositio: estimativa e censo tem
+      metodologias diferentes, e o Censo 2022 corrigiu as estimativas de forma
+      relevante. Junta-las numa serie unica sem marcar a origem esconderia uma
+      quebra metodologica. O `fct_indicador_uf_ano` usa a estimativa e recorre ao
+      censo so' onde ela nao existe, para calcular o PIB per capita.
+      2023 continua sem populacao publicada em nenhuma das duas tabelas.
+    parametros:
+      tabela: 4709
+      variavel: 93
+      niveis: [n1, n3]
+      periodos: all
+
   DESOCUPACAO:
     nome: "Taxa de desocupacao (14 anos ou mais)"
     fonte: "IBGE — PNAD Continua trimestral (SIDRA t/4099)"
@@ -106,6 +132,47 @@ indicadores:
       url: null
       formato: csv
 
+  # ── Tesouro Nacional / SICONFI (S11) ─────────────────────────────────
+  # E' o indicador com o vinculo mais forte com um mandato executivo: receita e
+  # despesa do estado sao literalmente o que o governador administra. Isso nao
+  # muda a Constituicao 0.2 — a tela continua descrevendo o periodo, com
+  # comparador, sem atribuir merito. Muda que aqui a proximidade e' defensavel.
+  RECEITA_ESTADUAL:
+    nome: "Receita orcamentaria liquida do estado"
+    fonte: "Tesouro Nacional — SICONFI/DCA (Anexo I-C)"
+    unidade: "R$ correntes"
+    periodicidade: anual
+    direcao_desejavel: neutro
+    provedor: siconfi
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Receita bruta realizada menos as deducoes (FUNDEB e outras). A bruta
+      superestima o que o estado dispoe: a parcela do FUNDEB e' vinculada por
+      constituicao e sai antes. Cobertura 2015-2025; antes disso o anexo vem vazio.
+    parametros:
+      anexo: "DCA-Anexo I-C"
+      conta: TotalReceitas
+      ano_inicio: 2015
+
+  DESPESA_ESTADUAL:
+    nome: "Despesa orcamentaria empenhada do estado"
+    fonte: "Tesouro Nacional — SICONFI/DCA (Anexo I-D)"
+    unidade: "R$ correntes"
+    periodicidade: anual
+    direcao_desejavel: neutro
+    provedor: siconfi
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Despesa EMPENHADA, nao paga: o pagamento pode escorregar para o exercicio
+      seguinte via restos a pagar, e o que mede a decisao tomada no ano e' o
+      empenho. Cobertura 2015-2025.
+    parametros:
+      anexo: "DCA-Anexo I-D"
+      conta: TotalDespesas
+      ano_inicio: 2015
+
   # ── Derivados (calculados no dbt, nao ingeridos) ─────────────────────
   # Existem no catalogo para aparecerem na `dim_indicador` com fonte e unidade
   # corretas. `provedor: derivado` significa: nenhum download, o valor nasce de
@@ -127,6 +194,24 @@ indicadores:
       depende_de: [PIB, POPULACAO]
 
   # ── Fontes de arquivo (S8, S10) — fase 3, ver docs/LACUNAS.md ────────
+  RESULTADO_ORCAMENTARIO:
+    nome: "Resultado orcamentario do estado"
+    fonte: "Calculado: SICONFI receita liquida menos despesa empenhada"
+    unidade: "R$ correntes"
+    periodicidade: anual
+    direcao_desejavel: cima
+    provedor: derivado
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Positivo = superavit, negativo = deficit. So' existe nos anos em que receita
+      e despesa coexistem. NAO e' nota de gestao: um deficit pode vir de decisao
+      deliberada de investimento, e um superavit de contingenciamento. A tela
+      mostra o numero com o comparador, nunca um juizo.
+    parametros:
+      formula: "RECEITA_ESTADUAL - DESPESA_ESTADUAL"
+      depende_de: [RECEITA_ESTADUAL, DESPESA_ESTADUAL]
+
   IDHM:
     nome: "Indice de Desenvolvimento Humano Municipal (agregado por UF)"
     fonte: "Atlas do Desenvolvimento Humano (PNUD/IPEA/FJP)"

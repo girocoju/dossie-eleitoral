@@ -37,6 +37,7 @@ ingest-historico:  ## baixa e carrega TSE 1998-2022
 ingest-socio:  ## baixa e carrega indicadores socioeconomicos (IBGE/SIDRA + Ipeadata)
 	$(BIN)/python -m ingest.ibge_sidra load
 	$(BIN)/python -m ingest.ipeadata load
+	$(BIN)/python -m ingest.siconfi load
 
 ingest-fotos:  ## baixa as fotos de urna, envia ao bucket e registra as URLs (F-13)
 	$(BIN)/python -m ingest.fotos load --ano $(ANO)

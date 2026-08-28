@@ -63,6 +63,22 @@ sources:
       - name: indicadores
         description: "S6 — formato longo (cod_indicador, sg_uf, ano, valor) vindo do SIDRA."
 
+  - name: raw_tesouro
+    description: >
+      S11 — receita e despesa orcamentaria dos governos estaduais, da Declaracao de
+      Contas Anuais do SICONFI. E' o indicador com o vinculo mais forte com um
+      mandato executivo: e' o orcamento que o governador administra.
+    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    schema: raw_tesouro
+    config:
+      loaded_at_field: _extracted_at
+      freshness:
+        warn_after: { count: 120, period: day }
+        error_after: { count: 400, period: day }
+    tables:
+      - name: indicadores
+        description: "Formato longo (cod_indicador, sg_uf, ano, valor), 2015-2025."
+
   - name: raw_ipea
     database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
     schema: raw_ipea

@@ -43,11 +43,18 @@ pivo as (
         sg_uf,
         ano,
         max(if(cod_indicador = 'PIB', valor, null))        as pib_mil_reais,
-        max(if(cod_indicador = 'POPULACAO', valor, null))  as populacao,
+        -- A estimativa (t/6579) e' a serie principal, mas ela pula anos de Censo.
+        -- Onde ela falta, entra o dado censitario (t/4709) — e' o que devolve 2022
+        -- ao PIB per capita e completa a janela dos governadores eleitos em 2018.
+        -- Ver L-12: 2023 continua sem populacao em nenhuma das duas tabelas.
+        coalesce(
+            max(if(cod_indicador = 'POPULACAO', valor, null)),
+            max(if(cod_indicador = 'POPULACAO_CENSO', valor, null))
+        )                                                  as populacao,
         max(if(cod_indicador = 'PIB', _extracted_at, null)) as _extracted_at,
         max(if(cod_indicador = 'PIB', _source_url, null))  as _source_url
     from observado
-    where cod_indicador in ('PIB', 'POPULACAO')
+    where cod_indicador in ('PIB', 'POPULACAO', 'POPULACAO_CENSO')
     group by sg_uf, ano
 
 ),
@@ -71,11 +78,41 @@ derivado as (
 
 ),
 
+orcamento as (
+
+    /*
+      Resultado orcamentario = receita liquida menos despesa empenhada.
+      Positivo e' superavit, negativo e' deficit — e nenhum dos dois e' nota de
+      gestao: deficit pode ser investimento deliberado, superavit pode ser
+      contingenciamento. A tela mostra o numero com comparador, nunca um juizo
+      (Constituicao 0.1).
+    */
+    select
+        'RESULTADO_ORCAMENTARIO'                            as cod_indicador,
+        sg_uf,
+        ano,
+        max(if(cod_indicador = 'RECEITA_ESTADUAL', valor, null))
+            - max(if(cod_indicador = 'DESPESA_ESTADUAL', valor, null))  as valor,
+        'R$ correntes'                                      as unidade,
+        'Calculado: SICONFI receita liquida menos despesa empenhada' as fonte,
+        1                                                   as n_periodos,
+        max(_extracted_at)                                  as _extracted_at,
+        max(_source_url)                                    as _source_url
+    from observado
+    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL')
+    group by sg_uf, ano
+    having max(if(cod_indicador = 'RECEITA_ESTADUAL', valor, null)) is not null
+       and max(if(cod_indicador = 'DESPESA_ESTADUAL', valor, null)) is not null
+
+),
+
 completo as (
 
     select * from observado
     union all
     select * from derivado
+    union all
+    select * from orcamento
 
 ),
 

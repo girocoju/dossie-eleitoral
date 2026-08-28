@@ -160,9 +160,18 @@ duas series coexistem — ou seja, **para em 2021**, apesar de o PIB ir ate' 202
 Perdem-se justamente os dois anos mais recentes. O modelo nao inventa o
 denominador: o par (UF, ano) simplesmente nao aparece.
 
-**Como fechar:** acrescentar ao catalogo as tabelas do Censo 2022 (4709) e do
-Censo 2010, com `provedor: sidra`, e unir as tres series em `stg_indicadores`
-marcando a origem de cada ponto.
+**FECHADA PARCIALMENTE em 28/08/2026.** A tabela 4709 (Censo 2022) foi
+acrescentada ao catalogo como `POPULACAO_CENSO`, indicador separado para nao
+esconder a quebra metodologica entre estimativa e censo. O
+`fct_indicador_uf_ano` usa a estimativa e recorre ao censo so' onde ela falta.
+
+Resultado: **PIB per capita passou de 2002-2021 para 2002-2022**, o que completa a
+janela de todos os governadores eleitos em 2018.
+
+**O que continua aberto:** 2023 nao tem populacao publicada em nenhuma das duas
+tabelas (nem estimativa, nem censo). Como o PIB vai ate' 2023, o PIB per capita
+fica um ano atras dele. 2007 e 2010 seguem sem preenchimento — sao anteriores ao
+inicio da serie de PIB, entao nao afetam nenhum indicador derivado.
 
 ---
 
