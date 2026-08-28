@@ -2,8 +2,13 @@
 
 Por que nao e' um `urlretrieve`:
 
-* O CDN do TSE (`cdn.tse.jus.br`) responde **403** para User-Agent de biblioteca e
-  tambem quando ha' rajada de requisicoes — e' preciso UA de navegador + backoff.
+* O CDN do TSE (`cdn.tse.jus.br`) tem um WAF que responde **403** para requisicao
+  com cabecalho incompleto — nao basta o User-Agent. Medido em 27/08/2026, mesma
+  URL, mesmo segundo: so' com UA -> 403; com o conjunto completo de cabecalhos que
+  um navegador manda (`Accept`, `Accept-Language`, `Sec-Fetch-*`, `sec-ch-ua`,
+  `Referer`) -> 206. Foi o que derrubou o primeiro pipeline no GitHub Actions, onde
+  a PRIMEIRA requisicao ja' falhava — parecia bloqueio de IP de datacenter e era
+  formato de requisicao.
 * Os arquivos sao grandes; queda no meio nao pode obrigar a baixar tudo de novo,
   entao o download e' retomado com `Range: bytes=N-`.
 * Constituicao §3/§4: todo arquivo baixado registra `sha256`, tamanho, URL e
@@ -31,12 +36,33 @@ USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
+# Conjunto completo, na ordem que um Chrome manda. Retirar qualquer um destes
+# reintroduz o 403 — conferido item a item em 27/08/2026.
 BASE_HEADERS = {
     "User-Agent": USER_AGENT,
-    "Accept": "*/*",
-    "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "image/avif,image/webp,*/*;q=0.8"
+    ),
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    # `identity` de proposito: os pacotes ja' sao .zip e uma camada extra de
+    # compressao (br, sobretudo) chegaria aqui sem quem descomprima.
+    "Accept-Encoding": "identity",
+    "Referer": "https://dadosabertos.tse.jus.br/",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "cross-site",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    "sec-ch-ua": '"Chromium";v="120", "Not(A:Brand";v="24"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
     "Connection": "close",
 }
+
+# Pausa entre downloads. O WAF do TSE reage a rajada, e o projeto nao tem pressa:
+# sao poucos arquivos por execucao.
+PAUSA_ENTRE_DOWNLOADS = 2.0
 
 CHUNK = 1 << 20  # 1 MiB
 GZIP_MAGIC = bytes([0x1F, 0x8B])
@@ -96,8 +122,10 @@ def _write_manifest(dest: Path, art: Artifact) -> None:
     )
 
 
-def _open(url: str, *, offset: int = 0, timeout: float = 120.0):
+def _open(url: str, *, offset: int = 0, timeout: float = 120.0, aceita_gzip: bool = False):
     headers = dict(BASE_HEADERS)
+    if aceita_gzip:
+        headers["Accept-Encoding"] = "gzip, deflate"
     if offset:
         headers["Range"] = f"bytes={offset}-"
     req = urllib.request.Request(url, headers=headers, method="GET")
@@ -133,6 +161,8 @@ def download(
     part = dest.with_suffix(dest.suffix + ".part")
     if force and part.exists():
         part.unlink()
+
+    time.sleep(PAUSA_ENTRE_DOWNLOADS)
 
     last_error: Exception | None = None
     ok = False
@@ -207,11 +237,15 @@ def _decode_body(raw: bytes, encoding: str | None) -> bytes:
 
 
 def get_json(url: str, *, timeout: float = 120.0, attempts: int = MAX_ATTEMPTS):
-    """GET + parse JSON com o mesmo backoff. Usado por SIDRA e Ipeadata."""
+    """GET + parse JSON com o mesmo backoff. Usado por SIDRA e Ipeadata.
+
+    Diferente do download de arquivo, aqui gzip e' bem-vindo: as respostas do IBGE
+    chegam a dezenas de MB de JSON e `_decode_body` sabe descomprimir.
+    """
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
-            with _open(url, timeout=timeout) as resp:
+            with _open(url, timeout=timeout, aceita_gzip=True) as resp:
                 raw = _decode_body(resp.read(), resp.headers.get("Content-Encoding"))
             return json.loads(raw.decode("utf-8-sig"))
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
