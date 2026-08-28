@@ -182,6 +182,26 @@ correcoes de nome de urna (MA, MT, RJ) que teriam sumido sem rastro.
 | F-16 / [ADR-015](adr/ADR-015-atividade-legislativa.md) | Atividade legislativa dos deputados | ✅ **Entregue** — 296.962 proposicoes de 710 deputados, so' `proponente = 1` |
 | Indicadores IPCA e SELIC | Inflacao e juros para a pagina de presidenciaveis | ✅ **Entregue** — IPCA 1980-2025 (46 anos), Selic 1974-2025 (52 anos), so' `BR` |
 
+## Local e CI gravam nas MESMAS tabelas
+
+Nao ha' ambiente de desenvolvimento separado: `radar-brasil-ddi` e' um so'. Uma
+carga local e uma execucao do Actions escrevem nas mesmas tabelas, e a ultima a
+terminar vence.
+
+Isso mordeu em 28/08/2026: um run de 48 minutos ainda em voo recarregou o SICONFI
+com a versao que ainda coletava a Uniao pela DCA, e ressuscitou 22 linhas de
+indicadores que ja' tinham sido removidos do catalogo. O `dbt build` local falhou
+com orfaos que o codigo local nao produzia mais — e a causa nao estava em lugar
+nenhum do repositorio.
+
+O sinal que denuncia: `_extracted_at` das linhas orfas nao bate com o do NDJSON em
+`data/staging`. Se divergir, alguem escreveu por cima.
+
+Duas defesas desde entao:
+
+1. `concurrency: cancel-in-progress` no workflow — uma execucao por vez.
+2. Ao carregar local com um run em voo, cancele o run antes (`gh run cancel`).
+
 ## Permissoes da service account do pipeline (nao estao em codigo)
 
 O `radar-pipeline@radar-brasil-ddi.iam.gserviceaccount.com` roda o CI por

@@ -35,6 +35,21 @@ on:
         default: "2026"
         required: false
 
+# UMA execucao por vez. Sem isto, dois runs simultaneos gravam nas MESMAS tabelas
+# do BigQuery e o ultimo a terminar vence — inclusive um run antigo, com codigo
+# antigo, sobrescrevendo o resultado de um novo.
+#
+# Aconteceu em 28/08/2026: um run de 48 minutos ainda em voo recarregou o SICONFI
+# com a versao que ainda coletava a Uniao pela DCA, ressuscitando 22 linhas de um
+# indicador que ja' tinha sido removido do catalogo. O `dbt build` local falhou por
+# orfaos que o codigo local nao produzia mais.
+#
+# `cancel-in-progress` porque o pipeline e' idempotente e o dado mais novo sempre
+# vence: nao ha' motivo para terminar uma carga que ja' esta' obsoleta.
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   RADAR_GCP_PROJECT: ${{ vars.RADAR_GCP_PROJECT || 'radar-brasil' }}
   RADAR_BQ_LOCATION: ${{ vars.RADAR_BQ_LOCATION || 'US' }}
