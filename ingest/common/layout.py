@@ -82,10 +82,22 @@ class DatasetLayout:
     agregar_por: tuple[str, ...] = ()
     somar: tuple[str, ...] = ()
     ue_esperadas: int | None = None
+    # Filtro declarativo aplicado na leitura: {campo: [valores aceitos]}. Existe
+    # para fontes onde o recorte muda a ordem de grandeza — a votacao por
+    # municipio tem ~70 milhoes de linhas somando as sete eleicoes, mas restrita a
+    # presidente e governador cai para a casa do milhao.
+    filtrar: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     @property
     def agrega(self) -> bool:
         return bool(self.agregar_por and self.somar)
+
+    def aceita(self, linha: dict[str, Any]) -> bool:
+        """Aplica o filtro declarado. Sem filtro, tudo passa."""
+        for campo, valores in self.filtrar.items():
+            if str(linha.get(campo)) not in valores:
+                return False
+        return True
 
     def valida_agregacao(self) -> None:
         """A chave declarada tem de caber dentro do grao de agregacao.
@@ -228,6 +240,10 @@ class Layout:
             agregar_por=tuple(spec.get("agregar_por", ()) or ()),
             somar=tuple(spec.get("somar", ()) or ()),
             ue_esperadas=spec.get("ue_esperadas") or self.ue_esperadas,
+            filtrar={
+                campo: tuple(str(v) for v in valores)
+                for campo, valores in (spec.get("filtrar") or {}).items()
+            },
         )
 
 

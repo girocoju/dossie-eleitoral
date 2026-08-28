@@ -49,17 +49,23 @@ Restou aberta a quebra por municipio — ver L-19.
 
 ---
 
-## L-03 · Mortalidade infantil por UF (S9)
+## L-03 · Mortalidade infantil — FECHADA PARCIALMENTE em 28/08/2026
 
-**O que falta:** serie por UF. Conferido em 27/08/2026: o Ipeadata so' tem
-`DEPIS_TMI`, de base Macroeconomica, ou seja, **apenas Brasil**. Nao ha' quebra
-estadual la'.
+**Resolvida pelo IBGE, nao pelo DATASUS.** O TabNet e' formulario HTML e o Atlas
+do PNUD esta' inacessivel; mas a SIDRA t/3834 traz a taxa por UF, ja' reconciliada
+e sem o vies de sub-registro que afeta a contagem bruta de obitos. 476 observacoes,
+28 unidades. Custou uma linha no catalogo — nenhum codigo novo.
 
-**Impacto:** o indicador esta' no catalogo com `verificado: false` e `provedor:
-arquivo`, e nao entra na carga.
+**O que continua aberto: a serie termina em 2016.** Mandatos posteriores nao tem
+este indicador, e a ausencia aparece na tela em vez de ser preenchida.
 
-**Como fechar:** extrair do DATASUS/TabNet (SIM + SINASC) por UF e ano, publicar
-a URL no catalogo `indicadores.yml`.
+**Por que nao usei a t/7362**, que iria de 2000 a 2060: e' tabela de PROJECAO. Os
+anos futuros sao modelo e mesmo os passados sao saida de modelo demografico.
+Misturar projecao com observacao numa serie historica seria exatamente o tipo de
+coisa que este projeto recusa. Usa-la exigiria, alem disso, suporte a
+classificacoes na ingestao do SIDRA — a serie vive numa classificacao `Ano`, e a
+tabela tem DUAS dimensoes com esse nome, o que quebra a deteccao automatica de
+periodo.
 
 ---
 
@@ -75,14 +81,22 @@ Ele aparece so' como corte de contexto.
 
 ---
 
-## L-05 · IDEB (S10) sem URL no catalogo
+## L-05 · IDEB e IDHM — hosts inacessiveis
 
-**O que falta:** URL do arquivo do INEP em `indicadores.yml`.
+**O que falta:** `download.inep.gov.br` (IDEB) e `atlasbrasil.org.br` (IDHM)
+**resetam a conexao** deste ambiente — conferido em 28/08/2026.
 
-**Impacto:** indicador declarado, `ingerivel = false`, fora da carga.
+Nao e' o mesmo caso do WAF do TSE (L-18): ali o servidor respondia 403 a
+requisicao mal formada e o cabecalho completo resolveu. Aqui a conexao cai no
+handshake TLS, antes de qualquer resposta HTTP. Pode ser bloqueio de rede
+temporario, restricao geografica ou politica do host.
 
-**Como fechar:** preencher `parametros.url` e implementar o provedor `arquivo`
-(leitura de XLSX) em `ingest/`.
+**Impacto:** os dois indicadores seguem no catalogo com `verificado: false` e
+`provedor: arquivo`, fora da carga.
+
+**Como fechar:** retestar de outra rede. Se persistir, procurar os mesmos
+indicadores em fonte alternativa — foi o que resolveu a mortalidade infantil
+(L-03), encontrada no IBGE depois de o DATASUS se mostrar inviavel.
 
 ---
 
@@ -319,8 +333,14 @@ ADR-002 (Power BI em Import mode sobre tabelas agregadas).
 (`fct_votacao_uf`), mas nao por municipio. Um mapa municipal da eleicao
 presidencial, por exemplo, nao e' possivel hoje.
 
-**Como fechar:** um fato adicional com grao municipio, restrito aos cargos
-MAJORITARIOS (1, 3, 5). O volume cai de ~70 milhoes para a ordem de 1,7 milhao de
-linhas — os proporcionais e' que sao caros, porque sao dezenas de milhares de
-candidatos. Exige decisao de escopo, porque acrescenta uma tabela grande ao
-modelo do Power BI.
+**FECHADA em 28/08/2026**, com escopo ainda mais estreito que o previsto:
+`fct_votacao_municipio` cobre Presidente (1) e Governador (3) — **752.232 linhas**
+nas sete eleicoes. Senador ficou de fora: e' majoritario, mas o mapa municipal de
+uma disputa estadual acrescenta pouco ao que `fct_votacao_uf` ja' mostra.
+
+O filtro declarativo (`filtrar` no layout) descartou 1,8 milhao de linhas so' em
+2002. Sem ele, seriam ~70 milhoes de linhas somando tudo.
+
+**Continua fora:** votos por municipio para cargos proporcionais. Sao dezenas de
+milhares de candidatos a deputado espalhados por centenas de municipios cada, e o
+mapa municipal de uma eleicao proporcional e' ruido, nao informacao.

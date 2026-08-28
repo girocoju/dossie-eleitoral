@@ -46,6 +46,11 @@ sources:
           S4 — votos por candidatura e turno, JA AGREGADOS na ingestao. A fonte tem
           grao municipio x zona (~10 milhoes de linhas por eleicao); somar antes de
           subir e' o que mantem o custo perto de zero (Constituicao 0.5).
+      - name: votacao_municipio
+        description: >
+          S4 com grao MUNICIPAL, restrito a Presidente e Governador. E' a base do
+          mapa eleitoral. O recorte por cargo e' o que mantem a tabela na casa das
+          centenas de milhares em vez de dezenas de milhoes (L-19).
       - name: propostas
         description: >
           S14 — existencia da proposta de governo por candidatura majoritaria,

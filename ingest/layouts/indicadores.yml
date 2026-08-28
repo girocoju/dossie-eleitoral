@@ -117,20 +117,32 @@ indicadores:
 
   MORTALIDADE_INFANTIL:
     nome: "Taxa de mortalidade infantil"
-    fonte: "DATASUS — SIM/SINASC (S9)"
+    fonte: "IBGE — Indicadores de Desenvolvimento Sustentavel (SIDRA t/3834)"
     unidade: "por mil nascidos vivos"
     periodicidade: anual
     direcao_desejavel: baixo
-    provedor: arquivo
-    verificado: false
+    provedor: sidra
+    verificado: true
+    conferido_em: "2026-08-28"
     notas: >
-      NAO existe no Ipeadata com quebra por UF — a unica serie de mortalidade
-      infantil la' e' DEPIS_TMI, de base Macroeconomica (so' Brasil), conferido em
-      27/08/2026. Tem de vir do DATASUS/TabNet (S9). Ate' la', o indicador fica fora
-      da carga (`--somente-verificados`) e a lacuna esta' em docs/LACUNAS.md.
+      Encontrada no IBGE, e nao no DATASUS: o TabNet e' formulario HTML e o Atlas
+      do PNUD esta' inacessivel. A serie do IBGE vem por UF e ja' reconciliada,
+      sem o vies de sub-registro que afeta a contagem bruta de obitos.
+
+      LIMITE: termina em 2016. Mandatos posteriores nao tem este indicador, e a
+      lacuna aparece na tela em vez de ser preenchida.
+
+      Existe a t/7362 (Projecao da Populacao), que vai de 2000 a 2060 — mas e'
+      tabela de PROJECAO: os anos futuros sao modelo, nao observacao, e mesmo os
+      passados sao saida de modelo demografico. Usa-la exigiria suporte a
+      classificacoes na ingestao do SIDRA (a serie fica numa classificacao `Ano`,
+      e a tabela tem DUAS dimensoes chamadas Ano, o que quebra a deteccao
+      automatica de periodo). Ver docs/LACUNAS.md, L-03.
     parametros:
-      url: null
-      formato: csv
+      tabela: 3834
+      variavel: 1940
+      niveis: [n1, n3]
+      periodos: all
 
   # ── Tesouro Nacional / SICONFI (S11) ─────────────────────────────────
   # E' o indicador com o vinculo mais forte com um mandato executivo: receita e

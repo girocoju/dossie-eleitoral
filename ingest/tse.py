@@ -187,8 +187,12 @@ def _agregar(ds: DatasetLayout, linhas: Iterator[Any]) -> Iterator[dict[str, Any
     2 milhoes de linhas lidas. Cabe em memoria com folga.
     """
     acumulado: dict[tuple[str, ...], dict[str, Any]] = {}
+    descartadas = 0
     for linha, _, _ in linhas:
         if linha is None:
+            continue
+        if not ds.aceita(linha):
+            descartadas += 1
             continue
         chave = tuple(str(linha.get(c)) for c in ds.agregar_por)
         alvo = acumulado.get(chave)
@@ -208,6 +212,8 @@ def _agregar(ds: DatasetLayout, linhas: Iterator[Any]) -> Iterator[dict[str, Any
             except ValueError:
                 pass
         alvo["n_linhas_agregadas"] += 1
+    if descartadas:
+        log.info("filtro %s descartou %d linhas", dict(ds.filtrar), descartadas)
     log.info("agregado: %d grupos", len(acumulado))
     yield from acumulado.values()
 

@@ -210,6 +210,48 @@ datasets:
       qt_votos_nominais:         [QT_VOTOS_NOMINAIS]
       qt_votos_nominais_validos: [QT_VOTOS_NOMINAIS_VALIDOS]
 
+  # Votacao por MUNICIPIO, restrita a Presidente (1) e Governador (3).
+  #
+  # O recorte nao e' economia de espaco por preguica: com os cargos proporcionais
+  # incluidos, sao ~70 milhoes de linhas somando as sete eleicoes — dezenas de
+  # milhares de candidatos a deputado, cada um com votos espalhados por centenas
+  # de municipios. Restrito ao executivo, cai para a casa do milhao, que cabe no
+  # Power BI em Import mode (ADR-002).
+  #
+  # E' tambem onde o mapa municipal significa alguma coisa: a eleicao presidencial
+  # e a de governador sao majoritarias e territoriais.
+  votacao_municipio:
+    pacote: "votacao_candidato_munzona/votacao_candidato_munzona_{ano}.zip"
+    arquivo_regex: '^votacao_candidato_munzona_{ano}_BRASIL\.csv$'
+    leiame: "votacao_candidato_munzona/leiame-votacao_candidato_munzona.pdf"
+    filtrar:
+      cod_cargo: ["1", "3"]
+    agregar_por: ["ano_eleicao", "cd_eleicao", "sg_uf", "cd_municipio",
+                  "nm_municipio", "cod_cargo", "sq_candidato", "nr_turno"]
+    somar: ["qt_votos_nominais", "qt_votos_nominais_validos"]
+    chave: ["ano_eleicao", "cd_eleicao", "sg_uf", "cd_municipio", "cod_cargo",
+            "sq_candidato", "nr_turno"]
+    ue_esperadas: 0
+    obrigatorios:
+      - ano_eleicao
+      - sq_candidato
+      - nr_turno
+      - cod_cargo
+      - sg_uf
+      - cd_municipio
+    campos:
+      ano_eleicao:               [ANO_ELEICAO]
+      cd_eleicao:                [CD_ELEICAO]
+      nr_turno:                  [NR_TURNO]
+      sg_uf:                     [SG_UF]
+      cd_municipio:              [CD_MUNICIPIO]
+      nm_municipio:              [NM_MUNICIPIO]
+      cod_cargo:                 [CD_CARGO]
+      sq_candidato:              [SQ_CANDIDATO]
+      nome_urna:                 [NM_URNA_CANDIDATO]
+      qt_votos_nominais:         [QT_VOTOS_NOMINAIS]
+      qt_votos_nominais_validos: [QT_VOTOS_NOMINAIS_VALIDOS]
+
   coligacoes:
     pacote: "consulta_coligacao/consulta_coligacao_{ano}.zip"
     arquivo_regex: '^consulta_coligacao_{ano}_(?P<ue>[A-Z]{2})\.csv$'

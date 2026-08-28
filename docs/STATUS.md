@@ -77,6 +77,7 @@ Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 
 
 | Indicador | Periodo | Fonte |
 |---|---|---|
+| Mortalidade infantil | 2000–2016 | IBGE t/3834 |
 | PIB | 2002–2023 | IBGE t/5938 |
 | PIB per capita | 2002–2022 | derivado |
 | Populacao (estimativa) | 2001–2025 | IBGE t/6579 |
@@ -87,8 +88,22 @@ Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 
 | **Despesa estadual** | **2015–2025** | **SICONFI/DCA** |
 | **Resultado orcamentario** | **2015–2025** | **derivado** |
 
-`fct_mandato_indicador`: 1.067 linhas, 8 indicadores. **Zero linhas sem comparador
-nacional.**
+Mais `RECEITA_UNIAO`, `DESPESA_UNIAO` e `RESULTADO_ORCAMENTARIO_UNIAO` (2015–2025),
+o orcamento federal — nivel de governo pelo qual um presidente responde, e serie
+separada da estadual de proposito.
+
+**Zero linhas sem comparador nacional.**
+
+## Votacao (L-02 e L-19 fechadas)
+
+| Tabela | Linhas | Grao |
+|---|---:|---|
+| `raw_tse.votacao` | 142.086 | candidatura x turno x UF |
+| `marts.fct_votacao_uf` | 142.086 | + nome, partido, % do total do candidato |
+| `marts.fct_votacao_municipio` | **752.232** | candidatura x turno x municipio, so' Presidente e Governador |
+
+6.387 municipios cobertos. Validado contra a historia: FHC 35.936.382 no 1o turno
+de 1998.
 
 ## Fase 4 — Polimento e publicacao
 
