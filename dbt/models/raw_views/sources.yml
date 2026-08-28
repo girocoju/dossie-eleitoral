@@ -34,6 +34,13 @@ sources:
         description: "S5 — consulta_vagas. Vagas em disputa por cargo e unidade eleitoral."
       - name: coligacoes
         description: "S5 — consulta_coligacao."
+      - name: fotos
+        description: >
+          S13 — uma linha por foto oficial de urna enviada ao bucket publico.
+          Guarda a URL, nunca o binario (ADR-012).
+        columns:
+          - name: url_foto
+            description: "URL publica no Cloud Storage. Caminho deterministico e estavel."
       - name: complementar
         description: >
           S3 — consulta_cand_complementar. Em 2026 o TSE moveu para ca' situacao de

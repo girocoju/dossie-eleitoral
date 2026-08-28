@@ -138,3 +138,18 @@ models:
         description: >
           Quantas medidas da fonte entraram no valor anual. 1 para series anuais;
           4 para a media dos trimestres da PNAD Continua.
+
+  - name: stg_tse__fotos
+    description: "S13 — foto oficial de urna por candidatura. Guarda URL, nunca binario (ADR-012)."
+    columns:
+      - name: sk_candidatura
+        tests: [not_null, unique]
+      - name: url_foto
+        tests: [not_null]
+      - name: tamanho_bytes
+        description: "Mediana medida: 5 KB. Serve para detectar imagem corrompida ou vazia."
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true

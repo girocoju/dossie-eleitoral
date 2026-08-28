@@ -8,6 +8,12 @@ table dim_candidato
 		lineageTag: 97ff8462-a150-ae1e-7cf0-27cd89b06688
 		displayFolder: Perfil
 
+	/// Cobertura da foto oficial. Abaixo de 95% o pipeline falha (F-13).
+	measure '% com foto' = DIVIDE(CALCULATE(COUNTROWS(dim_candidato), dim_candidato[tem_foto] = TRUE), COUNTROWS(dim_candidato))
+		formatString: 0.0%
+		lineageTag: 677154a5-3517-f3ce-d408-f8d8c3a32ab4
+		displayFolder: Qualidade
+
 	/// Quanto da trajetoria exibida nao depende do fallback nome+nascimento.
 	measure '% com identidade confirmada por CPF' = DIVIDE(CALCULATE(COUNTROWS(dim_candidato), dim_candidato[link_confiavel] = TRUE), COUNTROWS(dim_candidato))
 		formatString: 0.0%
@@ -156,6 +162,24 @@ table dim_candidato
 		lineageTag: 83e8a18e-60b8-0265-2c7d-37a7f2c6acd9
 		summarizeBy: none
 		sourceColumn: sg_uf_nascimento
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Foto oficial de urna, servida do bucket publico. NULL quando a fonte nao publica foto para a candidatura (F-13 / ADR-012).
+	column url_foto
+		dataType: string
+		dataCategory: ImageUrl
+		lineageTag: d8f49c31-d77e-8045-1f5c-6df5247a1b93
+		summarizeBy: none
+		sourceColumn: url_foto
+
+		annotation SummarizationSetBy = Automatic
+
+	column tem_foto
+		dataType: boolean
+		lineageTag: 6839d775-bc0e-77a3-bf31-2dd9e7cf0603
+		summarizeBy: none
+		sourceColumn: tem_foto
 
 		annotation SummarizationSetBy = Automatic
 

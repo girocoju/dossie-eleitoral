@@ -38,6 +38,9 @@ ingest-socio:  ## baixa e carrega indicadores socioeconomicos (IBGE/SIDRA + Ipea
 	$(BIN)/python -m ingest.ibge_sidra load
 	$(BIN)/python -m ingest.ipeadata load
 
+ingest-fotos:  ## baixa as fotos de urna, envia ao bucket e registra as URLs (F-13)
+	$(BIN)/python -m ingest.fotos load --ano $(ANO)
+
 verify-layout:  ## confere o header real do TSE contra ingest/layouts/tse_$(ANO).yml
 	$(BIN)/python -m ingest.tse verify-layout --ano $(ANO)
 
@@ -65,7 +68,7 @@ lint:  ## ruff check
 fmt:  ## ruff format
 	$(BIN)/python -m ruff format ingest tests
 
-run: ingest ingest-historico ingest-socio dbt-build  ## pipeline completo
+run: ingest ingest-historico ingest-socio ingest-fotos dbt-build  ## pipeline completo
 
 docs-status:  ## imprime o estado das Tasks
 	@cat docs/STATUS.md

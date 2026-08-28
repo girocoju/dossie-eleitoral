@@ -34,6 +34,13 @@ with candidaturas as (
 
 ),
 
+fotos as (
+
+    select sk_candidatura, url_foto
+    from {{ ref('stg_tse__fotos') }}
+
+),
+
 com_chave as (
 
     select
@@ -51,10 +58,10 @@ com_chave as (
 )
 
 select
-    sk_candidatura,
-    sq_candidato,
-    ano_eleicao,
-    id_pessoa,
+    c.sk_candidatura,
+    c.sq_candidato,
+    c.ano_eleicao,
+    c.id_pessoa,
     link_confiavel,
     cpf_hash,
     nome_completo,
@@ -97,5 +104,11 @@ select
     sg_uf,
     sg_ue,
     sigla_partido,
+
+    -- F-13: a URL, nunca o binario (ADR-012). NULL quando a fonte nao publica foto.
+    f.url_foto,
+    f.url_foto is not null                                       as tem_foto,
+
     _extracted_at
-from com_chave
+from com_chave as c
+left join fotos as f using (sk_candidatura)

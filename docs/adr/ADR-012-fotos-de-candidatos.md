@@ -1,6 +1,6 @@
 # ADR-012 — Fotos em bucket público, não no BigQuery
 
-**Status:** PROPOSTA — aguardando aprovação · **Data:** 2026-08-27 · **Feature:** F-13
+**Status:** Aceita · **Data:** 2026-08-27 · **Feature:** F-13 (implementada)
 
 ## Contexto
 
@@ -72,3 +72,16 @@ disso, custam US$ 0,004 por 10 mil — centavos.
   caminho é determinístico e estável: `gs://radar-brasil-fotos/2026/{SG_UE}/{sq_candidato}.jpg`.
 - Se o TSE mudar a nomenclatura, o teste de cobertura ≥ 95% falha a carga — o
   mesmo princípio que já protege os layouts (ADR-008).
+
+## Resultado da implementação — 2026-08-28
+
+| | |
+|---|---|
+| Fotos no bucket | **20.765**, das 28 unidades eleitorais |
+| Cobertura em `dim_candidato` | **99,98%** (20.765 de 20.769 candidaturas de 2026) |
+| Caminho | `gs://radar-brasil-fotos/2026/{SG_UE}/{sq_candidato}.jpg` |
+| URL pública | responde `200 image/jpeg`, sem autenticação, `Cache-Control: public, max-age=86400` |
+| `dbt build` | 147 de 147 |
+
+O upload pula o que já está no bucket: a execução diária custa uma listagem por
+unidade eleitoral e envia só foto de candidatura nova ou substituída.

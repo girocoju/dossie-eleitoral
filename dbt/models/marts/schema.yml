@@ -74,6 +74,14 @@ models:
               arguments:
                 to: ref('dim_cargo')
                 field: cod_cargo
+      - name: url_foto
+        description: >
+          URL publica da foto oficial de urna no Cloud Storage (F-13 / ADR-012).
+          O warehouse guarda a URL, nunca o binario. NULL quando a fonte nao
+          publica foto para aquela candidatura.
+      - name: tem_foto
+        description: "Conveniencia para filtro e para a medida de cobertura."
+        tests: [not_null]
 
   - name: dim_partido
     description: "Estado do partido em cada eleicao (sigla, numero, federacao)."

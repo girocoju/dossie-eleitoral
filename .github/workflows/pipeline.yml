@@ -143,6 +143,12 @@ jobs:
           python -m ingest.ibge_sidra load --somente-verificados
           python -m ingest.ipeadata  load --somente-verificados
 
+      # O upload pula o que ja' esta' no bucket, entao a execucao diaria custa uma
+      # listagem por UE e sobe so' foto de candidatura nova ou substituida.
+      - name: Ingestao das fotos (F-13)
+        if: steps.cred.outputs.temos == 'true'
+        run: python -m ingest.fotos load --ano 2026
+
       - name: dbt build
         if: steps.cred.outputs.temos == 'true'
         working-directory: dbt

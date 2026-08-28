@@ -36,7 +36,7 @@
 ### 2.1 Dentro do escopo (MVP — entrega antes do 1º turno)
 - Candidatos 2026 de todos os cargos em disputa, todas as UFs.
 - Perfil: cargo, UF, partido, coligação/federação, gênero, cor/raça, idade, grau de instrução, ocupação, situação da candidatura, reeleição (sim/não), bens declarados.
-- **Foto oficial de urna de cada candidato de 2026** (F-13 — *proposta, aguardando aprovação*).
+- **Foto oficial de urna de cada candidato de 2026** (F-13).
 - Histórico: eleições gerais 1998–2022 (candidaturas e resultados) para montar *"quem já ocupou o cargo"*.
 - Contexto socioeconômico por UF e Brasil: PIB e PIB per capita, população, desemprego (PNAD Contínua), IDHM, mortalidade infantil, IDEB, homicídios (Atlas da Violência/IPEA), receita/despesa pública (SICONFI).
 - Módulo *"Durante o mandato"*: para candidatos que foram Governador ou Presidente em mandato anterior, série dos indicadores da UF/Brasil no período do mandato vs. comparadores.
@@ -103,7 +103,7 @@
 ## 5. Modelo de dados (`marts`)
 
 ### Dimensões
-- `dim_candidato` — `sq_candidato` (chave TSE por eleição), `nome_urna`, `nome_completo`, `cpf_hash` (SHA-256 para linkar entre anos sem expor CPF), `genero`, `cor_raca`, `data_nascimento`, `grau_instrucao`, `ocupacao`, `url_foto` e `tem_foto` (F-13 — *proposta*).
+- `dim_candidato` — `sq_candidato` (chave TSE por eleição), `nome_urna`, `nome_completo`, `cpf_hash` (SHA-256 para linkar entre anos sem expor CPF), `genero`, `cor_raca`, `data_nascimento`, `grau_instrucao`, `ocupacao`, `url_foto` e `tem_foto` (F-13).
 - `dim_partido` — `sigla`, `nome`, `numero`, `federacao` (2022+).
 - `dim_cargo` — `cod_cargo`, `descricao`, `esfera` (federal/estadual), `vagas_2026`.
 - `dim_uf` — `sg_uf`, `nome`, `regiao`, `cod_ibge`.
@@ -215,7 +215,7 @@ Formato: **F-xx — nome** · *Prioridade* · Critérios de aceite (todos verifi
 - T-404 Publish to web, README com prints, post de lançamento.
 - **Aceite:** F-07, F-08, F-09, F-10. Deadline: antes de 04/10/2026.
 
-### Fase 4.5 — Fotos (F-13, proposta) — 1 dia
+### Fase 4.5 — Fotos (F-13) — concluída em 28/08/2026
 
 - T-451 Criar bucket público `radar-brasil-fotos` em `US`, com acesso de leitura
   anônimo e *uniform bucket-level access*.
@@ -282,7 +282,7 @@ radar-brasil/
 | ADR-004 | Base dos Dados para histórico | A decidir na T-201 | Pendente |
 | ADR-005 | `cpf_hash` como chave de pessoa | Vincula anos sem expor CPF | Aceita |
 | ADR-006 a ADR-011 | Ver `docs/adr/` | — | Aceitas |
-| ADR-012 | Fotos em bucket público, não no BigQuery | Binário não pertence a um warehouse; o Power BI lê por URL | **Proposta** |
+| ADR-012 | Fotos em bucket público, não no BigQuery | Binário não pertence a um warehouse; o Power BI lê por URL | Aceita |
 
 ---
 

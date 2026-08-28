@@ -47,6 +47,9 @@ class Coluna:
     descricao: str = ""
     oculta: bool = False
     ordenar_por: str | None = None
+    # `ImageUrl` faz o Power BI renderizar a URL como imagem em vez de texto.
+    # Sem isto a ficha do candidato mostra um link, nao a foto.
+    categoria: str | None = None
 
 
 @dataclass
@@ -192,6 +195,15 @@ TABELAS: list[Tabela] = [
             Coluna("estado_civil"),
             Coluna("ocupacao"),
             Coluna("sg_uf_nascimento"),
+            Coluna(
+                "url_foto",
+                categoria="ImageUrl",
+                descricao=(
+                    "Foto oficial de urna, servida do bucket publico. NULL quando a "
+                    "fonte nao publica foto para a candidatura (F-13 / ADR-012)."
+                ),
+            ),
+            Coluna("tem_foto", "boolean"),
             Coluna("cod_cargo", "int64", oculta=True),
             Coluna("sg_uf", oculta=True),
         ],
@@ -202,6 +214,14 @@ TABELAS: list[Tabela] = [
                 "#,0",
                 "Mediana, nao media: a distribuicao de idade e' assimetrica.",
                 "Perfil",
+            ),
+            Medida(
+                "% com foto",
+                "DIVIDE(CALCULATE(COUNTROWS(dim_candidato),"
+                " dim_candidato[tem_foto] = TRUE), COUNTROWS(dim_candidato))",
+                "0.0%",
+                "Cobertura da foto oficial. Abaixo de 95% o pipeline falha (F-13).",
+                "Qualidade",
             ),
             Medida(
                 "% com identidade confirmada por CPF",
@@ -456,6 +476,7 @@ RELACIONAMENTOS = [
 
 PAGINAS = [
     ("visao-geral", "Visao Geral"),
+    ("candidatos", "Candidatos"),
     ("presidencia", "Presidencia"),
     ("governadores", "Governadores"),
     ("senado", "Senado"),
@@ -509,6 +530,8 @@ def tmdl_tabela(t: Tabela) -> str:
         out.append(f"{TAB}{TAB}dataType: {c.tipo}")
         if c.formato:
             out.append(f"{TAB}{TAB}formatString: {c.formato}")
+        if c.categoria:
+            out.append(f"{TAB}{TAB}dataCategory: {c.categoria}")
         if c.oculta:
             out.append(f"{TAB}{TAB}isHidden")
         out.append(f"{TAB}{TAB}lineageTag: {lineage('column', t.nome, c.nome)}")
