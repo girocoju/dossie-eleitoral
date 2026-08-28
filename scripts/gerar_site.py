@@ -90,6 +90,10 @@ class Candidato:
     nome_completo: str | None
     sg_uf: str
     sigla_partido: str | None
+    nr_candidato: int | None
+    coligacao: str | None
+    composicao: str | None
+    federacao: str | None
     situacao: str | None
     url_foto: str | None
     idade: int | None
@@ -105,6 +109,7 @@ class Candidato:
     url_proposta: str | None
     trajetoria: list[dict] = field(default_factory=list)
     mudancas: list[dict] = field(default_factory=list)
+    indicadores: list[dict] = field(default_factory=list)
 
     @property
     def caminho(self) -> str:
@@ -135,10 +140,12 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     sql = f"""
         select
             d.sk_candidatura, d.sq_candidato, d.cod_cargo, d.nome_urna, d.nome_completo,
-            d.sg_uf, d.sigla_partido, d.url_foto, d.genero, d.cor_raca, d.grau_instrucao,
+            d.sg_uf, d.sigla_partido, d.nr_candidato, d.url_foto, d.genero, d.cor_raca,
+            d.grau_instrucao,
             d.ocupacao, d.sg_uf_nascimento,
             d.idade_na_posse_valida as idade,
             f.situacao_julgamento, f.total_bens_declarados, f.n_bens,
+            f.nome_coligacao, f.composicao_coligacao, f.sg_federacao,
             f.proposta_obrigatoria, f.tem_proposta_governo, f.url_proposta_oficial,
             d.id_pessoa
         from `{p}.marts.dim_candidato` d
@@ -152,7 +159,9 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
         c = Candidato(
             sk=r.sk_candidatura, sq=str(r.sq_candidato), cod_cargo=r.cod_cargo,
             nome_urna=r.nome_urna or "SEM NOME", nome_completo=r.nome_completo,
-            sg_uf=r.sg_uf, sigla_partido=r.sigla_partido,
+            sg_uf=r.sg_uf, sigla_partido=r.sigla_partido, nr_candidato=r.nr_candidato,
+            coligacao=r.nome_coligacao, composicao=r.composicao_coligacao,
+            federacao=r.sg_federacao,
             situacao=r.situacao_julgamento, url_foto=r.url_foto, idade=r.idade,
             genero=r.genero, cor_raca=r.cor_raca, grau_instrucao=r.grau_instrucao,
             ocupacao=r.ocupacao, uf_nascimento=r.sg_uf_nascimento,
@@ -167,6 +176,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     log.info("%d candidaturas majoritarias", len(saida))
     _anexar_trajetoria(cliente, ids)
     _anexar_mudancas(cliente, {c.sk: c for c in saida})
+    _anexar_indicadores(cliente, ids)
     return saida
 
 
@@ -229,6 +239,48 @@ def _anexar_mudancas(cliente, por_sk: dict[str, Candidato]) -> None:
         c.mudancas.append({"data": r.data_observacao, "texto": texto})
         n += 1
     log.info("%d alteracoes anexadas", n)
+
+
+def _anexar_indicadores(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """Indicadores durante mandatos executivos ANTERIORES da mesma pessoa.
+
+    So' existe para quem ja' foi Presidente ou Governador — a seed `cargo_tse`
+    marca isso em `modulo_durante_mandato`. Para senador e deputado nao ha' bloco:
+    o vinculo entre um parlamentar e um indicador estadual e' fraco demais para
+    ser exibido sem induzir leitura errada (SPEC 2.2).
+
+    Cada linha vem com o comparador nacional ao lado, porque a Constituicao 0.2
+    proibe numero de UF sozinho na tela — e com o aviso de que o indicador
+    descreve o PERIODO, nunca o efeito do mandato.
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    lista = "','".join(por_pessoa)
+    sql = f"""
+        select m.id_pessoa, m.cod_indicador, i.nome as indicador, m.unidade,
+               m.nm_ue, m.ano_inicio, m.ano_fim, m.cod_cargo,
+               m.ano_referencia_inicio, m.ano_referencia_fim,
+               m.valor_inicio, m.valor_fim, m.variacao_pct,
+               m.variacao_brasil_pct, m.delta_vs_brasil, m.janela_incompleta
+        from `{p}.marts.fct_mandato_indicador` m
+        join `{p}.marts.dim_indicador` i using (cod_indicador)
+        where m.id_pessoa in ('{lista}')
+        order by m.ano_inicio desc, i.nome
+    """
+    n = 0
+    for r in cliente.query(sql).result():
+        for c in por_pessoa.get(r.id_pessoa, []):
+            c.indicadores.append({
+                "indicador": r.indicador, "unidade": r.unidade, "ue": r.nm_ue,
+                "cargo": r.cod_cargo, "a1": r.ano_inicio, "a2": r.ano_fim,
+                "ref1": r.ano_referencia_inicio, "ref2": r.ano_referencia_fim,
+                "v1": r.valor_inicio, "v2": r.valor_fim,
+                "pct": r.variacao_pct, "pct_br": r.variacao_brasil_pct,
+                "delta": r.delta_vs_brasil, "incompleta": r.janela_incompleta,
+            })
+            n += 1
+    log.info("%d linhas de indicador de mandato anexadas", n)
 
 
 def carregar_proporcionais(cliente) -> dict[str, list[dict]]:

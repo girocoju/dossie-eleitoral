@@ -31,6 +31,11 @@ models:
   - name: dim_candidato
     description: "Uma linha por candidatura-pessoa. Chave: sk_candidatura."
     columns:
+      - name: nr_candidato
+        description: >
+          Numero de urna. Largura varia por cargo: 2 digitos em Presidente e
+          Governador, 3 em Senador, 4 em Deputado Federal, 5 em Estadual.
+        tests: [not_null]
       - name: sk_candidatura
         description: >
           (ano_eleicao, sg_ue, sq_candidato) concatenados. `sq_candidato` sozinho

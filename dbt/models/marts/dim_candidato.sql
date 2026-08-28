@@ -128,6 +128,16 @@ select
     sg_uf,
     sg_ue,
     sigla_partido,
+    /*
+      Numero de urna. E' o que a pessoa digita para votar, e por isso a informacao
+      mais pratica da ficha inteira — mais util, para quem vota, do que qualquer
+      atributo declarado.
+
+      A largura muda por cargo: 2 digitos em Presidente e Governador (o numero do
+      partido), 3 em Senador, 4 em Deputado Federal, 5 em Estadual. Guardado como
+      inteiro; quem exibe cuida do zero a' esquerda.
+    */
+    nr_candidato,
 
     -- F-13: a URL, nunca o binario (ADR-012). NULL quando a fonte nao publica foto.
     f.url_foto,

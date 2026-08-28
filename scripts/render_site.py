@@ -78,6 +78,74 @@ def _retrato(c: Candidato) -> str:
     return '<div class="semfoto"></div>'
 
 
+def _urna(c: Candidato) -> str:
+    """Numero de urna em destaque.
+
+    E' a informacao mais pratica da ficha: e' o que a pessoa digita para votar.
+    Fica ao lado do retrato, no tamanho que uma pessoa le' de relance — e nao
+    perdido entre atributos declarados.
+    """
+    if c.nr_candidato is None:
+        return '<div class="urna"><span class="marca-dado m-ausente">sem número</span></div>'
+    return (f'<div class="urna"><b>{c.nr_candidato}</b>'
+            f'<small>{e(c.sigla_partido) or ""}</small></div>')
+
+
+def _legenda(c: Candidato) -> str:
+    """Coligacao e federacao — a 'legenda' pela qual a candidatura foi registrada.
+
+    Federacao NAO e' coligacao: e' uniao partidaria que dura no minimo quatro anos
+    e vale para todos os cargos, enquanto coligacao morre com a eleicao. Sao
+    exibidas separadas porque significam coisas diferentes.
+    """
+    partes = []
+    if c.federacao:
+        partes.append(f"<div><dt>Federação</dt><dd>{e(c.federacao)}</dd></div>")
+    if c.coligacao:
+        partes.append(f"<div><dt>Coligação</dt><dd>{e(c.coligacao)}</dd></div>")
+    if c.composicao and c.composicao != c.sigla_partido:
+        partes.append(f"<div style='grid-column:1/-1'><dt>Composição</dt>"
+                      f"<dd style='font-size:14px'>{e(c.composicao)}</dd></div>")
+    if not partes:
+        return ""
+    return ('<section class="bloco"><h2>Legenda</h2>'
+            f'<dl class="campos">{"".join(partes)}</dl></section>')
+
+
+def _indicadores(c: Candidato) -> str:
+    """Bloco socioeconomico — so' para quem ja' teve mandato executivo."""
+    if not c.indicadores:
+        return ""
+    linhas = []
+    for i in c.indicadores:
+        if i["v1"] is None or i["v2"] is None:
+            continue
+        pct = f"{i['pct']:+.1f}%" if i["pct"] is not None else "—"
+        pct_br = f"{i['pct_br']:+.1f}%" if i["pct_br"] is not None else "—"
+        janela = f"{i['ref1']}–{i['ref2']}"
+        incompleta = (' <span class="marca-dado m-ausente">janela incompleta</span>'
+                      if i["incompleta"] else "")
+        linhas.append(
+            f"<tr><td>{e(i['indicador'])}{incompleta}</td>"
+            f"<td class='num'>{janela}</td>"
+            f"<td class='num'>{pct}</td><td class='num'>{pct_br}</td></tr>")
+    if not linhas:
+        return ""
+    primeiro = c.indicadores[0]
+    return f"""<section class="bloco">
+      <h2>Durante mandatos anteriores — {e(primeiro['ue'])}, {primeiro['a1']}–{primeiro['a2']}</h2>
+      <div class="rolagem"><table>
+        <thead><tr><th>Indicador</th><th>Janela</th><th>Variação</th>
+        <th>Brasil no mesmo período</th></tr></thead>
+        <tbody>{''.join(linhas)}</tbody></table></div>
+      <p class="aviso" style="margin:10px 0 0">
+        <b>Estes números descrevem o período, não o efeito do mandato.</b>
+        Cada variação aparece ao lado da variação nacional no mesmo intervalo,
+        porque um número isolado vira nota de gestão. PIB, desemprego e homicídios
+        dependem de fatores muito além do alcance de um governo estadual.</p>
+    </section>"""
+
+
 def _ficha(c: Candidato, quando: str) -> str:
     partes = [f"""
 <a href="{BASE_URL}/{CARGOS[c.cod_cargo][0]}/" style="font-size:13.5px">← {e(c.cargo_nome)}</a>
@@ -85,10 +153,10 @@ def _ficha(c: Candidato, quando: str) -> str:
   <div class="retrato">
     {_retrato(c)}
     <div class="legenda">foto de urna — TSE</div>
+    {_urna(c)}
     <div class="chips">
       <span class="chip">{e(c.cargo_nome)}</span>
       <span class="chip">{e(c.sg_uf)}</span>
-      {f'<span class="chip">{e(c.sigla_partido)}</span>' if c.sigla_partido else ''}
       {f'<span class="chip">{e(c.situacao)}</span>' if c.situacao else ''}
     </div>
   </div>
@@ -96,6 +164,7 @@ def _ficha(c: Candidato, quando: str) -> str:
     <h1>{e(c.nome_urna)}</h1>
     <p class="sub">{e(c.nome_completo or '')}</p>
 
+    {_legenda(c)}
     <section class="bloco"><h2>Perfil declarado ao TSE</h2>
     <dl class="campos">
       <div><dt>Idade na posse</dt><dd>{c.idade if c.idade else '—'}</dd></div>
@@ -168,6 +237,7 @@ def _ficha(c: Candidato, quando: str) -> str:
         apenas o estado atual — esta série não pode ser refeita depois de 04/10/2026.</p>
     </section>""")
 
+    partes.append(_indicadores(c))
     partes.append("</div></div>")
     desc = (f"{c.nome_urna}, candidatura a {c.cargo_nome} por {c.sg_uf} em 2026. "
             f"Perfil declarado ao TSE, trajetória eleitoral e plano de governo.")
