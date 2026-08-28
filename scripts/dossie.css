@@ -88,6 +88,8 @@ border-left:2px solid var(--rule)}
 .cartao[hidden]{display:none}
 
 /* texto integral do plano: leitura longa, entao coluna estreita e linha alta */
-.plano{max-width:62ch;margin-top:26px}
-.plano p{margin:0 0 14px;font-size:16px;line-height:1.68;color:var(--ink-2)}
+.plano{max-width:none;margin-top:26px;column-gap:44px}
+@media(min-width:1100px){.plano{columns:2;column-rule:1px solid var(--rule-2)}}
+.plano p{margin:0 0 14px;font-size:15.5px;line-height:1.66;color:var(--ink-2);
+break-inside:avoid-column}
 .plano p:first-child{font-size:17px;color:var(--ink)}

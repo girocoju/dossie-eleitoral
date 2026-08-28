@@ -336,10 +336,22 @@ def _ficha(c: Candidato, quando: str) -> str:
         # impede alguem de ler ausencia como omissao do candidato.
         plano = None
 
-    bens = (f"<dl class='campos'><div><dt>Total declarado</dt><dd>{brl(c.bens_total)}</dd></div>"
-            f"<div><dt>Itens</dt><dd>{c.bens_n or 0}</dd></div></dl>"
-            if c.bens_total is not None else
-            "<span class='marca-dado m-ausente'>não declarou bens</span>")
+    if c.bens_total is not None:
+        bens = (f"<dl class='campos'><div><dt>Total declarado</dt>"
+                f"<dd>{brl(c.bens_total)}</dd></div>"
+                f"<div><dt>Itens</dt><dd>{c.bens_n or 0}</dd></div></dl>")
+    else:
+        bens = "<span class='marca-dado m-ausente'>não declarou bens</span>"
+
+    # Limite LEGAL de gastos, nao gasto realizado. A diferenca importa: e' o teto
+    # que a lei impoe a' campanha, e nao diz nada sobre quanto foi gasto.
+    if c.limite_gasto:
+        bens += (f"<dl class='campos' style='margin-top:12px'><div style='grid-column:1/-1'>"
+                 f"<dt>Limite legal de gastos de campanha</dt>"
+                 f"<dd>{brl(c.limite_gasto)}"
+                 f"<span class='ajuda' tabindex='0' title='Teto que a Lei 9.504/97 impõe "
+                 f"à campanha deste cargo. Não é o quanto foi gasto — é o quanto pode "
+                 f"ser gasto.'>?</span></dd></div></dl>")
 
     if plano is None:
         partes.append(f"""

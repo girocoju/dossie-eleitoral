@@ -111,6 +111,7 @@ class Candidato:
     proposta_obrigatoria: bool
     tem_proposta: bool
     url_proposta: str | None
+    limite_gasto: float | None = None
     plano_texto: str | None = None
     plano_paginas: int | None = None
     plano_motivo: str | None = None
@@ -167,6 +168,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
             f.situacao_julgamento, f.total_bens_declarados, f.n_bens,
             f.nome_coligacao, f.composicao_coligacao, f.sg_federacao,
             f.proposta_obrigatoria, f.tem_proposta_governo, f.url_proposta_oficial,
+            f.despesa_max_campanha,
             d.id_pessoa
         from `{p}.marts.dim_candidato` d
         join `{p}.marts.fct_candidatura` f using (sk_candidatura)
@@ -192,6 +194,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
             proposta_obrigatoria=bool(r.proposta_obrigatoria),
             tem_proposta=bool(r.tem_proposta_governo),
             url_proposta=r.url_proposta_oficial,
+            limite_gasto=r.despesa_max_campanha,
         )
         saida.append(c)
         if r.id_pessoa:

@@ -377,6 +377,7 @@ radar-brasil/
 | ADR-015 | Atividade legislativa por classe, sem taxa de aprovação | Aprovação depende de estar na base do governo, não do mérito — seria placar | Aceita |
 | ADR-016 | Intermediário TLS do INEP versionado em `certs/` | O servidor omite um elo da cadeia; a raiz sempre foi confiável. Destrava o IDEB | Aceita |
 | ADR-017 | Orçamento federal pelo RTN, não pela DCA | A receita da DCA inclui operações de crédito (45% da União em 2020); o resultado tendia a zero por identidade contábil | Aceita |
+| ADR-020 | Financiamento de campanha, com o CPF do doador fora | O TSE publica CPF de doador em texto puro; o nome basta para prestar contas, o número só acrescenta risco | Proposta |
 | ADR-019 | Texto integral dos planos de governo | O endpoint certo do TSE estava no bundle do próprio app; 201 de 206 planos transcrevem, 19,3 mi de caracteres | Aceita |
 | ADR-018 | Site estático gerado do lake, em vez de ferramenta de BI | *Publish to web* não tem layout mobile, URL por candidato nem indexação; e 20 mil candidatos que mudam 1x/dia são geração estática, não consulta ao vivo | Aceita |
 
