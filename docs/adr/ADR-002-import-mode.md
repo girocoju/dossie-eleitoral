@@ -2,6 +2,11 @@
 
 **Status:** Aceita · **Data:** 2026-08-27 · **Origem:** SPEC secao 10
 
+> Continua valendo depois da [ADR-018](ADR-018-site-estatico-em-vez-de-bi.md), e
+> na verdade levada ao extremo. O raciocinio aqui era nao pagar query por
+> interacao do usuario. A geracao estatica e' a forma mais completa disso: uma
+> leitura dos marts por dia, zero por visita.
+
 ## Contexto
 DirectQuery faria o BigQuery cobrar bytes processados a cada interacao do usuario
 com o relatorio publicado. A Constituicao secao 5 exige custo proximo de zero,

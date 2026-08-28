@@ -54,7 +54,7 @@ seeds:
         tests: [not_null]
       - name: direcao_desejavel
         description: >
-          Usado SO' para escolher a cor neutra de tendencia no Power BI
+          Usado SO' para escolher a cor neutra de tendencia na tela
           (Constituicao 0.1). Nao e' juizo sobre gestao.
         tests:
           - not_null

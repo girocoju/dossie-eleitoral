@@ -15,8 +15,8 @@
 2. **Correlação não é causalidade — e o produto diz isso na tela.** Todo indicador socioeconômico cruzado com mandato é apresentado como *"o que aconteceu na região/país durante o mandato"*, sempre ao lado de um comparador (média nacional, UF vizinha, período anterior). Nunca como "resultado do candidato".
 3. **Somente dados públicos, com fonte e data de extração em toda visualização.**
 4. **Reprodutível do zero.** `make bootstrap && make run` (ou equivalente) recria tudo a partir das fontes originais. Nada de CSV editado na mão.
-5. **Custo próximo de zero.** BigQuery dentro do free tier (10 GB storage / 1 TB query por mês). Power BI em modo *Import* sobre tabelas agregadas — nunca DirectQuery em tabela grande.
-6. **Versionado.** Código, SQL, modelos dbt e o arquivo `.pbip`/`.pbit` no GitHub. Sem dados brutos no repo (`.gitignore` em `data/`).
+5. **Custo próximo de zero.** BigQuery dentro do free tier (10 GB storage / 1 TB query por mês). O site é **gerado uma vez por dia e servido estático** — zero query por visita, e escala por CDN sem teto (ADR-018).
+6. **Versionado.** Código, SQL, modelos dbt e o gerador do site no GitHub. Sem dados brutos no repo (`.gitignore` em `data/`).
 7. **LGPD/ética.** Dados de candidatos são públicos por lei, mas o projeto não expõe CPF nem endereço, e não cruza com dados de terceiros que não sejam agregados.
 
 ---
@@ -25,7 +25,7 @@
 
 **Uma frase:** um hub analítico que mostra *quem* são os candidatos das eleições gerais de 2026 (Presidente, Governador, Senador, Deputado Federal, Deputado Estadual/Distrital) e *em que contexto socioeconômico* concorrem — incluindo o que aconteceu nos indicadores de sua UF/país durante mandatos anteriores de quem tenta reeleição ou já governou.
 
-**Por que existe:** peça de portfólio da Data Duba Intelligence (DDI) demonstrando pipeline completo (ingestão → BigQuery → dbt → Power BI) sobre dados públicos brasileiros, com gancho de atualidade (eleições 2026, 1º turno em 04/10/2026).
+**Por que existe:** peça de portfólio da Data Duba Intelligence (DDI) demonstrando pipeline completo (ingestão → BigQuery → dbt → site público) sobre dados públicos brasileiros, com gancho de atualidade (eleições 2026, 1º turno em 04/10/2026). O produto público chama-se **Dossiê Eleitoral**.
 
 **Público:** recrutadores e potenciais clientes da DDI (primário); jornalistas de dados e eleitores curiosos (secundário).
 
@@ -40,7 +40,7 @@
 - Histórico: eleições gerais 1998–2022 (candidaturas e resultados) para montar *"quem já ocupou o cargo"*.
 - Contexto socioeconômico por UF e Brasil: PIB e PIB per capita, população, desemprego (PNAD Contínua), IDHM, mortalidade infantil, IDEB, homicídios (Atlas da Violência/IPEA), receita/despesa pública (SICONFI).
 - Módulo *"Durante o mandato"*: para candidatos que foram Governador ou Presidente em mandato anterior, série dos indicadores da UF/Brasil no período do mandato vs. comparadores.
-- Hub no Power BI com páginas: Visão Geral → Presidência → Governadores → Senado → Câmara → Assembleias → Contexto Socioeconômico → Durante o Mandato → Metodologia/Fontes.
+- Dossiê Eleitoral com páginas: Candidatos → Presidência → Governadores → Senado → Câmara → Assembleias → Contexto Socioeconômico → Durante o Mandato → Metodologia/Fontes.
 
 ### 2.2 Fora do escopo (explicitamente)
 - Propostas de governo (texto livre) — fase futura.
@@ -60,7 +60,7 @@
 | S1 | TSE Dados Abertos — `consulta_cand_{ano}.zip` | Candidatos, 1998–2026 | CSV, `;`, **Latin-1**, um arquivo por UF + BRASIL | Layout muda entre anos; usar o `leiame.pdf` de cada ano para mapear colunas |
 | S2 | TSE — `bem_candidato_{ano}.zip` | Bens declarados | CSV, mesmo padrão | Valor em string com vírgula decimal |
 | S3 | TSE — `consulta_cand_complementar_2026.zip` | Campos extras 2026 | CSV | Verificar conteúdo no leiame |
-| S4 | TSE — `votacao_candidato_munzona_{ano}.zip` | Votos por candidato/município/zona | CSV, grande (GBs) | Só 1998–2022 no MVP; agregar para UF antes de subir ao Power BI |
+| S4 | TSE — `votacao_candidato_munzona_{ano}.zip` | Votos por candidato/município/zona | CSV, grande (GBs) | Só 1998–2022 no MVP; agregar antes de subir ao BigQuery |
 | S5 | TSE — `consulta_vagas_{ano}.zip`, `consulta_coligacao_{ano}.zip` | Vagas e coligações | CSV | |
 | S6 | IBGE SIDRA (API) | PIB (5938), população (6579), PNAD desemprego (4099/6381) | JSON via `https://apisidra.ibge.gov.br` | Códigos de tabela devem ser confirmados no ato |
 | S7 | IPEA — Ipeadata (API) | Séries macro (inflação, câmbio, etc.) e Atlas da Violência | JSON via `http://www.ipeadata.gov.br/api/odata4/` | |
@@ -80,9 +80,9 @@
 
 ```
 ┌──────────────┐   ┌──────────────┐   ┌──────────────────┐   ┌───────────────┐
-│ Fontes       │──▶│ ingest/ (py) │──▶│ BigQuery         │──▶│ Power BI      │
+│ Fontes       │──▶│ ingest/ (py) │──▶│ BigQuery         │──▶│ Site estatico │
 │ TSE IBGE IPEA│   │ download +   │   │ raw → stg → marts│   │ Import mode   │
-│ basedosdados │   │ load raw     │   │ (dbt)            │   │ .pbip no git  │
+│ basedosdados │   │ load raw     │   │ (dbt)            │   │ HTML + JSON   │
 └──────────────┘   └──────────────┘   └──────────────────┘   └───────────────┘
                           │                    ▲
                           └── GitHub Actions ──┘ (agendado + manual)
@@ -92,11 +92,11 @@
 - **Warehouse:** BigQuery, projeto `radar-brasil`, datasets `raw_tse`, `raw_ibge`, `raw_ipea`, `stg`, `marts`. Localização `southamerica-east1` ou `US` (decidir — ver ADR-003).
 - **Transformação:** dbt-core + dbt-bigquery. Testes de schema obrigatórios em toda tabela de `marts`.
 - **Orquestração:** GitHub Actions (cron semanal até a eleição; manual depois). Sem Airflow no MVP.
-- **BI:** Power BI Desktop; arquivo salvo como `.pbip` (formato de projeto, versionável). Publicação via Power BI Service → *Publish to web* para o portfólio público.
+- **Publicação:** site estático gerado por script Python a partir de `marts`, hospedado com CDN. Sem servidor de aplicação: o dado muda uma vez por dia (ADR-018).
 - **Camadas de dados:**
   - `raw_*`: cópia fiel da fonte, tipos STRING, particionado por `ano_eleicao` quando aplicável.
   - `stg_*`: tipagem, renomeação para snake_case em pt-BR, deduplicação, padronização de códigos (UF, cargo, partido).
-  - `marts`: modelo estrela consumido pelo Power BI.
+  - `marts`: modelo estrela consumido pelo gerador do site.
 
 ---
 
@@ -155,18 +155,25 @@ Formato: **F-xx — nome** · *Prioridade* · Critérios de aceite (todos verifi
 - Para cada candidato 2026 com mandato anterior, a página mostra: série temporal do indicador na UF, linha do Brasil, faixa sombreada do mandato, e o `delta_vs_brasil`.
 - Texto fixo na página: *"Indicadores refletem o período; não medem o efeito do mandato."*
 
-**F-07 — Power BI: hub e páginas** · P0
-- Arquivo `bi/RadarBrasil.pbip` no repo.
-- Página Visão Geral com navegação por botões para as demais.
+**F-07 — Dossiê Eleitoral: site estático gerado do lake** · P0
+> Reescrita em 28/08/2026. Ver [ADR-018](docs/adr/ADR-018-site-estatico-em-vez-de-bi.md).
+- Gerador em Python lê `marts` e escreve HTML + JSON estáticos, na esteira diária.
+- **Uma URL por candidato** — compartilhável e indexável pelo Google. É o que a
+  publicação em iframe impedia, e o motivo de a ferramenta de BI ter caído.
+- Sete páginas por cargo, layout de dossiê: retrato, perfil declarado, trajetória
+  eleitoral, plano de governo e alterações registradas.
 - Toda página tem rodapé com fonte(s) e `_extracted_at`.
-- Paleta neutra; cor de partido só quando o usuário liga um toggle.
+- Paleta neutra; **cor de partido nunca como padrão** — só sob escolha explícita
+  de quem lê.
+- Sem barra de pontuação, sem nota, sem veredito automático: a ficha é registro,
+  não avaliação (Constituição §0.1).
 
 **F-08 — Perfil de candidatos** · P1
 - Filtros cruzados por cargo, UF, partido, gênero, cor/raça, faixa etária, instrução, reeleição.
 - Distribuição de bens declarados (mediana, quartis, top-N com nome).
 
 **F-09 — Metodologia** · P1
-- Página no Power BI + `docs/METODOLOGIA.md` explicando fontes, janelas de mandato, limites da análise, e a regra de correlação ≠ causalidade.
+- Página no site + `docs/METODOLOGIA.md` explicando fontes, janelas de mandato, limites da análise, e a regra de correlação ≠ causalidade.
 
 **F-10 — Pipeline agendado** · P1
 - GitHub Actions: `ingest → dbt run → dbt test` semanal, com falha bloqueando o merge.
@@ -251,7 +258,7 @@ Critérios de aceite:
 - T-102 Mesmo para bens, complementar, vagas, coligações.
 - T-103 `stg_tse__candidaturas` (só 2026 por enquanto) + testes.
 - T-104 `dim_candidato`, `dim_partido`, `fct_candidatura` (2026).
-- T-105 Power BI: conexão, página Visão Geral + Presidência + Governadores.
+- ~~T-105 Power BI: conexão, página Visão Geral + Presidência + Governadores.~~ → **T-105 Gerador do site: páginas Candidatos + Presidência + Governadores** (ADR-018).
 - **Aceite:** F-01, F-03 (parcial), F-07 (parcial). Dashboard mostra os candidatos a presidente e a governador de 2026 corretamente contra o DivulgaCandContas em amostra de 10 casos.
 
 ### Fase 2 — Histórico e mandatos (3–5 dias)
@@ -266,7 +273,7 @@ Critérios de aceite:
 - T-301 `ingest/ibge_sidra.py`, `ingest/ipeadata.py`, loaders para S8–S10.
 - T-302 `fct_indicador_uf_ano` + `dim_indicador`.
 - T-303 `fct_mandato_indicador` com comparadores Brasil e região.
-- T-304 Página Power BI "Durante o Mandato" + "Contexto Socioeconômico".
+- T-304 Páginas "Durante o Mandato" e "Contexto Socioeconômico" no site.
 - **Aceite:** F-04, F-05, F-06.
 
 ### Fase 4 — Polimento e publicação (2–3 dias)
@@ -283,7 +290,7 @@ Critérios de aceite:
 - T-452 `ingest/fotos.py`: baixa por UE, valida o padrão do nome, envia ao bucket,
   registra `sq_candidato → url` num NDJSON e carrega em `raw_tse.fotos`.
 - T-453 `dim_candidato` ganha `url_foto` e `tem_foto`; dois testes dbt novos.
-- T-454 Power BI: coluna marcada como *Image URL*, exibida na página principal.
+- T-454 Retrato do candidato na ficha, lido por URL do bucket público.
 - **Aceite:** F-13.
 
 ### Fase 4.6 — Proposta de governo (F-14) — concluída em 28/08/2026
@@ -291,7 +298,7 @@ Critérios de aceite:
 - T-461 `ingest/propostas.py`: consulta a API do DivulgaCandContas por candidatura
   majoritária, identifica os arquivos `codTipo = 5` e carrega em `raw_tse.propostas`.
 - T-462 `stg_tse__propostas`; `fct_candidatura` ganha os cinco campos da F-14.
-- T-463 Dois testes dbt novos + medida e rótulo de três estados no Power BI.
+- T-463 Dois testes dbt novos + rótulo de três estados na ficha (apresentou / não apresentou / não exigido).
 - **Aceite:** F-14.
 
 ### Fase 4.7 — Legislativo (F-15, F-16) — concluída em 28/08/2026
@@ -332,7 +339,7 @@ radar-brasil/
 │   ├── seeds/
 │   └── tests/
 ├── bi/
-│   └── RadarBrasil.pbip
+│   └── RadarBrasil.pbip   (ARQUIVADO — ver ADR-018)
 ├── docs/
 │   ├── METODOLOGIA.md
 │   └── adr/
@@ -358,18 +365,19 @@ radar-brasil/
 
 | # | Decisão | Motivo | Status |
 |---|---|---|---|
-| ADR-001 | Power BI em vez de Looker Studio | Conector nativo BigQuery, `.pbip` versionável, melhor para portfólio corporativo | Aceita |
-| ADR-002 | Import mode com tabelas agregadas | Evitar custo de query por interação no BigQuery | Aceita |
+| ADR-001 | Power BI em vez de Looker Studio | Conector nativo BigQuery, `.pbip` versionável | **Substituída pela ADR-018** |
+| ADR-002 | Import mode com tabelas agregadas | Evitar custo de query por interação no BigQuery | Aceita (levada ao extremo pela ADR-018) |
 | ADR-003 | Localização do dataset BigQuery | `US` é compatível com Base dos Dados (US); `southamerica-east1` reduz latência. Se usar S12, `US`. | Pendente |
 | ADR-004 | Base dos Dados para histórico | A decidir na T-201 | Pendente |
 | ADR-005 | `cpf_hash` como chave de pessoa | Vincula anos sem expor CPF | Aceita |
 | ADR-006 a ADR-011 | Ver `docs/adr/` | — | Aceitas |
-| ADR-012 | Fotos em bucket público, não no BigQuery | Binário não pertence a um warehouse; o Power BI lê por URL | Aceita |
+| ADR-012 | Fotos em bucket público, não no BigQuery | Binário não pertence a um warehouse; a ficha lê por URL | Aceita |
 | ADR-013 | Proposta de governo: existência + link, sem re-hospedar PDF | Credibilidade da fonte, cópia envelhece, e o download exigiria engenharia reversa | Aceita |
 | ADR-014 | Ponte de identidade com Câmara e Senado | Câmara publica CPF (casamento exato); Senado não, e a diferença viaja no dado | Aceita |
 | ADR-015 | Atividade legislativa por classe, sem taxa de aprovação | Aprovação depende de estar na base do governo, não do mérito — seria placar | Aceita |
 | ADR-016 | Intermediário TLS do INEP versionado em `certs/` | O servidor omite um elo da cadeia; a raiz sempre foi confiável. Destrava o IDEB | Aceita |
 | ADR-017 | Orçamento federal pelo RTN, não pela DCA | A receita da DCA inclui operações de crédito (45% da União em 2020); o resultado tendia a zero por identidade contábil | Aceita |
+| ADR-018 | Site estático gerado do lake, em vez de ferramenta de BI | *Publish to web* não tem layout mobile, URL por candidato nem indexação; e 20 mil candidatos que mudam 1x/dia são geração estática, não consulta ao vivo | Aceita |
 
 ---
 
@@ -386,7 +394,10 @@ radar-brasil/
   próximo da responsabilidade de um governador; hoje o projeto ingere apenas anos
   finais do fundamental, que é o que o §3 (S8) especificava. Idem anos iniciais,
   que são majoritariamente municipais e servem melhor à página de Prefeito de 2028.
-- Publish to web do Power BI atende, ou vale embutir num site estático da DDI?
+- ~~Publish to web do Power BI atende, ou vale embutir num site estático da DDI?~~
+  **Respondida em 28/08/2026:** site estático. O *Publish to web* não suporta
+  layout mobile, não dá URL por candidato e não é indexável — os três canais pelos
+  quais um produto público de fato circula. Ver ADR-018.
 
 ---
 
@@ -397,5 +408,5 @@ radar-brasil/
 | Layout TSE muda entre anos | Alto | `layouts/tse_{ano}.yml` + testes de schema por ano |
 | Indicadores com defasagem (PIB estadual sai com ~2 anos de atraso) | Médio | flag `janela_incompleta`, texto na tela |
 | Leitura partidária do módulo "Durante o mandato" | Alto (reputacional) | Constituição 1 e 2; comparadores sempre visíveis; revisão de cada página com a pergunta "alguém pode ler isso como endosso?" |
-| Estouro do free tier do BigQuery | Baixo | particionamento por ano; Power BI em Import; monitorar bytes processados |
+| Estouro do free tier do BigQuery | Baixo | particionamento por ano; site gerado 1x/dia (zero query por visita); monitorar bytes processados |
 | Prazo (1º turno em 04/10) | Alto | MVP = Fases 0–4; tudo mais é fase 2 |

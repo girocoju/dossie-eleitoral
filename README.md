@@ -5,7 +5,10 @@ Presidente, Governador, Senador e Deputado, e **em que contexto socioeconomico**
 eles concorrem — incluindo o que aconteceu com os indicadores da UF durante
 mandatos anteriores de quem ja' governou.
 
-Pipeline completo sobre dados publicos: **TSE / IBGE / IPEA → BigQuery → dbt → Power BI**.
+Pipeline completo sobre dados publicos: **TSE / IBGE / IPEA / INEP / Tesouro → BigQuery → dbt → site estatico**.
+
+O produto publico chama-se **Dossie Eleitoral**: uma ficha por candidato, com URL
+propria, gerada uma vez por dia a partir do lake ([ADR-018](docs/adr/ADR-018-site-estatico-em-vez-de-bi.md)).
 
 > **Correlacao nao e' causalidade — e o produto diz isso na tela.**
 > O modulo "Durante o mandato" mostra o que aconteceu no periodo, sempre ao lado
@@ -29,7 +32,7 @@ O pipeline de ingestao foi exercitado contra os **arquivos reais** das fontes em
 | IBGE/SIDRA — PIB, populacao, desocupacao | 1.596 observacoes | 2001–2025 |
 | IPEA — taxa de homicidios | 1.260 observacoes | 1980–2024 |
 
-O modelo dbt (13 modelos, 107 testes) e o modelo semantico do Power BI estao
+O modelo dbt (22 modelos, 207 testes) e a documentacao de metodologia estao
 escritos; falta a **materializacao no BigQuery**, que depende de um projeto GCP.
 O que esta' feito, o que falta e por que: [docs/STATUS.md](docs/STATUS.md).
 
@@ -37,9 +40,9 @@ O que esta' feito, o que falta e por que: [docs/STATUS.md](docs/STATUS.md).
 
 ```
 ┌──────────────┐   ┌──────────────┐   ┌──────────────────┐   ┌───────────────┐
-│ Fontes       │──▶│ ingest/ (py) │──▶│ BigQuery         │──▶│ Power BI      │
+│ Fontes       │──▶│ ingest/ (py) │──▶│ BigQuery         │──▶│ Site estatico │
 │ TSE IBGE IPEA│   │ download +   │   │ raw → stg → marts│   │ Import mode   │
-│              │   │ load raw     │   │ (dbt)            │   │ .pbip no git  │
+│              │   │ load raw     │   │ (dbt)            │   │ HTML + JSON   │
 └──────────────┘   └──────────────┘   └──────────────────┘   └───────────────┘
                           │                    ▲
                           └── GitHub Actions ──┘
@@ -47,7 +50,7 @@ O que esta' feito, o que falta e por que: [docs/STATUS.md](docs/STATUS.md).
 
 - `raw_*` — copia fiel da fonte, tudo STRING, particionada por ano.
 - `stg` — tipagem, limpeza de sentinelas do TSE, schema unico entre anos.
-- `marts` — modelo estrela consumido pelo Power BI.
+- `marts` — modelo estrela consumido pelo gerador do site.
 
 ## Como rodar
 
@@ -110,9 +113,9 @@ ingest/            ingestao (stdlib; BigQuery so' na hora de carregar)
   layouts/         layout do TSE por ano + catalogo de indicadores  ← o coracao do projeto
   common/          download com cache/sha256, resolucao de layout, normalizacao
 dbt/               staging + marts, 107 testes
-bi/                RadarBrasil.pbip (TMDL + JSON, versionavel)
+bi/                ARQUIVADO — modelo Power BI, ver ADR-018
 docs/              METODOLOGIA, LACUNAS, STATUS, ADRs
-scripts/           geradores de seed e do esqueleto do .pbip
+scripts/           geradores de seed e do site
 tests/             pytest (87 testes, sem rede)
 ```
 
@@ -154,7 +157,7 @@ Ver [ADR-006](docs/adr/ADR-006-hmac-no-cpf.md) e [ADR-007](docs/adr/ADR-007-hash
 | [docs/LACUNAS.md](docs/LACUNAS.md) | Dado ausente, registrado — nunca preenchido |
 | [docs/STATUS.md](docs/STATUS.md) | Estado de cada Task |
 | [docs/adr/](docs/adr/) | Decisoes de arquitetura |
-| [bi/README.md](bi/README.md) | Como abrir o Power BI e as regras de tela |
+| [bi/README.md](bi/README.md) | Diretorio arquivado — por que o Power BI saiu |
 
 ## Licenca
 

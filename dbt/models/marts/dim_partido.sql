@@ -10,7 +10,7 @@
   mudam com fusao e incorporacao, e federacao so' existe a partir de 2022. Guardar
   o estado por eleicao e' o que permite ler 2010 com os nomes de 2010.
 
-  Sem nenhuma cor de partido aqui: a paleta do Power BI e' neutra por padrao e a
+  Sem nenhuma cor de partido aqui: a paleta do site e' neutra por padrao e a
   cor partidaria so' aparece sob toggle explicito do usuario (Constituicao 0.1).
 */
 

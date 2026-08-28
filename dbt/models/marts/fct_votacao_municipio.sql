@@ -13,7 +13,7 @@
   cargos proporcionais, seriam ~70 milhoes de linhas somando as sete eleicoes —
   dezenas de milhares de candidatos a deputado, cada um com votos espalhados por
   centenas de municipios. Restrito ao executivo majoritario, fica na casa das
-  centenas de milhares, o que cabe no Power BI em Import mode (ADR-002).
+  centenas de milhares, o que cabe numa carga unica diaria (ADR-002, ADR-018).
 
   E' tambem onde o mapa municipal significa alguma coisa: presidente e governador
   sao eleitos por maioria num territorio, e a distribuicao geografica do voto e'

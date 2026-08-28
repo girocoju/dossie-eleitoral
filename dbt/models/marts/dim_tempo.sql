@@ -9,7 +9,7 @@
   Grao: um ano. Cobre de 1980 (inicio da serie de homicidios do Atlas da Violencia,
   a mais longa do projeto) ao ano corrente.
 
-  `ano_eleicao_anterior` e' o que permite ao Power BI responder "de que mandato
+  `ano_eleicao_anterior` e' o que permite a' ficha responder "de que mandato
   este ano faz parte" sem calculo no visual.
 */
 

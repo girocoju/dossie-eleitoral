@@ -6,7 +6,7 @@ junto com qualquer arquivo daqui.
 
 | # | Decisao | Status |
 |---|---|---|
-| [ADR-001](ADR-001-power-bi.md) | Power BI em vez de Looker Studio | Aceita |
+| [ADR-001](ADR-001-power-bi.md) | Power BI em vez de Looker Studio | Substituida pela ADR-018 |
 | [ADR-002](ADR-002-import-mode.md) | Import mode sobre tabelas agregadas | Aceita |
 | [ADR-003](ADR-003-localizacao-bigquery.md) | Datasets do BigQuery em `US` | Aceita |
 | [ADR-004](ADR-004-fonte-do-historico.md) | CSV do TSE como fonte unica, Base dos Dados so' para conferencia | Aceita |
@@ -23,3 +23,4 @@ junto com qualquer arquivo daqui.
 | [ADR-015](ADR-015-atividade-legislativa.md) | Atividade legislativa por classe, sem taxa de aprovacao | Aceita |
 | [ADR-016](ADR-016-cadeia-tls-incompleta.md) | Intermediario TLS do INEP versionado no repositorio | Aceita |
 | [ADR-017](ADR-017-orcamento-federal-pelo-rtn.md) | Orcamento federal pelo RTN, nao pela DCA | Aceita |
+| [ADR-018](ADR-018-site-estatico-em-vez-de-bi.md) | Site estatico gerado do lake, em vez de ferramenta de BI | Aceita |

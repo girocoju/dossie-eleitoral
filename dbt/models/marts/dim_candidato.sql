@@ -20,7 +20,7 @@
     3. nenhum dos dois -> `id_pessoa` NULL e a candidatura nao entra em
        `fct_mandato`, porque nao ha' como afirmar que e' a mesma pessoa.
 
-  `link_confiavel = false` marca o caso 2. O Power BI mostra esse aviso sempre que
+  `link_confiavel = false` marca o caso 2. A ficha mostra esse aviso sempre que
   a trajetoria de uma pessoa depender do fallback — o leitor precisa saber que
   homonimo com mesma data de nascimento existe.
 */

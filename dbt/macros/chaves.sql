@@ -8,7 +8,7 @@
 
   A chave minima que e' unica em TODOS os anos e' (ano_eleicao, sg_ue, sq_candidato).
   Este macro a materializa como uma unica coluna, para as junções ficarem legiveis
-  e para o Power BI ter uma chave simples.
+  e para a camada de apresentacao ter uma chave simples.
 #}
 
 {% macro sk_candidatura(ano_eleicao='ano_eleicao', sg_ue='sg_ue', sq_candidato='sq_candidato') -%}

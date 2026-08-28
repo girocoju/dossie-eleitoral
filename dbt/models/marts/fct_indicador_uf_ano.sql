@@ -11,7 +11,7 @@
 
   A regra da Constituicao 0.2 — "sempre ao lado de um comparador" — e' garantida
   AQUI, no dado, e nao no visual: toda linha carrega `valor_brasil` e
-  `valor_regiao` do mesmo indicador e ano. Nao existe caminho no Power BI que
+  `valor_regiao` do mesmo indicador e ano. Nao existe caminho na tela que
   mostre o numero de uma UF sem o comparador disponivel, porque eles vem na
   mesma linha.
 

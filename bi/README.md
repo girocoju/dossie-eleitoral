@@ -1,3 +1,28 @@
+# `bi/` — ARQUIVADO
+
+> **Este diretorio nao esta' mais em uso.** Ver
+> [ADR-018](../docs/adr/ADR-018-site-estatico-em-vez-de-bi.md).
+
+O produto publico do projeto — o **Dossie Eleitoral** — passou a ser um site
+estatico gerado a partir dos marts, e nao um relatorio de BI publicado em iframe.
+
+**Por que parou:** o *Publish to web* do Power BI nao suporta layout mobile, nao
+da' URL por candidato e nao e' indexavel pelo Google. Sao justamente os tres
+canais pelos quais um produto publico circula. O Looker Studio tem os mesmos
+limites. A escolha nunca foi entre as duas ferramentas de BI — era entre publicar
+dentro de um iframe ou publicar na web.
+
+**Por que continua aqui:** o modelo semantico em TMDL
+(`RadarBrasil.SemanticModel/definition/model.tmdl`) e' um registro legivel do
+modelo estrela — relacionamentos, hierarquias e medidas descritos em texto. Serve
+de documentacao do desenho dimensional, independente da ferramenta.
+
+Apagar seria perda sem ganho; deixar sem aviso sugeriria que esta' vivo.
+
+---
+
+_Conteudo original abaixo, preservado como estava._
+
 # Power BI — `RadarBrasil.pbip`
 
 Formato PBIP: **texto, versionavel** ([ADR-001](../docs/adr/ADR-001-power-bi.md)).

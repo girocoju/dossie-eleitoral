@@ -28,7 +28,7 @@
 | T-102 Bens, complementar, vagas, coligacoes | ✅ | 5 datasets, 28 arquivos cada |
 | T-103 `stg_tse__candidaturas` + testes | ✅ | Materializado no BigQuery: 20.765 linhas, testes verdes |
 | T-104 `dim_candidato`, `dim_partido`, `fct_candidatura` | ✅ | 20.765 / 30 / 20.765 linhas materializadas |
-| T-105 Power BI: conexao + Visao Geral, Presidencia, Governadores | 🟡 | Modelo semantico TMDL escrito; visuais faltam ser montados no Desktop |
+| T-105 Dossie Eleitoral: gerador do site (Candidatos, Presidencia, Governadores) | 🟡 | Layout aprovado; gerador a escrever. Power BI arquivado — ver ADR-018 |
 
 **Numeros reais da carga de 2026** (`data/staging/qa/`):
 
@@ -287,7 +287,8 @@ MESMO commit da carga. Rodar `python scripts/gerar_seeds.py` antes de commitar.
 
 1. `make ingest-historico` — os 8 layouts ja' estao conferidos. E' isto que faz
    `fct_mandato` e o modulo "Durante o mandato" deixarem de ser vazios.
-2. Montar os visuais no Power BI Desktop sobre o modelo TMDL ja' escrito,
-   apontando `ProjetoGCP` (ver `.env`) e `DatasetMarts = marts`.
+2. Escrever o gerador do **Dossie Eleitoral**: script Python que le' `marts` e
+   emite HTML + JSON estaticos, uma URL por candidato (ADR-018). O Power BI saiu:
+   *Publish to web* nao tem layout mobile, URL por candidato nem indexacao.
 3. Secrets do GitHub Actions (`RADAR_GCP_SA_JSON`, `RADAR_CPF_SALT`) para o
    pipeline agendado — o alvo `ci` usa service account, nao ADC.
