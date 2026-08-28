@@ -37,13 +37,10 @@ Conferido em 28/08/2026.
 from __future__ import annotations
 
 import argparse
-import io
 import re
 import sys
-import zipfile
 from pathlib import Path
 from typing import Any
-from xml.etree import ElementTree as ET
 
 from ingest.common.config import DATASET_RAW_INEP, get_settings
 from ingest.common.http import download, get_texto, utc_now
@@ -55,6 +52,7 @@ from ingest.common.indicadores import (
     por_provedor,
 )
 from ingest.common.log import get_logger
+from ingest.common.planilha import Planilha, abrir
 from ingest.common.textnorm import strip_accents
 from ingest.common.ufs import UFS
 from ingest.common.writer import NdjsonWriter
@@ -74,8 +72,6 @@ ARQUIVO_UFS = "divulgacao_regioes_ufs_ideb_2025.zip"
 ARQUIVO_BRASIL = "divulgacao_brasil_ideb_2025.zip"
 
 FONTE = "INEP — IDEB (planilhas de divulgacao)"
-
-NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 
 # A planilha abrevia. "R. G. do Norte" nao casa com "Rio Grande do Norte" por
 # normalizacao nenhuma — precisa de tabela. Qualquer territorio que nao resolva
@@ -114,69 +110,6 @@ def sigla_de(nome: str) -> str | None:
     if rot in IGNORAR:
         return None
     return APELIDOS.get(rot) or _POR_NOME.get(rot)
-
-
-# ── leitura de xlsx sem dependencia externa ─────────────────────────────────
-#
-# xlsx e' um zip de XML. O nucleo da ingestao e' stdlib-only por decisao do
-# projeto (pyproject), e um leitor de planilha nao justifica quebrar isso.
-
-
-class Planilha:
-    """Uma aba, indexada por REFERENCIA de celula.
-
-    Indexar por posicao seria errado: o xlsx OMITE celulas vazias, entao a
-    n-esima celula de uma linha nao e' a n-esima coluna. Uma unica celula em
-    branco no meio deslocaria todos os anos.
-    """
-
-    def __init__(self, z: zipfile.ZipFile, alvo: str) -> None:
-        self._compart = [
-            "".join(t.text or "" for t in si.iter(f"{NS}t"))
-            for si in ET.fromstring(z.read("xl/sharedStrings.xml")).iter(f"{NS}si")
-        ]
-        raiz = ET.fromstring(z.read(alvo))
-        self.linhas: dict[int, dict[str, str]] = {}
-        for row in raiz.iter(f"{NS}row"):
-            n = int(row.get("r"))
-            celulas: dict[str, str] = {}
-            for c in row.iter(f"{NS}c"):
-                ref = c.get("r") or ""
-                m = _COL.match(ref)
-                if m:
-                    celulas[m.group(1)] = self._valor(c)
-            self.linhas[n] = celulas
-
-    def _valor(self, c: ET.Element) -> str:
-        v = c.find(f"{NS}v")
-        if v is None:
-            return ""
-        if c.get("t") == "s":
-            return self._compart[int(v.text)]
-        return v.text or ""
-
-
-def abrir_abas(caminho: Path) -> dict[str, Planilha]:
-    """Devolve {nome da aba: Planilha}. O download vem como zip de zip."""
-    externo = zipfile.ZipFile(caminho)
-    nome_xlsx = next(n for n in externo.namelist() if n.endswith(".xlsx"))
-    z = zipfile.ZipFile(io.BytesIO(externo.read(nome_xlsx)))
-
-    rels = ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))
-    ns_rel = "{http://schemas.openxmlformats.org/package/2006/relationships}"
-    alvo_por_id = {
-        r.get("Id"): "xl/" + r.get("Target").lstrip("/")
-        for r in rels.iter(f"{ns_rel}Relationship")
-    }
-    ns_doc = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
-
-    wb = ET.fromstring(z.read("xl/workbook.xml"))
-    abas: dict[str, Planilha] = {}
-    for s in wb.iter(f"{NS}sheet"):
-        alvo = alvo_por_id.get(s.get(f"{ns_doc}id"))
-        if alvo and alvo in z.namelist():
-            abas[_rotulo(s.get("name"))] = Planilha(z, alvo)
-    return abas
 
 
 def _linha_de_codigos(pl: Planilha, origem: str = "") -> tuple[int, dict[str, int]]:
@@ -231,7 +164,7 @@ def extrair(
     aba_pedida = _rotulo(ind.parametros[chave_aba])
     rede_pedida = _rotulo(ind.parametros["rede"])
 
-    abas = abrir_abas(caminho)
+    abas = abrir(caminho, normalizar=_rotulo)
     if aba_pedida not in abas:
         raise ValueError(
             f"aba {ind.parametros[chave_aba]!r} nao existe em {caminho.name}. "

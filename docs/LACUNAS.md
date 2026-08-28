@@ -423,50 +423,44 @@ justamente o que um painel apressado apagaria.
 
 ---
 
-## L-22 · O resultado orcamentario da UNIAO nao e' resultado fiscal
+## L-22 · FECHADA — orcamento federal trocado para o RTN
 
-**Situacao:** ABERTA e URGENTE — encontrada em 28/08/2026 ao gerar insights
+**Situacao:** **fechada** em 28/08/2026 · ver [ADR-017](adr/ADR-017-orcamento-federal-pelo-rtn.md)
 
-`RECEITA_UNIAO` e `RESULTADO_ORCAMENTARIO_UNIAO` **nao podem ser lidos como
-superavit ou deficit**. A receita da DCA inclui **operacoes de credito**, ou seja,
-emissao de titulos do Tesouro — o dinheiro tomado emprestado para cobrir o
-deficit entra como se fosse arrecadacao.
+### O que estava errado
 
-Medido no anexo I-C da Uniao em 2020:
+O projeto media o orcamento federal pela DCA do SICONFI, a mesma fonte dos
+estados. A receita da DCA inclui **operacoes de credito** — divida emitida para
+cobrir o deficit, contada como receita. Na Uniao de 2020 foram R$ 1.647,9 bi, 45%
+do total. Receita menos despesa tendia a zero por identidade contabil.
 
-```
-TOTAL DAS RECEITAS                   R$ 3.754,5 bi
-  Receitas de Capital                R$ 2.135,6 bi
-    Operacoes de Credito             R$ 1.647,9 bi   <- divida, contada como receita
-  Receitas Correntes                 R$ 1.586,4 bi
-```
+| Ano | Serie antiga (DCA) | Resultado primario real |
+|---|---|---|
+| 2020 | -48 bi | **-743 bi** |
+| 2025 | **+635 bi de superavit** | **-61,7 bi de deficit** |
 
-Operacoes de credito foram **45% da receita** que o projeto registrou para a Uniao
-naquele ano. Por isso `RESULTADO_ORCAMENTARIO_UNIAO` deu **-48 bi em 2020**,
-enquanto o resultado primario do Governo Central no mesmo ano foi da ordem de
-**-743 bi**. Nao sao numeros discordantes: sao coisas diferentes. Receita que
-inclui o financiamento do proprio deficit tende a zero por identidade contabil.
+O numero estava corretamente extraido da fonte. Errado era o ROTULO — e nenhum
+teste pega esse tipo de erro.
 
-**Os estados NAO tem esse problema.** Medido em 2023: operacoes de credito sao
-1,1% da receita em SP, 0,1% no RJ e 0,2% no MA. `RECEITA_ESTADUAL`,
-`DESPESA_ESTADUAL` e `RESULTADO_ORCAMENTARIO` seguem validos — a distorcao e'
-especifica da Uniao, que se financia por divida em escala incomparavel.
+### O que substituiu
 
-**Risco concreto:** um painel exibindo "Uniao: superavit de R$ 635 bi em 2025"
-estaria errado no sentido em que qualquer leitor entenderia a frase. E' o tipo de
-erro que a Constituicao 0.2 nao pega, porque o numero esta' corretamente extraido
-da fonte — o que esta' errado e' o ROTULO.
+`RECEITA_LIQUIDA_UNIAO`, `DESPESA_PRIMARIA_UNIAO` e `RESULTADO_PRIMARIO_UNIAO`,
+do **Resultado do Tesouro Nacional**, tabela 2.1. Serie de **1997 a 2025** — 29
+anos, contra os 11 da DCA, cobrindo sete mandatos presidenciais em vez de dois.
 
-**Como fechar (nao feito ainda, precisa de decisao):**
+Conferido: 2020 = -743,3 bi, 2022 = **+46,4 bi de superavit**, 2023 = -228,5 bi.
+O ano com superavit importa: uma serie que so' produzisse deficit nao teria como
+ser conferida.
 
-1. Subtrair `2.1.0.0.00.0.0 - Operacoes de Credito` da receita da Uniao, ou
-2. Usar so' `1.0.0.0.00.0.0 - Receitas Correntes`, ou
-3. Trocar a fonte pelo Resultado do Tesouro Nacional (RTN), que publica o
-   resultado primario ja' calculado e e' o numero que a imprensa usa.
+### O que NAO mudou
 
-A opcao 3 e' a mais honesta para uma tela publica, porque entrega o mesmo conceito
-que o leitor tem na cabeca. As tres mudam o significado da serie e por isso viram
-ADR antes de codigo.
+Os estados continuam no SICONFI. Operacoes de credito la' sao 1,1% da receita em
+SP, 0,1% no RJ e 0,2% no MA — a conta vale.
 
-**Enquanto nao fecha:** a serie NAO vai para a pagina de presidenciaveis com
-rotulo de superavit/deficit.
+### Como isso foi descoberto
+
+Gerando insights de exemplo, conferindo um numero contra a realidade. Passou por
+`dbt build` verde, 205 testes e uma revisao de codigo sem ser notado.
+
+Virou regra: **antes de publicar um indicador, comparar ao menos um ano com um
+valor conhecido de fora do pipeline.**

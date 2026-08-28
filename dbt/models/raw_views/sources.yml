@@ -87,7 +87,15 @@ sources:
         error_after: { count: 400, period: day }
     tables:
       - name: indicadores
-        description: "Formato longo (cod_indicador, sg_uf, ano, valor), 2015-2025."
+        description: >
+          Formato longo (cod_indicador, sg_uf, ano, valor), 2015-2025. SO' estados —
+          o orcamento federal esta' em `rtn`, por causa da L-22.
+      - name: rtn
+        description: >
+          S18 — Resultado do Tesouro Nacional, Governo Central, 1997-2025. Receita
+          liquida, despesa primaria e resultado primario. SUBSTITUI as series da
+          Uniao vindas da DCA, que incluiam operacoes de credito na receita e por
+          isso nao mediam resultado fiscal (L-22, ADR-017).
 
   - name: raw_ipea
     database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"

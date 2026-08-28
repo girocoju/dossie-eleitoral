@@ -87,14 +87,10 @@ pivo_orcamento as (
         ano,
         max(if(cod_indicador = 'RECEITA_ESTADUAL', valor, null))  as receita,
         max(if(cod_indicador = 'DESPESA_ESTADUAL', valor, null))  as despesa,
-        max(if(cod_indicador = 'RECEITA_UNIAO', valor, null))      as receita_uniao,
-        max(if(cod_indicador = 'DESPESA_UNIAO', valor, null))      as despesa_uniao,
         max(_extracted_at)                                        as _extracted_at,
         max(_source_url)                                          as _source_url
     from observado
-    where cod_indicador in (
-        'RECEITA_ESTADUAL', 'DESPESA_ESTADUAL', 'RECEITA_UNIAO', 'DESPESA_UNIAO'
-    )
+    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL')
     group by sg_uf, ano
 
 ),
@@ -102,11 +98,19 @@ pivo_orcamento as (
 orcamento as (
 
     /*
-      Resultado orcamentario = receita liquida menos despesa empenhada.
+      Resultado orcamentario ESTADUAL = receita liquida menos despesa empenhada.
       Positivo e' superavit, negativo e' deficit — e nenhum dos dois e' nota de
       gestao: deficit pode ser investimento deliberado, superavit pode ser
       contingenciamento. A tela mostra o numero com comparador, nunca um juizo
       (Constituicao 0.1).
+
+      SO' ESTADOS. O equivalente federal NAO se calcula assim e nao mora aqui: a
+      receita da DCA inclui operacoes de credito, que para a Uniao chegaram a 45%
+      do total em 2020, e a conta tendia a zero por identidade contabil. O
+      resultado primario do Governo Central vem pronto do RTN, ja' observado, em
+      `RESULTADO_PRIMARIO_UNIAO`. Ver L-22 e ADR-017.
+
+      Nos estados a mesma distorcao e' de 0,1% a 1,1% da receita, e a conta vale.
     */
     select
         'RESULTADO_ORCAMENTARIO'                            as cod_indicador,
@@ -124,67 +128,6 @@ orcamento as (
 
 ),
 
-orcamento_uniao as (
-
-    /*
-      Mesma conta, outro nivel de governo. Serie separada de proposito: o
-      orcamento federal e o de um estado diferem por duas ordens de grandeza, e
-      um "Brasil" que misturasse os dois nao serviria de comparador para ninguem.
-      Esta e' a serie que responde por um PRESIDENTE.
-    */
-    select
-        'RESULTADO_ORCAMENTARIO_UNIAO'                      as cod_indicador,
-        sg_uf,
-        ano,
-        receita_uniao - despesa_uniao                       as valor,
-        'R$ correntes'                                      as unidade,
-        'Calculado: SICONFI Uniao, receita liquida menos despesa empenhada' as fonte,
-        1                                                   as n_periodos,
-        _extracted_at,
-        _source_url
-    from pivo_orcamento
-    where receita_uniao is not null
-      and despesa_uniao is not null
-
-),
-
-/*
-  O SICONFI publica por ente: 27 estados, sem agregado nacional. Sem um `BR`, a
-  regra do comparador obrigatorio (Constituicao 0.2) ficaria sem o lado nacional
-  justamente nos indicadores fiscais.
-
-  A soma dos 27 estados E' um agregado legitimo — e' o conjunto das financas
-  estaduais —, mas NAO e' "o Brasil" no sentido de orcamento da Uniao. Por isso a
-  `fonte` diz explicitamente "soma dos 27 estados": quem ler a linha sabe o que
-  esta' vendo.
-
-  So' vale para valores somaveis. Somar taxa de desocupacao ou de homicidios seria
-  absurdo, e por isso a lista de indicadores aqui e' fixa.
-*/
-nacional_somado as (
-
-    select
-        cod_indicador,
-        'BR'                                                as sg_uf,
-        ano,
-        sum(valor)                                          as valor,
-        any_value(unidade)                                  as unidade,
-        'Tesouro Nacional — SICONFI/DCA (soma dos 27 estados)' as fonte,
-        1                                                   as n_periodos,
-        max(_extracted_at)                                  as _extracted_at,
-        any_value(_source_url)                              as _source_url
-    from (
-        select * from observado
-        union all
-        select * from orcamento
-    )
-    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL', 'RESULTADO_ORCAMENTARIO')
-      and sg_uf != 'BR'
-    group by cod_indicador, ano
-    having count(*) = 27   -- so' agrega ano completo; ano parcial nao vira "Brasil"
-
-),
-
 completo as (
 
     select * from observado
@@ -192,8 +135,6 @@ completo as (
     select * from derivado
     union all
     select * from orcamento
-    union all
-    select * from orcamento_uniao
     union all
     select * from nacional_somado
 

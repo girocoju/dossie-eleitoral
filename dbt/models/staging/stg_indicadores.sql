@@ -6,7 +6,7 @@
 }}
 
 /*
-  Une IBGE/SIDRA, IPEA/Ipeadata, Tesouro/SICONFI e INEP/IDEB no grao
+  Une IBGE/SIDRA, IPEA/Ipeadata, Tesouro (SICONFI e RTN) e INEP/IDEB no grao
   (cod_indicador, sg_uf, ano).
 
   A deduplicacao existe porque a ingestao e' idempotente mas nao transacional: se
@@ -69,6 +69,20 @@ with fontes as (
         _extracted_at,
         _source_url
     from {{ source('raw_inep', 'indicadores') }}
+
+    union all
+
+    select
+        cod_indicador,
+        sg_uf,
+        ano,
+        valor,
+        unidade,
+        fonte,
+        n_periodos,
+        _extracted_at,
+        _source_url
+    from {{ source('raw_tesouro', 'rtn') }}
 
 )
 

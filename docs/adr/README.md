@@ -22,3 +22,4 @@ junto com qualquer arquivo daqui.
 | [ADR-014](ADR-014-ponte-legislativo.md) | Ponte de identidade entre TSE e Camara/Senado | Aceita |
 | [ADR-015](ADR-015-atividade-legislativa.md) | Atividade legislativa por classe, sem taxa de aprovacao | Aceita |
 | [ADR-016](ADR-016-cadeia-tls-incompleta.md) | Intermediario TLS do INEP versionado no repositorio | Aceita |
+| [ADR-017](ADR-017-orcamento-federal-pelo-rtn.md) | Orcamento federal pelo RTN, nao pela DCA | Aceita |

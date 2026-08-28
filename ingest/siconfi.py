@@ -3,8 +3,9 @@
     python -m ingest.siconfi load   [--ano-inicio 2015] [--dry-run] [--target local]
     python -m ingest.siconfi verify [--ano 2023]
 
-Receita e despesa orcamentaria dos governos estaduais, da Declaracao de Contas
-Anuais (DCA). E' o indicador com o vinculo MAIS FORTE de todo o projeto com um
+Receita e despesa orcamentaria dos governos ESTADUAIS, da Declaracao de Contas
+Anuais (DCA). O orcamento federal NAO vem daqui — vem do RTN, em `ingest/rtn.py`
+(ver L-22). E' o indicador com o vinculo MAIS FORTE de todo o projeto com um
 mandato executivo: PIB, desemprego e homicidios dependem de mil fatores fora do
 alcance de um governador, mas receita e despesa do estado sao literalmente o que
 ele administra.
@@ -60,16 +61,23 @@ CONTA_DESPESA = "TotalDespesas"
 
 FONTE = "Tesouro Nacional — SICONFI/DCA"
 
-# A Uniao tambem declara no SICONFI, com esfera 'U' e cod_ibge 1. Sao SERIES
-# SEPARADAS das estaduais, de proposito: o orcamento federal (R$ 4,4 tri em 2023)
-# e o de um estado (R$ 50 bi) nao sao comparaveis, e misturar os dois num mesmo
-# indicador produziria um "Brasil" que nao serve de comparador para ninguem.
+# A Uniao tambem declara no SICONFI, mas o projeto NAO a le' daqui — e' o assunto
+# da L-22 e da ADR-017.
 #
-#   RECEITA_ESTADUAL / DESPESA_ESTADUAL   -> 27 UFs, e o BR e' a SOMA delas.
-#                                            E' o comparador de um GOVERNADOR.
-#   RECEITA_UNIAO / DESPESA_UNIAO         -> so' BR, o orcamento federal.
-#                                            E' o que responde por um PRESIDENTE.
-ENTE_UNIAO = "1"
+# A receita da DCA inclui OPERACOES DE CREDITO. Para a Uniao isso foi R$ 1.647,9
+# bi em 2020, 45% do total: divida emitida para cobrir o deficit entrava como se
+# fosse arrecadacao, e receita menos despesa tendia a zero por identidade
+# contabil. A serie dava -48 bi para 2020, ano cujo resultado primario real foi
+# -743 bi.
+#
+# Para os ESTADOS a mesma conta e' valida: operacoes de credito sao 0,1% da
+# receita no RJ, 0,2% no MA e 1,1% em SP (2023). A distorcao e' especifica de um
+# ente que se financia por divida em escala federal.
+#
+#   RECEITA_ESTADUAL / DESPESA_ESTADUAL  -> aqui, SICONFI/DCA. Comparador de um
+#                                           GOVERNADOR, e o BR e' a soma dos 27.
+#   RESULTADO_PRIMARIO_UNIAO e cia       -> `ingest/rtn.py`, Tesouro Nacional.
+#                                           Responde por um PRESIDENTE.
 
 
 def _rotulo(texto: Any) -> str:
@@ -127,33 +135,6 @@ def despesa_empenhada(itens: list[dict[str, Any]]) -> float | None:
     return None
 
 
-def coletar_uniao(ano_inicio: int, ano_fim: int, extraido_em: str) -> list[Observacao]:
-    """Orcamento federal. E' o nivel de governo pelo qual um presidente responde."""
-    obs: list[Observacao] = []
-    for ano in range(ano_inicio, ano_fim + 1):
-        rec = receita_liquida(consultar(ano, ANEXO_RECEITA, ENTE_UNIAO))
-        time.sleep(PAUSA)
-        des = despesa_empenhada(consultar(ano, ANEXO_DESPESA, ENTE_UNIAO))
-        time.sleep(PAUSA)
-        for cod, valor in (("RECEITA_UNIAO", rec), ("DESPESA_UNIAO", des)):
-            if valor is None:
-                continue
-            obs.append(
-                Observacao(
-                    cod_indicador=cod,
-                    sg_uf="BR",
-                    ano=ano,
-                    valor=valor,
-                    unidade="R$ correntes",
-                    fonte=f"{FONTE} — Uniao",
-                    extracted_at=extraido_em,
-                    source_url=API,
-                )
-            )
-    log.info("Uniao: %d observacoes", len(obs))
-    return obs
-
-
 def coletar(ano_inicio: int, ano_fim: int, *, dry_run: bool = False) -> list[Observacao]:
     extraido_em = utc_now()
     obs: list[Observacao] = []
@@ -189,11 +170,9 @@ def coletar(ano_inicio: int, ano_fim: int, *, dry_run: bool = False) -> list[Obs
                 log.info("%d/%d consultas, %d observacoes", feitas, total, len(obs))
 
     if dry_run:
-        consultas = total + (ano_fim - ano_inicio + 1)
-        log.info("[dry-run] faria %d consultas (x2 anexos) em %s", consultas, API)
+        log.info("[dry-run] faria %d consultas (x2 anexos) em %s", total, API)
         return obs
 
-    obs.extend(coletar_uniao(ano_inicio, ano_fim, extraido_em))
     return obs
 
 

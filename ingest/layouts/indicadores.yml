@@ -274,56 +274,6 @@ indicadores:
       conta: TotalDespesas
       ano_inicio: 2015
 
-  RECEITA_UNIAO:
-    nome: "Receita orcamentaria liquida da Uniao"
-    fonte: "Tesouro Nacional — SICONFI/DCA (Uniao)"
-    unidade: "R$ correntes"
-    periodicidade: anual
-    direcao_desejavel: neutro
-    provedor: siconfi
-    verificado: true
-    conferido_em: "2026-08-28"
-    notas: >
-      Orcamento FEDERAL — o nivel de governo pelo qual um presidente responde.
-      Serie SEPARADA da estadual de proposito: R$ 4,38 tri (Uniao, 2023) e
-      R$ 10,2 bi (Acre, 2023) diferem por duas ordens de grandeza, e um "Brasil"
-      que misturasse os dois nao serviria de comparador para ninguem.
-      Use esta na pagina de Presidencia; RECEITA_ESTADUAL na de Governadores.
-
-      ATENCAO — NAO E' RESULTADO FISCAL (L-22). A receita da DCA inclui
-      OPERACOES DE CREDITO: em 2020 foram R$ 1.648 bi, 45% do que esta' registrado
-      aqui. Divida tomada para cobrir o deficit entra como se fosse arrecadacao,
-      e por isso receita menos despesa tende a zero por identidade contabil.
-
-      O resultado primario do Governo Central em 2020 foi da ordem de -743 bi; a
-      serie daqui da' -48 bi. Nao e' divergencia, sao conceitos diferentes.
-
-      Os ESTADOS nao tem esse problema: operacoes de credito sao 0,1% a 1,1% da
-      receita estadual. A distorcao e' especifica da Uniao.
-    parametros:
-      anexo: "DCA-Anexo I-C"
-      ente: 1
-      ano_inicio: 2015
-
-  DESPESA_UNIAO:
-    nome: "Despesa orcamentaria empenhada da Uniao"
-    fonte: "Tesouro Nacional — SICONFI/DCA (Uniao)"
-    unidade: "R$ correntes"
-    periodicidade: anual
-    direcao_desejavel: neutro
-    provedor: siconfi
-    verificado: true
-    conferido_em: "2026-08-28"
-    notas: "Orcamento federal. Ver RECEITA_UNIAO."
-    parametros:
-      anexo: "DCA-Anexo I-D"
-      ente: 1
-      ano_inicio: 2015
-
-  # ── Derivados (calculados no dbt, nao ingeridos) ─────────────────────
-  # Existem no catalogo para aparecerem na `dim_indicador` com fonte e unidade
-  # corretas. `provedor: derivado` significa: nenhum download, o valor nasce de
-  # `marts/fct_indicador_uf_ano.sql`.
   PIB_PER_CAPITA:
     nome: "PIB per capita a precos correntes"
     fonte: "Calculado: IBGE t/5938 (PIB) / IBGE t/6579 (populacao)"
@@ -364,24 +314,6 @@ indicadores:
     parametros:
       formula: "RECEITA_ESTADUAL - DESPESA_ESTADUAL"
       depende_de: [RECEITA_ESTADUAL, DESPESA_ESTADUAL]
-
-  RESULTADO_ORCAMENTARIO_UNIAO:
-    nome: "Resultado orcamentario da Uniao"
-    fonte: "Calculado: SICONFI Uniao, receita liquida menos despesa empenhada"
-    unidade: "R$ correntes"
-    periodicidade: anual
-    direcao_desejavel: cima
-    provedor: derivado
-    verificado: true
-    conferido_em: "2026-08-28"
-    notas: >
-      Superavit ou deficit federal. Mesma ressalva do estadual: NAO e' nota de
-      gestao, e a variacao percentual e' indefinida quando o sinal muda — use a
-      variacao absoluta. Conferido: 2019 superavit de R$ 352 bi; 2023 deficit de
-      R$ 213 bi.
-    parametros:
-      formula: "RECEITA_UNIAO - DESPESA_UNIAO"
-      depende_de: [RECEITA_UNIAO, DESPESA_UNIAO]
 
   IDHM:
     nome: "Indice de Desenvolvimento Humano Municipal (agregado por UF)"
@@ -443,3 +375,79 @@ indicadores:
       aba: "UF e Regiões (AF)"
       aba_brasil: "Brasil (Anos Finais)"
       rede: "Pública"
+
+  # ── Tesouro Nacional / RTN (S18) ─────────────────────────────────────
+  #
+  # SUBSTITUEM as antigas RECEITA_UNIAO, DESPESA_UNIAO e
+  # RESULTADO_ORCAMENTARIO_UNIAO, que vinham da DCA do SICONFI e NAO mediam
+  # resultado fiscal: a receita da DCA inclui operacoes de credito (45% do total
+  # da Uniao em 2020), entao receita menos despesa tendia a zero por identidade
+  # contabil. Ver L-22 e ADR-017.
+  #
+  # Os ESTADOS continuam vindo do SICONFI: la' operacoes de credito sao 0,1% a
+  # 1,1% da receita, e a DCA e' a fonte certa para eles.
+
+  RECEITA_LIQUIDA_UNIAO:
+    nome: "Receita liquida do Governo Central"
+    fonte: "Tesouro Nacional — RTN, tabela 2.1"
+    unidade: "R$ correntes"
+    periodicidade: anual
+    direcao_desejavel: neutro
+    provedor: rtn
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Receita primaria total menos transferencias por reparticao de receita a
+      estados e municipios. NAO inclui operacoes de credito — e' essa a diferenca
+      para a serie antiga vinda da DCA.
+
+      `direcao_desejavel: neutro`: arrecadar mais nao e' em si bom nem ruim, e
+      colorir tendencia aqui seria tomar partido numa discussao tributaria.
+    parametros:
+      aba: "2.1"
+      rubrica: "3. RECEITA LIQUIDA"
+
+  DESPESA_PRIMARIA_UNIAO:
+    nome: "Despesa primaria total do Governo Central"
+    fonte: "Tesouro Nacional — RTN, tabela 2.1"
+    unidade: "R$ correntes"
+    periodicidade: anual
+    direcao_desejavel: neutro
+    provedor: rtn
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Despesa PRIMARIA: exclui juros da divida, que entram a' parte. E' o conceito
+      usado na regra fiscal e o que a imprensa chama de "gasto".
+    parametros:
+      aba: "2.1"
+      rubrica: "4. DESPESA TOTAL"
+
+  RESULTADO_PRIMARIO_UNIAO:
+    nome: "Resultado primario do Governo Central"
+    fonte: "Tesouro Nacional — RTN, tabela 2.1 (acima da linha)"
+    unidade: "R$ correntes"
+    periodicidade: anual
+    direcao_desejavel: cima
+    provedor: rtn
+    verificado: true
+    conferido_em: "2026-08-28"
+    notas: >
+      Receita liquida menos despesa primaria, 1997-2025. Negativo e' deficit.
+      E' o numero que a imprensa chama de "resultado primario" e o que a regra
+      fiscal persegue — o mesmo conceito que o leitor tem na cabeca.
+
+      Medicao "ACIMA DA LINHA" (linha 5 da tabela 2.1), que e' a manchete do RTN.
+      A planilha traz tambem a medicao abaixo da linha, que difere por ajustes
+      metodologicos e discrepancia estatistica; sao poucos bilhoes de diferenca e
+      misturar as duas entre anos criaria degraus falsos.
+
+      O QUE ESTA SERIE NAO E': o resultado do setor publico consolidado, que
+      inclui estados, municipios e estatais. Aqui e' so' o Governo Central, que e'
+      o nivel pelo qual um presidente responde.
+
+      Assim como o PIB e a Selic, o numero descreve o PERIODO, nao o efeito de um
+      mandato (Constituicao 0.2).
+    parametros:
+      aba: "2.1"
+      rubrica: "5. RESULTADO PRIMARIO GOVERNO CENTRAL"

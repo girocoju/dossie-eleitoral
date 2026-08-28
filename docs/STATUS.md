@@ -88,9 +88,22 @@ Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 
 | **Despesa estadual** | **2015–2025** | **SICONFI/DCA** |
 | **Resultado orcamentario** | **2015–2025** | **derivado** |
 
-Mais `RECEITA_UNIAO`, `DESPESA_UNIAO` e `RESULTADO_ORCAMENTARIO_UNIAO` (2015–2025),
-o orcamento federal — nivel de governo pelo qual um presidente responde, e serie
-separada da estadual de proposito.
+| **IDEB (anos finais, rede publica)** | **2005–2025** | **INEP** |
+| **IDHM** | **1991/2000/2010** | **Ipeadata (Atlas)** |
+| **IPCA** | **1980–2025** | **SIDRA t/1737** |
+| **Selic** | **1980–2025** | **Ipeadata** |
+
+Mais o orcamento FEDERAL, que vem de fonte propria: `RECEITA_LIQUIDA_UNIAO`,
+`DESPESA_PRIMARIA_UNIAO` e `RESULTADO_PRIMARIO_UNIAO`, do **RTN do Tesouro**,
+**1997–2025**.
+
+Ate' 28/08/2026 o federal vinha da DCA como o estadual, e estava errado: a receita
+da DCA inclui operacoes de credito (45% do total da Uniao em 2020), entao a conta
+tendia a zero por identidade contabil e a serie chegou a mostrar "superavit de
+R$ 635 bi" em 2025, onde havia deficit de 61,7 bi. Ver L-22 e ADR-017.
+
+O federal e o estadual NAO se somam nem se comparam: conceitos diferentes, entes
+diferentes, metodologias diferentes.
 
 **Zero linhas sem comparador nacional.**
 
@@ -168,6 +181,25 @@ correcoes de nome de urna (MA, MT, RJ) que teriam sumido sem rastro.
 | F-15 / [ADR-014](adr/ADR-014-ponte-legislativo.md) | Ponte de identidade com Camara e Senado | ✅ **Entregue** — 513 deputados por CPF, 81 senadores por nome+nascimento |
 | F-16 / [ADR-015](adr/ADR-015-atividade-legislativa.md) | Atividade legislativa dos deputados | ✅ **Entregue** — 296.962 proposicoes de 710 deputados, so' `proponente = 1` |
 | Indicadores IPCA e SELIC | Inflacao e juros para a pagina de presidenciaveis | ✅ **Entregue** — IPCA 1980-2025 (46 anos), Selic 1974-2025 (52 anos), so' `BR` |
+
+## Permissoes da service account do pipeline (nao estao em codigo)
+
+O `radar-pipeline@radar-brasil-ddi.iam.gserviceaccount.com` roda o CI por
+Workload Identity Federation (ADR-011). O que ele precisa nao esta' versionado em
+lugar nenhum — vive so' no IAM do GCP — entao fica registrado aqui:
+
+| Recurso | Papel | Por que |
+|---|---|---|
+| projeto `radar-brasil-ddi` | BigQuery Data Editor + Job User | criar dataset, carregar tabela, rodar dbt |
+| bucket `radar-brasil-fotos` | `roles/storage.objectViewer` | listar o que ja' subiu, para nao reenviar |
+| bucket `radar-brasil-fotos` | `roles/storage.objectCreator` | subir foto nova |
+
+Concedido em 28/08/2026, depois de o CI falhar com **403 no upload de fotos**. A
+etapa F-13 rodava local (credencial do dono) e quebrava no Actions.
+
+Deliberadamente SEM `objectAdmin`: a ingestao lista e cria, nunca apaga. Se um dia
+precisar remover foto de candidatura cancelada, o papel entra junto com o codigo
+que apaga — nao antes.
 
 ## Uma armadilha do CI que ja' quebrou quatro execucoes
 

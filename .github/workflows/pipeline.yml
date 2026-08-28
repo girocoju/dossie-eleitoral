@@ -155,6 +155,7 @@ jobs:
           # SICONFI so' publica DCA uma vez por ano; roda junto sem custo relevante
           python -m ingest.siconfi   load
           python -m ingest.ideb      load
+          python -m ingest.rtn       load
 
       # O upload pula o que ja' esta' no bucket, entao a execucao diaria custa uma
       # listagem por UE e sobe so' foto de candidatura nova ou substituida.

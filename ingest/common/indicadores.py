@@ -26,7 +26,7 @@ log = get_logger("indicadores")
 CATALOGO_PATH = Path(__file__).resolve().parents[1] / "layouts" / "indicadores.yml"
 
 DIRECOES = frozenset({"cima", "baixo", "neutro"})
-PROVEDORES = frozenset({"sidra", "ipeadata", "siconfi", "inep", "arquivo", "derivado"})
+PROVEDORES = frozenset({"sidra", "ipeadata", "siconfi", "inep", "rtn", "arquivo", "derivado"})
 
 
 class CatalogoError(RuntimeError):

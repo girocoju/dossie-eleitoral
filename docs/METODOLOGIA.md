@@ -192,7 +192,35 @@ nenhum calculo.
   existe desde 1974 no Ipeadata, mas os seis primeiros anos ficam de fora para nao
   criar um periodo em que so' um indicador tem dado.
 
-## 10. Inflacao e juros: leitura com cuidado extra
+## 10. Orcamento: o federal e o estadual vem de fontes diferentes
+
+Nao e' inconsistencia, e' correcao. Ate' 28/08/2026 os dois vinham da DCA do
+SICONFI, e o federal estava errado.
+
+| Nivel | Fonte | Indicadores |
+|---|---|---|
+| Estados | SICONFI/DCA | `RECEITA_ESTADUAL`, `DESPESA_ESTADUAL`, `RESULTADO_ORCAMENTARIO` |
+| Uniao | Tesouro/RTN | `RECEITA_LIQUIDA_UNIAO`, `DESPESA_PRIMARIA_UNIAO`, `RESULTADO_PRIMARIO_UNIAO` |
+
+**Por que.** A receita da DCA inclui operacoes de credito — divida emitida para
+cobrir o deficit, contada como receita. Na Uniao de 2020 isso foi R$ 1.647,9 bi,
+45% do total, e receita menos despesa tendia a zero por identidade contabil: a
+serie dava -48 bi para um ano cujo resultado primario foi -743 bi. Para 2025
+chegava a mostrar "superavit de R$ 635 bi" onde havia deficit de 61,7 bi.
+
+Nos estados a mesma distorcao e' de 0,1% a 1,1% da receita, e a conta vale. Ver
+[ADR-017](adr/ADR-017-orcamento-federal-pelo-rtn.md) e L-22.
+
+**O que a serie federal NAO e':** nao e' o resultado do setor publico consolidado
+(que inclui estados, municipios e estatais) nem o resultado nominal (que inclui
+juros da divida, R$ 892 bi so' em 2025). E' o Governo Central, primario — o nivel
+e o conceito pelos quais um presidente responde.
+
+**Comparabilidade:** o resultado federal e o estadual NAO se somam nem se
+comparam. Sao conceitos diferentes, de entes diferentes, com metodologias
+diferentes. A tela os mostra em paginas diferentes.
+
+## 11. Inflacao e juros: leitura com cuidado extra
 
 `IPCA` e `SELIC` existem so' no nivel `BR` — nao ha' versao por UF, e isso e'
 intencional, nao lacuna. Sao series da pagina de presidenciaveis.
@@ -213,7 +241,7 @@ Por isso `direcao_desejavel` da Selic e' `neutro`: juro alto nao e' "ruim" nem j
 baixo "bom" — depende inteiramente da inflacao do momento. Colorir tendencia ali
 seria editorializar.
 
-## 11. Atividade legislativa: por que nao ha' um numero so'
+## 12. Atividade legislativa: por que nao ha' um numero so'
 
 `fct_atividade_legislativa` **nao tem** linha "total de proposicoes do deputado".
 O grao inclui `classe_proposicao`, de proposito.
@@ -239,7 +267,7 @@ do total.
 **`qt_destino_desconhecido` e' separado de `qt_em_tramitacao`.** Ausencia de
 informacao nao e' andamento.
 
-## 12. Reprodutibilidade
+## 13. Reprodutibilidade
 
 ```bash
 make bootstrap

@@ -369,6 +369,7 @@ radar-brasil/
 | ADR-014 | Ponte de identidade com Câmara e Senado | Câmara publica CPF (casamento exato); Senado não, e a diferença viaja no dado | Aceita |
 | ADR-015 | Atividade legislativa por classe, sem taxa de aprovação | Aprovação depende de estar na base do governo, não do mérito — seria placar | Aceita |
 | ADR-016 | Intermediário TLS do INEP versionado em `certs/` | O servidor omite um elo da cadeia; a raiz sempre foi confiável. Destrava o IDEB | Aceita |
+| ADR-017 | Orçamento federal pelo RTN, não pela DCA | A receita da DCA inclui operações de crédito (45% da União em 2020); o resultado tendia a zero por identidade contábil | Aceita |
 
 ---
 

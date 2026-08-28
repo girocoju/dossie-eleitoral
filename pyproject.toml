@@ -35,6 +35,7 @@ radar-fotos = "ingest.fotos:main"
 radar-propostas = "ingest.propostas:main"
 radar-siconfi = "ingest.siconfi:main"
 radar-ideb = "ingest.ideb:main"
+radar-rtn = "ingest.rtn:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -12,6 +12,12 @@
 3. **Toda decisão nova vira um ADR** em `docs/adr/ADR-0xx-*.md` e uma linha na tabela do SPEC §10.
 4. **Toda dúvida vira uma linha** em SPEC §11 (*Perguntas em aberto*).
 5. **Todo dado ausente vira uma linha** em [docs/LACUNAS.md](docs/LACUNAS.md) — nunca preencha buraco de dado.
+6. **Confira todo indicador novo contra um valor conhecido de fora do pipeline**
+   antes de dar por pronto. Ao menos um ano, contra um número publicado.
+   Nenhum teste automático pega o erro em que o dado é extraído corretamente e o
+   **rótulo** é que está errado — foi assim que o orçamento federal passou meses
+   mostrando superávit onde havia déficit (L-22 / ADR-017). `dbt build` verde,
+   205 testes e uma revisão de código não pegaram; conferir um número pegou.
 
 ## Convenções (SPEC §9)
 
