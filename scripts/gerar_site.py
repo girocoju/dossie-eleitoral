@@ -522,6 +522,10 @@ def carregar_proporcionais(cliente) -> dict[str, list[dict]]:
         select d.cod_cargo, d.sq_candidato, d.nome_urna, d.sg_uf, d.sigla_partido,
                f.situacao_julgamento, d.url_foto, d.genero, d.grau_instrucao, d.ocupacao,
                d.idade_na_posse_valida as idade, f.nome_coligacao,
+               -- O numero na urna e' a informacao mais operacional que existe
+               -- numa lista de 1.126 nomes, e era a unica que faltava: quem
+               -- decide o voto digita o numero, nao o nome.
+               d.nr_candidato, f.sg_federacao,
                a.normativa, a.fiscalizacao, a.virou_norma
         from `{p}.marts.dim_candidato` d
         join `{p}.marts.fct_candidatura` f using (sk_candidatura)
@@ -535,6 +539,7 @@ def carregar_proporcionais(cliente) -> dict[str, list[dict]]:
         chave = PROPORCIONAIS[r.cod_cargo][0]
         por_cargo.setdefault(chave, []).append({
             "sq": str(r.sq_candidato), "nome": r.nome_urna, "uf": r.sg_uf,
+            "nr": r.nr_candidato, "fed": r.sg_federacao,
             "partido": r.sigla_partido, "situacao": r.situacao_julgamento,
             "foto": r.url_foto, "genero": r.genero, "instrucao": r.grau_instrucao,
             "ocupacao": r.ocupacao, "idade": r.idade, "coligacao": r.nome_coligacao,

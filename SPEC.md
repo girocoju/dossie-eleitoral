@@ -206,6 +206,44 @@ Silva soma R$ 35.267.670,96 no pipeline e R$ 35.267.670,96 na página oficial.
 
 ---
 
+**F-18 — Ficha própria para as candidaturas proporcionais** · P1 · **backlog, aprovada em 29/08/2026**
+
+**Por que entra.** O projeto foi mostrado a pessoas reais e a falta mais citada
+foi esta: quem decide o voto para deputado enfrenta 1.126 nomes só em São Paulo,
+e é justamente aí que uma ficha ajuda mais — não menos. Hoje os 529 majoritários
+têm página própria e as 20.765 candidaturas proporcionais têm apenas listagem.
+
+**O contra-argumento, e por que ele perde.** Vinte mil páginas com poucos campos
+distintos é o padrão que buscadores classificam como conteúdo raso, e o risco não
+é penalidade: é o site inteiro passar a ser lido como de baixa qualidade. O
+critério que decide, porém, não é ranqueamento — é **utilidade pública**
+(Constituição §0). Um site de consulta serve quem chega por link direto e por
+compartilhamento, e ficha sem URL própria não é compartilhável.
+
+**Alcance.** Uma página por candidatura proporcional (~20.765 em 2026), no mesmo
+formato da dos majoritários: foto oficial, perfil declarado, legenda completa
+(federação, coligação e composição), número na urna, trajetória eleitoral,
+prestação de contas e — para quem tem — atividade legislativa.
+
+**O que muda na engenharia, e não é pouco:**
+- a geração passa de ~740 para ~21 mil páginas;
+- o envio por FTP deixa de caber numa execução: hoje são 790 arquivos em 13
+  minutos, e 21 mil no mesmo ritmo passariam de cinco horas. **Exige sincronização
+  incremental** — enviar só o que mudou, comparando hash contra um manifesto no
+  servidor. É o item que precisa ser resolvido antes de qualquer outro;
+- o `sitemap.xml` passa de 738 para ~21 mil URLs, e deve ser dividido em índice
+  mais sitemaps por cargo e UF (o limite por arquivo é 50 mil URLs, mas arquivos
+  menores são rastreados melhor).
+
+**O que NÃO muda.** Nenhum ranking, nenhuma nota, nenhum indicador
+socioeconômico atribuído a deputado — o vínculo entre um parlamentar e um número
+regional é fraco demais para ir à tela (SPEC §2.2), e isso vale igualmente aqui.
+
+---
+
+
+---
+
 **F-15 — Ponte de identidade com Câmara e Senado** · P1 · **Implementada em 28/08/2026**
 
 > Fonte nova (S15, S16). Ver [ADR-014](docs/adr/ADR-014-ponte-legislativo.md).

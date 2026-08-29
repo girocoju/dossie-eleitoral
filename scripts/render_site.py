@@ -746,7 +746,7 @@ o exige.</p>
 <div class="filtros">
   {filtro_uf}
   <select id="partido"><option value="">Todos os partidos</option>{op_pt}</select>
-  <input id="busca" type="search" placeholder="Buscar por nome" autocomplete="off">
+  <input id="busca" type="search" placeholder="Buscar por nome ou número" autocomplete="off">
 </div>
 <p class="contagem" id="contagem">{len(cands)} candidaturas</p>
 <div class="grade" id="grade">{''.join(_cartao(c) for c in cands)}</div>
@@ -800,11 +800,14 @@ do site inteiro.</p>
 <div class="filtros">
   <select id="uf"><option value="">Escolha o estado…</option>{opcoes}</select>
   <select id="partido" disabled><option value="">Todos os partidos</option></select>
-  <input id="busca" type="search" placeholder="Buscar por nome" autocomplete="off" disabled>
+  <input id="busca" type="search" autocomplete="off" disabled
+         placeholder="Buscar por nome ou número">
 </div>
 <p class="contagem" id="contagem">nenhum estado selecionado</p>
 <div class="rolagem" style="max-height:none"><table>
-  <thead><tr><th>Nome de urna</th><th>Partido</th><th>Coligação</th><th>Situação</th>
+  <thead><tr><th></th><th>Nome de urna</th>
+  <th title="o número que se digita na urna">Nº</th>
+  <th>Partido</th><th>Federação</th><th>Coligação</th><th>Situação</th>
   <th>Idade</th><th>Ocupação</th><th title="projetos de lei, PEC e afins como proponente"
   >PLs na Câmara</th><th>Viraram norma</th></tr></thead>
   <tbody id="linhas"></tbody></table></div>
@@ -815,11 +818,16 @@ const $ = (id) => document.getElementById(id);
 function desenhar() {{
   const pt = $("partido").value, q = $("busca").value.trim().toLowerCase();
   const vis = dados.filter(d => (!pt || d.partido === pt) &&
-    (!q || (d.nome || "").toLowerCase().includes(q)));
+    (!q || (d.nome || "").toLowerCase().includes(q)
+        || String(d.nr ?? "").startsWith(q)));
   $("contagem").textContent = vis.length.toLocaleString("pt-BR") + " de " +
     dados.length.toLocaleString("pt-BR") + " candidaturas neste estado";
   $("linhas").innerHTML = vis.map(d => `<tr>
-    <td>${{d.nome ?? ""}}</td><td>${{d.partido ?? ""}}</td>
+    <td class="retrato">${{d.foto
+      ? `<img src="${{d.foto}}" alt="" loading="lazy" decoding="async">` : ""}}</td>
+    <td>${{d.nome ?? ""}}</td>
+    <td class="urna-lista">${{d.nr ?? "—"}}</td>
+    <td>${{d.partido ?? ""}}</td><td>${{d.fed ?? ""}}</td>
     <td>${{d.coligacao ?? ""}}</td><td>${{d.situacao ?? ""}}</td>
     <td class="num">${{d.idade ?? "—"}}</td><td>${{d.ocupacao ?? ""}}</td>
     <td class="num">${{d.pl ?? "—"}}</td><td class="num">${{d.norma ?? "—"}}</td></tr>`).join("");
