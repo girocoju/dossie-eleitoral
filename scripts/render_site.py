@@ -260,17 +260,26 @@ def _indicadores(c: Candidato) -> str:
 
 
 def _pct(parte: float, todo: float) -> str:
-    """Percentual que nunca vira "0%" por arredondamento.
+    """Percentual que o arredondamento nao transforma em mentira.
 
-    R$ 200.051 sobre um limite de R$ 88,9 milhoes e' 0,22%, e `.0f` escreve "0%"
-    — que o leitor entende como "nao arrecadou nada". Abaixo de 1% sai "<1%", que
-    e' pequeno sem ser falso.
+    Dois extremos, e os dois enganam do mesmo jeito — dizendo que uma parcela e'
+    o todo, ou que nao existe:
+
+        0,22%   `.0f` escreve "0%"    -> o leitor le' "nao arrecadou nada"
+       99,67%   `.0f` escreve "100%"  -> o leitor le' "veio tudo dessa origem"
+
+    Sai `&lt;1%` e `&gt;99%`, que sao pequenos e grandes sem serem falsos. As
+    entidades vao ESCAPADAS: `<1%` cru fecha a celula da tabela, porque o
+    navegador le' o `<` como inicio de tag. Aconteceu no ar em 29/08/2026 — a
+    coluna "Fatia" da linha de pessoas fisicas do Lula ficou vazia.
     """
     if not todo:
         return "—"
     v = parte / todo * 100
-    if v > 0 and v < 1:
-        return "<1%"
+    if 0 < v < 1:
+        return "&lt;1%"
+    if 99 < v < 100:
+        return "&gt;99%"
     return f"{v:.0f}%"
 
 
