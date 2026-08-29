@@ -61,10 +61,15 @@ esta linha.
 
 O QUE ESTE SCRIPT NAO FAZ: APAGAR
 
-Ele envia e sobrescreve; nunca remove nada do servidor. Um erro no calculo de
-caminho, num processo que roda sozinho todo dia contra um site publico, apagaria
-o site — e o custo de um arquivo velho sobrando e' incomparavelmente menor. O
-que ficou orfao e' LISTADO ao fim, e a remocao e' decisao de gente.
+Ele envia e sobrescreve. Um erro no calculo de caminho, num processo que roda
+sozinho todo dia contra um site publico, apagaria o site — e o custo de um
+arquivo velho sobrando e' incomparavelmente menor. Arquivo orfao fica onde esta',
+e remove-lo e' decisao de gente.
+
+A UNICA excecao esta' em `_liberar_caminho`: um diretorio VAZIO ocupando o lugar
+exato de um arquivo que vai ser escrito. E' auto-reparo de um bug que este
+proprio modulo cometeu, e nao consegue apagar conteudo — `RMD` recusa diretorio
+nao-vazio.
 
 E' o mesmo motivo pelo qual candidatura que some da publicacao do TSE (L-23) nao
 some da carga: preferir o resto a mais do que o resto a menos.
@@ -260,6 +265,27 @@ def garantir_pasta(sessao: ftplib.FTP, caminho: str, ja_feitas: set[str]) -> Non
     ja_feitas.add(caminho)
 
 
+def _liberar_caminho(sessao: ftplib.FTP, destino: str) -> None:
+    """Remove um DIRETORIO VAZIO que esteja ocupando o lugar de um arquivo.
+
+    A versao anterior deste modulo criou `/index.html` como diretorio (ver o
+    comentario em `enviar`). Enquanto ele existir, o `STOR` do index de verdade
+    falha e a home do dossie fica quebrada — e nao ha' como consertar sem acesso
+    manual ao FTP, que so' o dono da conta tem.
+
+    E' a UNICA remocao que este modulo faz, e ela nao consegue apagar conteudo:
+    `RMD` recusa diretorio nao-vazio. No pior caso a chamada falha e o envio
+    segue exatamente como antes. Nada e' removido por estar "sobrando" — so' o
+    que esta' impedindo um arquivo de existir.
+    """
+    try:
+        sessao.rmd(destino)
+    except ftplib.all_errors:
+        return  # o normal: nao existe, ou e' arquivo, ou tem conteudo dentro
+    log.warning("removido diretorio vazio que ocupava o lugar do arquivo %s",
+                destino)
+
+
 def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
            seco: bool) -> tuple[int, int]:
     arquivos = sorted(p for p in origem.rglob("*") if p.is_file())
@@ -270,13 +296,27 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
                          "Rode `python -m scripts.gerar_site` antes.")
 
     base = raiz_remota.rstrip("/")
+    # A pasta de destino JA' EXISTE — a conta de FTP esta' enraizada nela. Marcar
+    # ela e os ancestrais como "ja' feitos" evita um `mkd /public_html` inutil,
+    # que tenta criar diretorio fora do alcance da conta e so' polui o log com
+    # erro de permissao. Criar o destino nao e' tarefa deste script; se ele nao
+    # existir, o primeiro `STOR` falha alto, que e' o certo.
     feitas: set[str] = set()
+    if base:
+        partes = base.split("/")
+        for i in range(len(partes)):
+            feitas.add("/".join(partes[:i + 1]))
     bytes_enviados = 0
 
     for i, caminho in enumerate(arquivos, 1):
         rel = caminho.relative_to(origem).as_posix()
         destino = f"{base}/{rel}" if base else rel
-        pasta = destino.rsplit("/", 1)[0]
+        # Arquivo na RAIZ nao tem pasta-pai. Sem o `if`, `rsplit` devolve o
+        # proprio nome do arquivo e o script cria um DIRETORIO `index.html`,
+        # onde o `STOR` seguinte bate com `550 Not a regular file`. Aconteceu
+        # em 29/08/2026, depois de 700 arquivos subirem: todos estavam em
+        # subpasta, e a raiz vem tarde na ordem alfabetica.
+        pasta = destino.rsplit("/", 1)[0] if "/" in destino else ""
 
         if seco:
             log.info("[dry-run] %s -> %s (%d bytes)", rel, destino,
@@ -285,6 +325,7 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
             continue
 
         garantir_pasta(sessao, pasta, feitas)
+        _liberar_caminho(sessao, destino)
         with caminho.open("rb") as f:
             sessao.storbinary(f"STOR {destino}", f, blocksize=BLOCO)
         bytes_enviados += caminho.stat().st_size

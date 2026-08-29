@@ -99,3 +99,69 @@ class TestEnvio:
 
     def test_nunca_enviar_cobre_o_env(self):
         assert ".env" in NUNCA_ENVIAR
+
+
+class FTPFalso:
+    """Grava o que teria sido feito, para conferir CAMINHOS sem tocar em rede.
+
+    O bug de 29/08/2026 nao era detectavel por `--dry-run`: ele nao calcula
+    pasta-pai nenhuma. So' um duble que registre os `mkd` pega.
+    """
+
+    def __init__(self):
+        self.pastas: list[str] = []
+        self.arquivos: list[str] = []
+        self.removidos: list[str] = []
+
+    def mkd(self, caminho):
+        self.pastas.append(caminho)
+
+    def rmd(self, caminho):
+        self.removidos.append(caminho)
+        raise OSError("nao existe")  # o caso normal
+
+    def storbinary(self, cmd, f, blocksize=None):
+        self.arquivos.append(cmd.removeprefix("STOR "))
+
+
+class TestCaminhosRemotos:
+    def _site(self, tmp_path: Path) -> Path:
+        (tmp_path / "index.html").write_text("home", encoding="utf-8")
+        (tmp_path / "sitemap.xml").write_text("<urlset/>", encoding="utf-8")
+        (tmp_path / "candidato" / "fulano").mkdir(parents=True)
+        (tmp_path / "candidato" / "fulano" / "index.html").write_text("x", encoding="utf-8")
+        return tmp_path
+
+    def test_arquivo_na_raiz_nao_vira_pasta(self, tmp_path: Path):
+        # O BUG: `mkd("index.html")` criava um diretorio com o nome do arquivo, e
+        # o `STOR` seguinte batia em `550 Not a regular file`. Quebrou a home do
+        # dossie depois de 700 arquivos terem subido.
+        ftp = FTPFalso()
+        enviar(ftp, self._site(tmp_path), "/", seco=False)
+        assert "index.html" not in ftp.pastas
+        assert "sitemap.xml" not in ftp.pastas
+        assert ftp.pastas == ["candidato", "candidato/fulano"]
+
+    def test_todos_os_arquivos_chegam(self, tmp_path: Path):
+        ftp = FTPFalso()
+        enviar(ftp, self._site(tmp_path), "/", seco=False)
+        assert sorted(ftp.arquivos) == [
+            "candidato/fulano/index.html", "index.html", "sitemap.xml"]
+
+    def test_raiz_configurada_prefixa_tudo(self, tmp_path: Path):
+        ftp = FTPFalso()
+        enviar(ftp, self._site(tmp_path), "/public_html/dossie", seco=False)
+        assert "/public_html/dossie/index.html" in ftp.arquivos
+        # A raiz de destino ja' existe: a conta de FTP esta' enraizada nela.
+        # Tentar cria-la pediria `mkd /public_html`, fora do alcance da conta.
+        assert not any(x.startswith("/public_html") and
+                       "candidato" not in x for x in ftp.pastas)
+        assert ftp.pastas == ["/public_html/dossie/candidato",
+                              "/public_html/dossie/candidato/fulano"]
+
+    def test_tenta_liberar_o_caminho_de_cada_arquivo(self, tmp_path: Path):
+        # Auto-reparo: se um diretorio vazio estiver ocupando o lugar do arquivo,
+        # ele sai. `RMD` recusa diretorio com conteudo, entao isso nao apaga dado.
+        ftp = FTPFalso()
+        enviar(ftp, self._site(tmp_path), "/", seco=False)
+        assert "index.html" in ftp.removidos
