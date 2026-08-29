@@ -1,6 +1,6 @@
 # ADR-020 — Financiamento de campanha, com o CPF do doador fora
 
-**Status:** Proposta · **Data:** 2026-08-28 · **Feature:** F-17 (S20)
+**Status:** Aceita · **Data:** 2026-08-28 · **Feature:** F-11 (S18)
 
 ## Contexto
 
@@ -28,14 +28,20 @@ Origem dos recursos:
 Essa última linha é a mais interessante: o arquivo traz `SQ_CANDIDATO_DOADOR`, o
 que permite ligar candidatura a candidatura. É rede de financiamento, não só lista.
 
+**Mas o campo cru engana.** Filtrar por `SQ_CANDIDATO_DOADOR` preenchido dá 6.880
+lançamentos, e a leitura óbvia — "6.880 vezes em que um candidato financiou outro" —
+está errada: em **6.446** deles o doador é o próprio candidato da linha. É recurso
+próprio, não apoio. A rede real entre candidaturas distintas tem **434** lançamentos,
+R$ 9,2 milhões. Daí a coluna `e_autofinanciamento`, que separa os dois na ingestão.
+
 ## O problema
 
 O arquivo traz **`NR_CPF_CNPJ_DOADOR` em texto puro**. Conferido no primeiro
 registro de `receitas_candidatos_2026_AM.csv`:
 
 ```
-NM_DOADOR              LUIZ CASTRO ANDRADE NETO
-NR_CPF_CNPJ_DOADOR     07396570204          ← CPF de pessoa física, legível
+NM_DOADOR              L***** C***** A***** N***
+NR_CPF_CNPJ_DOADOR     071********          ← CPF de pessoa física, legível
 ```
 
 O doador é público por lei eleitoral — é essa publicidade que permite fiscalizar
@@ -64,7 +70,7 @@ não serve para nada — e ela já é publicada pelo TSE exatamente com esse pro
 
 ## O que a tela precisa dizer, e que o próprio TSE não diz bem
 
-A página do TSE mostra, para o candidato a Presidente com maior campanha do país:
+A página do TSE mostra, para a maior campanha presidencial **do PT**:
 
 ```
 Receitas   R$ 35.267.670,96
@@ -84,15 +90,30 @@ ADR-013 acertou. A tela vai distinguir três estados, sempre:
 | Prazo aberto, nada entregue | *"prestação ainda não entregue"* |
 | Não se aplica | ausência explicada |
 
+## Verificação (Regra 6)
+
+O total apurado pelo pipeline foi conferido contra o valor publicado pelo TSE, na
+página da candidatura de Luiz Inácio Lula da Silva:
+
+| | |
+|---|---|
+| Publicado pelo TSE | R$ 35.267.670,96 |
+| Apurado pelo pipeline | **R$ 35.267.670,96** |
+
+Bate ao centavo. Conferido também o que parecia buraco: 1.273 lançamentos sem
+origem declarada somam exatamente **R$ 0,00** — são zeros reais do arquivo, não
+dado faltando, e por isso saem do staging em vez de virar uma categoria vazia.
+
 ## Consequências
 
 **Cobertura hoje é parcial e vai crescer.** 7.722 candidaturas de 20.765 têm
 receita declarada — a prestação final vem depois de 04/10. O número na tela precisa
 sempre vir com a data de extração, como todo o resto do projeto.
 
-**Doação de candidato a candidato vira dado de rede.** 373 lançamentos já ligam
-candidaturas entre si. É o material mais analítico do pacote e não existe pronto em
-lugar nenhum de forma consultável.
+**Doação de candidato a candidato vira dado de rede.** 434 lançamentos ligam
+candidaturas *distintas* entre si — depois de descontar os 6.446 de recurso próprio,
+que o campo cru confundiria com apoio. É o material mais analítico do pacote e não
+existe pronto em lugar nenhum de forma consultável.
 
 **Nenhum ranking de "quem arrecadou mais".** Volume de arrecadação não é mérito nem
 demérito, e uma lista ordenada por dinheiro é exatamente o tipo de placar que a

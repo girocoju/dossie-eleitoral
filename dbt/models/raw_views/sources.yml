@@ -55,6 +55,29 @@ sources:
         description: >
           S14 — existencia da proposta de governo por candidatura majoritaria,
           consultada no DivulgaCandContas. Guarda link, nunca PDF (ADR-013).
+      - name: financiamento_receitas
+        description: >
+          S18 — receitas declaradas de campanha, um registro por lancamento. O CPF
+          do doador pessoa fisica NAO existe nesta tabela: a ingestao o substitui
+          por HMAC antes de gravar (ADR-020).
+        columns:
+          - name: doador_cpf_hash
+            description: >
+              HMAC-SHA256 do CPF do doador, com o mesmo salt do candidato. Permite
+              agrupar doacoes da mesma pessoa sem guardar o numero.
+          - name: doador_cnpj
+            description: >
+              CNPJ EM CLARO, de proposito. Identifica empresa, partido ou comite —
+              nao e' dado pessoal, e e' o que permite rastrear doador institucional.
+          - name: e_autofinanciamento
+            description: >
+              TRUE quando o doador-candidato e' o proprio candidato. Em 2026, 6.446
+              dos 6.880 lancamentos com doador-candidato sao isto — sem a distincao,
+              autofinanciamento seria lido como rede de apoio entre candidaturas.
+      - name: financiamento_despesas
+        description: >
+          S18 — despesas CONTRATADAS (nao pagas). "Paga" e' subconjunto e responde
+          outra pergunta; misturar daria um numero que nao e' nenhum dos dois.
       - name: complementar
         description: >
           S3 — consulta_cand_complementar. Em 2026 o TSE moveu para ca' situacao de

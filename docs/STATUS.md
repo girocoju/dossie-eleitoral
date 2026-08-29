@@ -130,7 +130,9 @@ de 1998.
 
 ## Fase 5 — Pos-eleicao
 
-F-11 (financiamento) e F-12 (resultados 2026): ⬜ fase 2 do produto, apos 25/10/2026.
+F-11 (financiamento): ✅ entregue em 28/08/2026 — saiu da fase 2 porque a
+prestacao ja' esta' substantiva (R$ 3,59 bi sobre 7.722 candidaturas), mesmo sem
+estar completa. F-12 (resultados 2026): ⬜ fase 2, apos 25/10/2026.
 
 ---
 
@@ -181,6 +183,7 @@ correcoes de nome de urna (MA, MT, RJ) que teriam sumido sem rastro.
 | F-14 / [ADR-013](adr/ADR-013-proposta-de-governo.md) | Proposta de governo dos majoritarios | ✅ **Entregue** — 206 apresentaram, 5 nao constam, 20.558 nao se aplica |
 | F-15 / [ADR-014](adr/ADR-014-ponte-legislativo.md) | Ponte de identidade com Camara e Senado | ✅ **Entregue** — 513 deputados por CPF, 81 senadores por nome+nascimento |
 | F-16 / [ADR-015](adr/ADR-015-atividade-legislativa.md) | Atividade legislativa dos deputados | ✅ **Entregue** — 296.962 proposicoes de 710 deputados, so' `proponente = 1` |
+| F-11 / [ADR-020](adr/ADR-020-financiamento-de-campanha.md) | Financiamento de campanha | ✅ **Entregue** — 43.610 receitas e 54.019 despesas sobre 7.722 candidaturas; CPF de doador hasheado na ingestao. Conferido ao centavo contra o TSE |
 | Indicadores IPCA e SELIC | Inflacao e juros para a pagina de presidenciaveis | ✅ **Entregue** — IPCA 1980-2025 (46 anos), Selic 1974-2025 (52 anos), so' `BR` |
 
 ## Job que falha em 1 segundo, sem runner e sem log

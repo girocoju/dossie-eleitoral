@@ -443,3 +443,69 @@ models:
           513 de hoje. A linha continua valida como atividade da Camara, mas nao
           chega a' ficha de nenhum candidato.
         tests: [not_null]
+
+  - name: fct_financiamento_candidatura
+    description: >
+      Receita de campanha por candidatura e ORIGEM do recurso. A origem faz parte
+      da chave porque o total sozinho esconde o unico fato que o dado responde bem:
+      em 2026, 92% do dinheiro de campanha do pais e' recurso de partido.
+      Nao existe ranking — ordenar politicos por dinheiro e' placar (Constituicao 0.1).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [sk_candidatura, origem_recurso]
+    columns:
+      - name: sk_candidatura
+        tests: [not_null]
+      - name: origem_recurso
+        tests: [not_null]
+      - name: vl_receita
+        description: >
+          Somavel entre linhas, ao contrario de `fct_atividade_legislativa`: sao
+          parcelas do mesmo dinheiro, nao categorias incomparaveis.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+      - name: qt_doadores
+        description: >
+          Doadores DISTINTOS, nao lancamentos. Cinquenta transferencias da mesma
+          pessoa sao um doador, e a diferenca e' o fato politico.
+        tests: [not_null]
+      - name: vl_autofinanciamento
+        description: "Recurso proprio do candidato, isolado do que veio de terceiros."
+        tests: [not_null]
+
+  - name: fct_doador_candidatura
+    description: >
+      Quem financiou cada candidatura, ja' somando as doacoes repetidas da mesma
+      origem. Responde a pergunta que a prestacao de contas existe para responder e
+      que a lista crua de 43 mil lancamentos nao responde.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [sk_candidatura, sk_doador]
+    columns:
+      - name: sk_candidatura
+        tests: [not_null]
+      - name: sk_doador
+        tests: [not_null]
+      - name: doador_cnpj
+        description: >
+          EM CLARO de proposito, e NULL para pessoa fisica. CNPJ identifica empresa,
+          partido ou comite — nao e' dado pessoal, e e' o que permite ver a mesma
+          empresa financiando candidaturas de partidos diferentes (ADR-020).
+      - name: nome_doador
+        description: >
+          Vem do maior lancamento, nao de `any_value`: quando a mesma identidade
+          aparece com grafias diferentes, a que acompanha o maior valor e' a que o
+          leitor tem mais chance de reconhecer.
+      - name: vl_doado
+        tests: [not_null]
+      - name: e_o_proprio_candidato
+        description: >
+          Separa recurso proprio de repasse entre candidaturas. Sao 434 repasses
+          reais em 2026, contra 6.446 lancamentos de dinheiro do proprio bolso.
+        tests: [not_null]

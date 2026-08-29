@@ -228,3 +228,52 @@ models:
           Fica visivel de proposito: um projeto com 1 assinante e um com 264 nao
           dizem a mesma coisa sobre quem propos.
         tests: [not_null]
+
+  - name: stg_tse__financiamento
+    description: >
+      Receitas declaradas de campanha, um lancamento por linha. O CPF do doador
+      pessoa fisica nao existe neste modelo nem na tabela abaixo dele: a ingestao
+      o substitui por HMAC antes de gravar (ADR-020).
+    columns:
+      - name: sq_receita
+        tests: [not_null, unique]
+      - name: sk_candidatura
+        tests: [not_null]
+      - name: valor
+        description: >
+          Ja' chega FLOAT64 — a conversao do decimal brasileiro acontece em Python,
+          na ingestao. E' a excecao do projeto e esta' anotada no modelo.
+        tests: [not_null]
+      - name: sk_doador
+        description: >
+          Identidade estavel do doador: CNPJ quando empresa, hash de CPF quando
+          pessoa. Nome sozinho nao serve — homonimia fundiria gente diferente.
+      - name: doador_tipo
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [fisica, juridica, "nao informado"]
+      - name: e_autofinanciamento
+        description: >
+          TRUE quando o doador-candidato e' o proprio candidato da linha. Sem esta
+          coluna, os 6.446 lancamentos de recurso proprio de 2026 apareceriam como
+          apoio de terceiros.
+        tests: [not_null]
+
+  - name: stg_tse__despesas_campanha
+    description: >
+      Despesas CONTRATADAS de campanha. "Paga" e' subconjunto e responde outra
+      pergunta — quanto ja' saiu do caixa, nao quanto foi comprometido.
+    columns:
+      - name: sq_despesa
+        tests: [not_null, unique]
+      - name: sk_candidatura
+        tests: [not_null]
+      - name: valor
+        tests: [not_null]
+      - name: fornecedor_tipo
+        tests:
+          - accepted_values:
+              arguments:
+                values: [fisica, juridica, "nao informado"]

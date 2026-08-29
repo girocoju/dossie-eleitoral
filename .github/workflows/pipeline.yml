@@ -221,6 +221,13 @@ jobs:
         if: steps.cred.outputs.temos == 'true'
         run: python -m ingest.proposicoes load
 
+      # Um ZIP de 15 MB com 27 CSV por tipo. Ate' 04/10 o TSE republica conforme as
+      # campanhas prestam contas, entao a cobertura sobe a cada dia — em 28/08/2026
+      # eram 7.722 das 20.765 candidaturas.
+      - name: Financiamento de campanha (F-11, ADR-020)
+        if: steps.cred.outputs.temos == 'true'
+        run: python -m ingest.financiamento load --ano 2026
+
       - name: dbt build
         if: steps.cred.outputs.temos == 'true'
         working-directory: dbt

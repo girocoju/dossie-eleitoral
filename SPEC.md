@@ -44,7 +44,6 @@
 
 ### 2.2 Fora do escopo (explicitamente)
 - Propostas de governo (texto livre) — fase futura.
-- Prestação de contas / financiamento de campanha — fase 2 (dados só ficam completos após a eleição).
 - Resultados 2026 — fase 2 (após 04/10 e 25/10).
 - Qualquer modelo preditivo de resultado eleitoral.
 - Qualquer inferência causal ("o governador X gerou Y").
@@ -71,6 +70,10 @@
 | S12 | **Base dos Dados** (`basedosdados` no BigQuery) | Versões já tratadas de TSE, IBGE, IPEA | SQL direto no BigQuery | **Atalho recomendado para o histórico 1998–2022.** Verificar cobertura de 2026 antes de depender; para 2026 usar S1–S3 direto |
 | S13 | TSE — `foto_cand{ano}_{UF}_div.zip` | Foto de cada candidato | ZIP de JPG, um por UF, em `eleicoes/eleicoes{ano}/fotos/` | **Confirmada disponível em 27/08/2026** (AC 2,3 MB · DF 3,9 MB · SP 15,4 MB · BR 0,3 MB). ~150–250 MB no total de 2026 — não vai para o BigQuery; destino natural é bucket público no Cloud Storage, com a URL na `dim_candidato`. Proposta de inclusão pendente de decisão |
 | S14 | TSE — DivulgaCandContas | Proposta de governo (PDF) | Uma requisição por candidato | **Não existe em lote** — ver docs/LACUNAS.md, L-17. Só obrigatória para majoritários: 529 de 20.765 candidaturas em 2026 |
+| S15 | Câmara — API de Deputados | Deputados em exercício | REST JSON | 513 em 28/08/2026 |
+| S16 | Senado — API de Senadores | Senadores em exercício | REST XML | 81 em 28/08/2026. **Não publica CPF** — daí o casamento por nome + nascimento (ADR-014) |
+| S17 | Câmara — arquivos em lote de proposições | Proposições e autorias, 2023–2026 | CSV anual | 296.962 proposições após filtrar `proponente = 1` |
+| S18 | TSE — prestação de contas eleitorais | Receitas e despesas de campanha | ZIP de CSV por UF | 43.610 receitas e 54.019 despesas em 28/08/2026, sobre 7.722 candidaturas. **Traz CPF de doador em texto puro** — hasheado na ingestão (ADR-020). Cobertura cresce até depois de 04/10 |
 
 **Regra:** cada fonte tem um script/idempotente em `ingest/` que baixa, valida hash, e carrega em `raw_*`. A data de extração é gravada em coluna `_extracted_at`.
 
@@ -178,7 +181,27 @@ Formato: **F-xx — nome** · *Prioridade* · Critérios de aceite (todos verifi
 **F-10 — Pipeline agendado** · P1
 - GitHub Actions: `ingest → dbt run → dbt test` semanal, com falha bloqueando o merge.
 
-**F-11 — Financiamento de campanha** · P2 (fase 2)
+**F-11 — Financiamento de campanha** · P1 · **Implementada em 28/08/2026**
+
+> Fonte nova (S18). Ver [ADR-020](docs/adr/ADR-020-financiamento-de-campanha.md).
+
+**Por que saiu da fase 2:** a prestação de contas só fica *completa* depois da
+eleição, mas já está *substantiva*: R$ 3,59 bilhões declarados sobre 7.722
+candidaturas em 28/08/2026. Esperar o número final teria custado a única fonte que
+liga uma candidatura a quem a sustenta.
+
+**Alcance real:** 43.610 lançamentos de receita e 54.019 de despesa contratada.
+Conferido contra o TSE ao centavo (Regra 6): a candidatura de Luiz Inácio Lula da
+Silva soma R$ 35.267.670,96 no pipeline e R$ 35.267.670,96 na página oficial.
+
+**O que NÃO entra, de propósito:**
+- **CPF de doador.** O arquivo traz em texto puro; a ingestão substitui por HMAC
+  antes de gravar. CNPJ fica legível — identifica empresa, não pessoa.
+- **Ranking por valor arrecadado.** Arrecadar muito não é mérito nem demérito, e
+  lista de político ordenada por dinheiro é placar (Constituição §0.1).
+- **Zero fabricado.** Quem não declarou não aparece com R$ 0,00 — aparece como
+  *"prestação ainda não entregue"*, que é outra coisa.
+
 **F-12 — Resultados 2026** · P2 (fase 2, após 25/10)
 
 ---
@@ -377,7 +400,7 @@ radar-brasil/
 | ADR-015 | Atividade legislativa por classe, sem taxa de aprovação | Aprovação depende de estar na base do governo, não do mérito — seria placar | Aceita |
 | ADR-016 | Intermediário TLS do INEP versionado em `certs/` | O servidor omite um elo da cadeia; a raiz sempre foi confiável. Destrava o IDEB | Aceita |
 | ADR-017 | Orçamento federal pelo RTN, não pela DCA | A receita da DCA inclui operações de crédito (45% da União em 2020); o resultado tendia a zero por identidade contábil | Aceita |
-| ADR-020 | Financiamento de campanha, com o CPF do doador fora | O TSE publica CPF de doador em texto puro; o nome basta para prestar contas, o número só acrescenta risco | Proposta |
+| ADR-020 | Financiamento de campanha, com o CPF do doador fora | O TSE publica CPF de doador em texto puro; o nome basta para prestar contas, o número só acrescenta risco | Aceita |
 | ADR-019 | Texto integral dos planos de governo | O endpoint certo do TSE estava no bundle do próprio app; 201 de 206 planos transcrevem, 19,3 mi de caracteres | Aceita |
 | ADR-018 | Site estático gerado do lake, em vez de ferramenta de BI | *Publish to web* não tem layout mobile, URL por candidato nem indexação; e 20 mil candidatos que mudam 1x/dia são geração estática, não consulta ao vivo | Aceita |
 

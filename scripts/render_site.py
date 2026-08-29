@@ -259,6 +259,134 @@ def _indicadores(c: Candidato) -> str:
     </section>"""
 
 
+def _pct(parte: float, todo: float) -> str:
+    """Percentual que nunca vira "0%" por arredondamento.
+
+    R$ 200.051 sobre um limite de R$ 88,9 milhoes e' 0,22%, e `.0f` escreve "0%"
+    — que o leitor entende como "nao arrecadou nada". Abaixo de 1% sai "<1%", que
+    e' pequeno sem ser falso.
+    """
+    if not todo:
+        return "—"
+    v = parte / todo * 100
+    if v > 0 and v < 1:
+        return "<1%"
+    return f"{v:.0f}%"
+
+
+def _financiamento(c: Candidato) -> str:
+    """Quem sustenta a campanha (F-11 / ADR-020).
+
+    TRES ESTADOS, NUNCA DOIS. Uma candidatura sem linha na prestacao de contas
+    NAO declarou zero — nao declarou nada, porque o prazo vai ate' depois de
+    04/10/2026. Escrever "R$ 0,00" ali sugeriria campanha sem dinheiro onde ha'
+    apenas prazo em aberto. E' o mesmo erro que a ADR-013 evitou entre "nao
+    apresentou plano" e "nao e' exigido plano".
+
+    SEM RANKING. O valor aparece ao lado do limite legal do cargo, que e' o unico
+    comparador que significa alguma coisa. Nao ha' posicao, nem comparacao com
+    outras candidaturas: lista de politico ordenada por dinheiro e' placar
+    (Constituicao 0.1).
+
+    A ORIGEM VEM ANTES DO TOTAL, na leitura. R$ 40 milhoes todos do partido e
+    R$ 40 milhoes vindos de tres mil pessoas sao fatos politicos opostos, e o
+    total sozinho nao distingue.
+    """
+    if not c.financiamento:
+        return """<section class="bloco">
+      <h2>Financiamento de campanha</h2>
+      <p><span class="marca-dado m-ausente">prestação ainda não entregue</span></p>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        Isto <b>não</b> significa campanha sem arrecadação: significa que esta
+        candidatura ainda não consta na prestação de contas publicada pelo TSE.
+        O prazo final é posterior a 04/10/2026, e a cobertura cresce a cada carga.</p>
+    </section>"""
+
+    total = sum(f["valor"] for f in c.financiamento)
+    proprio = sum(f["proprio"] for f in c.financiamento)
+
+    linhas = "".join(
+        f"<tr><td>{e(f['origem'])}</td>"
+        f"<td class='num'>{brl(f['valor'])}</td>"
+        f"<td class='num'>{_pct(f['valor'], total)}</td>"
+        f"<td class='num'>{f['doadores']:,}</td></tr>".replace(",", ".")
+        for f in c.financiamento
+    )
+
+    # O limite legal e' o unico comparador honesto: e' o teto que a lei impoe a
+    # ESTE cargo, nao o que outra campanha arrecadou.
+    if c.limite_gasto:
+        contra_limite = (
+            f"<p style='margin:12px 0 0;font-size:13.5px'>Arrecadado equivale a "
+            f"<b>{_pct(total, c.limite_gasto)}</b> do limite legal de gastos deste "
+            f"cargo ({brl(c.limite_gasto)}).</p>")
+    else:
+        contra_limite = ""
+
+    if c.despesa_contratada:
+        despesa = (f"<p style='margin:6px 0 0;font-size:13.5px'>Despesa "
+                   f"<b>contratada</b>: {brl(c.despesa_contratada)}"
+                   f"<span class='ajuda' tabindex='0' title='Contratada, não paga. "
+                   f"É o quanto a campanha se comprometeu a gastar; o valor já pago "
+                   f"é um subconjunto disso e responde outra pergunta.'>?</span></p>")
+    else:
+        despesa = ("<p style='margin:6px 0 0;font-size:13.5px'>Despesa contratada: "
+                   "<span class='marca-dado m-ausente'>nada declarado até aqui</span></p>")
+
+    proprio_txt = (f" Desse total, {brl(proprio)} são recursos do próprio candidato."
+                   if proprio else "")
+
+    doadores = ""
+    if c.doadores:
+        itens = []
+        for d in c.doadores[:12]:
+            # CNPJ aparece; CPF nao existe no dado (ADR-020). Pessoa fisica sai
+            # so' com o nome, que e' o que a prestacao de contas publica.
+            if d["proprio"]:
+                marca = " <small>(recursos próprios)</small>"
+            elif d["cnpj"]:
+                marca = f" <small>CNPJ {e(d['cnpj'])}</small>"
+            else:
+                marca = ""
+            vezes = f" · {d['n']} doações" if d["n"] > 1 else ""
+            itens.append(
+                f"<tr><td>{e(d['nome'] or '—')}{marca}</td>"
+                f"<td class='num'>{brl(d['valor'])}{vezes}</td></tr>")
+        doadores = f"""
+      <h3 style="margin:26px 0 10px;font-size:15px">Maiores doadores declarados</h3>
+      <div class="rolagem"><table>
+        <thead><tr><th>Doador</th><th>Valor</th></tr></thead>
+        <tbody>{''.join(itens)}</tbody></table></div>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        Doações repetidas do mesmo doador aparecem <b>somadas</b>, não repetidas —
+        quem transferiu cinquenta vezes é um doador, não cinquenta. O CNPJ de
+        empresa aparece porque identifica quem financia; o <b>CPF de pessoa física
+        nunca é publicado nem armazenado</b> por este projeto.</p>"""
+
+    ate = max((f["ate"] for f in c.financiamento if f["ate"]), default=None)
+    corte = (f" Última receita declarada em {ate[8:10]}/{ate[5:7]}/{ate[:4]}."
+             if ate else "")
+
+    return f"""<section class="bloco">
+      <h2>Financiamento de campanha</h2>
+      <p style="font-size:20px;font-weight:700;margin:0 0 4px">{brl(total)}</p>
+      <p style="font-size:13px;color:var(--ink-3);margin:0">
+        declarados até aqui.{proprio_txt}</p>
+      {contra_limite}{despesa}
+      <h3 style="margin:26px 0 10px;font-size:15px">De onde veio</h3>
+      <div class="rolagem"><table>
+        <thead><tr><th>Origem</th><th>Valor</th><th>Fatia</th>
+        <th>Doadores</th></tr></thead><tbody>{linhas}</tbody></table></div>
+      {doadores}
+      <p class="aviso" style="margin:14px 0 0">
+        <b>Prestação parcial.</b> O prazo final é posterior a 04/10/2026, então
+        estes valores sobem a cada carga e não são comparáveis entre candidaturas
+        que prestaram contas em datas diferentes.{corte} Arrecadar muito não é
+        mérito nem demérito — por isso não há classificação por valor em lugar
+        nenhum deste site.</p>
+    </section>"""
+
+
 def _ficha(c: Candidato, quando: str) -> str:
     partes = [f"""
 <a href="{BASE_URL}/{CARGOS[c.cod_cargo][0]}/" style="font-size:13.5px">← {e(c.cargo_nome)}</a>
@@ -382,6 +510,7 @@ def _ficha(c: Candidato, quando: str) -> str:
     </section>""")
 
     partes.append(_atividade(c))
+    partes.append(_financiamento(c))
     partes.append(_indicadores(c))
     partes.append("</div></div>")
     desc = (f"{c.nome_urna}, candidatura a {c.cargo_nome} por {c.sg_uf} em 2026. "

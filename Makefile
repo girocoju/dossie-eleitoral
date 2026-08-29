@@ -52,6 +52,9 @@ ingest-legislativo:  ## parlamentares em exercicio e atividade legislativa (F-15
 	$(BIN)/python -m ingest.legislativo load
 	$(BIN)/python -m ingest.proposicoes load
 
+ingest-financiamento:  ## receitas e despesas de campanha (F-11, ADR-020)
+	$(BIN)/python -m ingest.financiamento load --ano $(ANO)
+
 site:  ## gera o Dossie Eleitoral em site/ (F-07, ADR-018)
 	$(BIN)/python -m scripts.gerar_site --saida site
 

@@ -513,3 +513,31 @@ carga truncada, nao produz 0,1% de divergencia — produz dezenas de por cento.
 
 **Como fechar:** nao fecha. E' o comportamento da fonte, e capturá-lo e' um dos
 motivos de o projeto existir.
+
+---
+
+## L-24 · Dois tercos das candidaturas ainda nao prestaram contas
+
+**Estado:** aberta, e fecha sozinha · **Fonte:** S18 · **Medido em:** 28/08/2026
+
+7.722 das 20.765 candidaturas de 2026 constam na prestacao de contas eleitorais.
+As outras 13.043 nao declararam **nada** — o que nao e' o mesmo que declarar zero.
+
+O prazo legal de prestacao e' posterior a 04/10/2026. Ate' la' o TSE republica o
+pacote conforme as campanhas entregam, e a cobertura sobe a cada carga diaria.
+
+**Por que isto e' uma lacuna e nao um bug:** o numero esta' certo; e' o calendario
+que ainda nao chegou. O erro possivel nao esta' no dado, esta' na **tela** — se a
+ficha de quem nao prestou contas mostrasse "R$ 0,00", afirmaria campanha sem
+dinheiro onde ha' apenas prazo em aberto. A propria pagina do TSE faz isso hoje:
+mostra `Despesas R$ 0,00` para campanhas presidenciais milionarias.
+
+**Como o projeto trata:** `Candidato.financiamento` fica em lista vazia e o bloco
+escreve *"prestacao ainda nao entregue"*. Nenhuma linha zerada e' fabricada em
+lugar nenhum do pipeline — nem no `raw`, nem no mart, nem na ficha. E' a mesma
+distincao da ADR-013 entre "nao apresentou plano" e "nao e' exigido plano".
+
+**Quando fecha:** depois de 04/10/2026, com a prestacao final. A cobertura de hoje
+ja' e' verificavel: o total de uma candidatura confere ao centavo com a pagina
+oficial (ADR-020, seccao Verificacao).
+

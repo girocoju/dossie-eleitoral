@@ -120,6 +120,12 @@ class Candidato:
     mudancas: list[dict] = field(default_factory=list)
     indicadores: list[dict] = field(default_factory=list)
     atividade: list[dict] = field(default_factory=list)
+    # Financiamento (F-11 / ADR-020). `None` e `[]` NAO sao a mesma coisa aqui:
+    # lista vazia = a candidatura nao consta na prestacao de contas, e a tela
+    # precisa dizer "ainda nao entregue", nunca "R$ 0,00".
+    financiamento: list[dict] = field(default_factory=list)
+    doadores: list[dict] = field(default_factory=list)
+    despesa_contratada: float | None = None
 
     @property
     def partido_completo(self) -> str:
@@ -205,6 +211,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     _anexar_indicadores(cliente, ids)
     _anexar_atividade(cliente, ids)
     _anexar_planos(cliente, {c.sk: c for c in saida})
+    _anexar_financiamento(cliente, {c.sk: c for c in saida})
     return saida
 
 
@@ -346,6 +353,71 @@ def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
             })
             n += 1
     log.info("%d linhas de atividade legislativa anexadas", n)
+
+
+def _anexar_financiamento(cliente, por_sk: dict[str, Candidato]) -> None:
+    """Receita por origem, principais doadores e despesa contratada (ADR-020).
+
+    AUSENCIA NAO E' ZERO. Candidatura que nao aparece na prestacao de contas fica
+    com `financiamento = []`, e a tela diz "prestacao ainda nao entregue". Escrever
+    R$ 0,00 sugeriria campanha sem gasto onde ha' apenas prazo em aberto — o prazo
+    vai ate' depois de 04/10/2026.
+
+    O doador vem SOMADO por identidade (`sk_doador`), nunca por nome: quem fez
+    cinquenta transferencias e' um doador, e cinquenta linhas iguais na tela dariam
+    a impressao de cinquenta apoiadores.
+    """
+    p = cliente.project
+    try:
+        origens = list(cliente.query(f"""
+            select sk_candidatura, origem_recurso, vl_receita, qt_doadores,
+                   vl_autofinanciamento, dt_ultima_receita
+            from `{p}.marts.fct_financiamento_candidatura`
+            order by vl_receita desc
+        """).result())
+        doadores = list(cliente.query(f"""
+            select sk_candidatura, nome_doador, doador_cnpj, doador_tipo,
+                   doador_ramo, vl_doado, qt_doacoes, e_o_proprio_candidato
+            from `{p}.marts.fct_doador_candidatura`
+            qualify row_number() over (
+                partition by sk_candidatura order by vl_doado desc) <= 20
+        """).result())
+        despesas = list(cliente.query(f"""
+            select sk_candidatura, sum(valor) as total
+            from `{p}.stg.stg_tse__despesas_campanha`
+            group by 1
+        """).result())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("financiamento indisponivel (%s) — o site sai sem o bloco",
+                    str(exc)[:90])
+        return
+
+    for r in origens:
+        c = por_sk.get(r.sk_candidatura)
+        if c:
+            c.financiamento.append({
+                "origem": r.origem_recurso, "valor": float(r.vl_receita),
+                "doadores": r.qt_doadores,
+                "proprio": float(r.vl_autofinanciamento or 0),
+                "ate": r.dt_ultima_receita.isoformat() if r.dt_ultima_receita else None,
+            })
+    for r in doadores:
+        c = por_sk.get(r.sk_candidatura)
+        if c:
+            c.doadores.append({
+                "nome": r.nome_doador, "cnpj": r.doador_cnpj,
+                "tipo": r.doador_tipo, "ramo": r.doador_ramo,
+                "valor": float(r.vl_doado), "n": r.qt_doacoes,
+                "proprio": bool(r.e_o_proprio_candidato),
+            })
+    for r in despesas:
+        c = por_sk.get(r.sk_candidatura)
+        if c:
+            c.despesa_contratada = float(r.total)
+
+    com = sum(1 for c in por_sk.values() if c.financiamento)
+    log.info("%d de %d candidaturas com prestacao de contas declarada",
+             com, len(por_sk))
 
 
 def _anexar_planos(cliente, por_sk: dict[str, Candidato]) -> None:
