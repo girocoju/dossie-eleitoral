@@ -38,6 +38,10 @@ on:
         description: "Anos do TSE a recarregar (separados por espaco)"
         default: "2026"
         required: false
+      somente_publicar:
+        description: "Republicar o site a partir do BigQuery atual, sem reingerir"
+        type: boolean
+        default: false
 
 env:
   RADAR_GCP_PROJECT: ${{ vars.RADAR_GCP_PROJECT || 'radar-brasil' }}
@@ -86,6 +90,7 @@ jobs:
     # Sem service account configurada o job e' pulado em vez de falhar vermelho.
     if: >
       github.event_name != 'pull_request' &&
+      !inputs.somente_publicar &&
       (github.event_name == 'schedule' ||
        github.event_name == 'workflow_dispatch' ||
        github.ref == 'refs/heads/main')
@@ -359,13 +364,35 @@ jobs:
     runs-on: ubuntu-latest
     needs: pipeline
     # NUNCA em pull request: um PR de fork nao publica no site de producao.
+    # `always()` e' necessario: sem ele, um job com `needs` so' roda se a
+    # dependencia teve SUCESSO, e `somente_publicar` a deixa PULADA de proposito.
+    # As condicoes abaixo continuam decidindo tudo — `always()` so' devolve a
+    # decisao para elas.
     if: >
+      always() &&
       github.event_name != 'pull_request' &&
       github.ref == 'refs/heads/main' &&
-      needs.pipeline.result == 'success'
+      (needs.pipeline.result == 'success' ||
+       (needs.pipeline.result == 'skipped' && inputs.somente_publicar))
+    # SEM `cancel-in-progress`, ao contrario do `pipeline` logo acima — e a
+    # assimetria e' o ponto.
+    #
+    # Cancelar faz sentido para a CARGA: ela e' idempotente, escreve nas mesmas
+    # tabelas e o dado mais novo sempre vence, entao terminar uma carga obsoleta
+    # e' desperdicio.
+    #
+    # Para a PUBLICACAO e' o oposto. Ela e' o ultimo passo, e um deploy cancelado
+    # nao deixa o site "um pouco desatualizado": deixa exatamente como estava. Em
+    # 29/08/2026 foram cinco cancelamentos em cadeia — quatro pushes seguidos mais
+    # o cron das 14h que disparou atrasado as 17:27 — e o site ficou oito horas
+    # com a versao anterior a uma correcao que afirmava, na ficha de uma pessoa
+    # real, que ela nao havia sido eleita.
+    #
+    # Sem `cancel-in-progress`, um gatilho novo ESPERA a publicacao em curso
+    # terminar. O GitHub mantem no maximo um run pendente por grupo, entao a fila
+    # nao cresce: o deploy em andamento termina e o mais recente entra depois.
     concurrency:
       group: publicar-${{ github.ref }}
-      cancel-in-progress: true
     permissions:
       contents: read
       id-token: write

@@ -186,6 +186,41 @@ correcoes de nome de urna (MA, MT, RJ) que teriam sumido sem rastro.
 | F-11 / [ADR-020](adr/ADR-020-financiamento-de-campanha.md) | Financiamento de campanha | ✅ **Entregue** — 43.610 receitas e 54.019 despesas sobre 7.722 candidaturas; CPF de doador hasheado na ingestao. Conferido ao centavo contra o TSE |
 | Indicadores IPCA e SELIC | Inflacao e juros para a pagina de presidenciaveis | ✅ **Entregue** — IPCA 1980-2025 (46 anos), Selic 1974-2025 (52 anos), so' `BR` |
 
+## Correcao commitada, testada e NAO publicada
+
+Sintoma: o bug foi corrigido, os testes passam, o commit esta' no `main` — e o
+site continua mostrando o erro. Foi o que aconteceu em 29/08/2026: a ficha de
+Lula seguiu oito horas dizendo "2006 · Presidente · Nao eleito" depois de a
+correcao existir, e quem viu foi o usuario, de novo.
+
+**A causa nao estava no codigo, estava na fila.** `cancel-in-progress: true`
+valia para os dois jobs, entao cada gatilho novo matava o anterior:
+
+    15:47  e8ba320  push      cancelado   <- a correcao do Lula e do Guto
+    15:58  3858b01  push      cancelado   <- a pagina de metodologia
+    16:14  7740c8e  push      cancelado   <- o glossario dos indicadores
+    16:29  8709729  push      cancelado   <- pelo cron das 14h, atrasado ate' 17:27
+    17:27  8709729  schedule  SUCESSO
+
+Quatro pushes em 40 minutos mais um cron atrasado. O `pipeline` leva ~50 min,
+entao a cadeia nunca chegava ao fim.
+
+### O que mudou
+
+`publicar` perdeu o `cancel-in-progress`. Para a CARGA cancelar e' correto — e'
+idempotente e o dado mais novo vence. Para a PUBLICACAO e' o oposto: um deploy
+cancelado nao deixa o site um pouco desatualizado, deixa exatamente como estava.
+
+Ha' tambem `somente_publicar` no `workflow_dispatch`: republica o site a partir
+do BigQuery atual, sem reingerir nada. E' o caminho de minutos para corrigir a
+tela quando o dado ja' esta' certo.
+
+### A parte que nenhuma configuracao resolve
+
+Empilhar commits sem conferir se o anterior publicou. Depois de um push que
+corrige algo VISIVEL, o certo e' esperar o run terminar e conferir em producao
+antes do proximo.
+
 ## Job que falha em 1 segundo, sem runner e sem log
 
 Sintoma: `runner_id: null`, `steps: []`, o job comeca e termina no mesmo segundo,
