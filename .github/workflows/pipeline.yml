@@ -379,4 +379,10 @@ jobs:
           RADAR_FTP_PASSWORD: ${{ secrets.HOSTINGER_PASSWORD }}
           RADAR_FTP_PORT: ${{ secrets.HOSTINGER_PORT }}
           RADAR_FTP_DIR: "/"
+          # NAO e' segredo: e' o nome no certificado publico da Hostinger.
+          # A conexao vai para RADAR_FTP_HOST; a verificacao TLS confere o
+          # certificado contra ESTE nome, porque e' o que o servidor de
+          # fato apresenta (Sectigo, *.hstgr.io). A cadeia e o hostname
+          # seguem verificados — ver ADR-021.
+          RADAR_FTP_TLS_NOME: "ftp.hstgr.io"
         run: python -m scripts.publicar --origem site

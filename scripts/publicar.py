@@ -11,12 +11,47 @@ aparece no historico do shell e na lista de processos:
     RADAR_FTP_PORT      21          (opcional)
     RADAR_FTP_DIR       /           (opcional — a conta ja' esta' enraizada em
                                      /public_html/dossie)
+    RADAR_FTP_TLS_NOME  ftp.hstgr.io  (opcional — ver abaixo)
 
 TLS NAO E' OPCIONAL AQUI
 
 FTP simples manda usuario e senha em TEXTO PURO. Vindo de um runner do GitHub,
 isso atravessa a internet aberta a cada execucao diaria. `FTP_TLS` com `AUTH TLS`
-resolve, e a Hostinger suporta na porta 21.
+resolve, e a Hostinger aceita na porta 21 — TLS 1.3, medido em 29/08/2026.
+
+Nada aqui afrouxa a verificacao: `verify_mode` continua CERT_REQUIRED e
+`check_hostname` continua True, no canal de controle e no de dados. Nao existe
+`CERT_NONE` neste modulo.
+
+    O NOME QUE O CERTIFICADO PRECISA COBRIR
+
+A Hostinger apresenta um certificado Sectigo legitimo para `*.hstgr.io` — a
+infraestrutura dela — e NAO para o apelido do cliente, `ftp.datadubaintel.com`.
+Verificar o hostname contra o endereco de conexao falha, e falha com razao: o
+certificado realmente nao cobre aquele nome.
+
+Entao `RADAR_FTP_TLS_NOME` separa as duas coisas, que sempre foram duas:
+
+    onde conectar          RADAR_FTP_HOST      ftp.datadubaintel.com
+    quem deve estar la'    RADAR_FTP_TLS_NOME  ftp.hstgr.io
+
+A verificacao segue completa — cadeia ate' uma CA publica, validade e hostname.
+Muda apenas contra QUAL nome, e o nome passa a ser o verdadeiro. Quem sequestrasse
+o DNS de `datadubaintel.com` precisaria de um certificado publicamente confiavel
+para algum `*.hstgr.io` para se passar pelo servidor. Nao e' o mesmo que aceitar
+qualquer certificado.
+
+O que isto NAO prova: qual maquina da Hostinger atendeu. Prova que e' a
+Hostinger — que e' a afirmacao verdadeira disponivel.
+
+    POR QUE NAO FIXAR O CERTIFICADO
+
+Seria o instinto, e o projeto tem precedente (ADR-016, a intermediaria do INEP no
+repo). Aqui nao serve: o certificado medido expira em 01/09/2026, tres dias
+depois de ter sido lido. Uma impressao digital fixada quebraria a publicacao na
+primeira renovacao, num sabado, sem ninguem entender o motivo.
+
+    A VALVULA
 
 Se o servidor recusar TLS, este script FALHA em vez de cair para FTP simples. A
 degradacao silenciosa e' o pior padrao possivel para credencial: funcionaria, e
@@ -69,22 +104,52 @@ def _config() -> dict[str, str | int]:
         "senha": os.environ["RADAR_FTP_PASSWORD"],
         "porta": int(os.environ.get("RADAR_FTP_PORT") or 21),
         "raiz": os.environ.get("RADAR_FTP_DIR") or "/",
+        # Vazio = verificar contra o proprio host de conexao, que e' o
+        # comportamento padrao e o correto para servidor com certificado
+        # no proprio nome.
+        "nome_tls": (os.environ.get("RADAR_FTP_TLS_NOME") or "").strip(),
     }
 
 
 def conectar(cfg: dict) -> ftplib.FTP:
-    """FTPS explicito. Cai para FTP simples SO' com a valvula ligada."""
+    """FTPS com verificacao completa. Cai para FTP simples SO' com a valvula."""
+    # Padrao da stdlib: CERT_REQUIRED + check_hostname. Nao e' relaxado em
+    # lugar nenhum deste modulo.
     contexto = ssl.create_default_context()
+    nome_tls = cfg["nome_tls"] or cfg["host"]
     try:
         sessao = ftplib.FTP_TLS(context=contexto)
         sessao.connect(cfg["host"], cfg["porta"], timeout=60)
+        # `FTP_TLS` verifica o certificado contra `self.host`, tanto no canal de
+        # controle (`auth`) quanto no de dados (`ntransfercmd`). Trocar aqui e' o
+        # que separa "onde conectar" de "quem deve estar la'": a conexao TCP ja'
+        # foi feita e nao e' afetada, e `makepasv` usa o IP do peer.
+        sessao.host = nome_tls
         sessao.auth()
         sessao.login(cfg["user"], cfg["senha"])
         # Sem isto o canal de CONTROLE e' cifrado e o de DADOS nao — as paginas
         # subiriam em claro. Nao e' segredo, mas tambem nao custa nada.
         sessao.prot_p()
-        log.info("conectado a %s por FTPS", cfg["host"])
+        if nome_tls != cfg["host"]:
+            log.info("conectado a %s, certificado verificado como %s",
+                     cfg["host"], nome_tls)
+        else:
+            log.info("conectado a %s por FTPS", cfg["host"])
         return sessao
+
+    except ssl.SSLCertVerificationError as exc:
+        # NAO e' recusa de TLS: o servidor ofereceu, e o certificado e' que nao
+        # confere. Diagnosticar errado manda a pessoa procurar no lugar errado —
+        # foi exatamente o que a primeira versao deste modulo fez.
+        raise SystemExit(
+            f"o certificado de {cfg['host']} nao passou na verificacao contra o "
+            f"nome '{nome_tls}':\n  {exc}\n\n"
+            "Em hospedagem compartilhada isso costuma ser normal: o servidor tem "
+            "certificado do PROVEDOR, nao do dominio do cliente. Veja qual nome "
+            "ele cobre com\n\n    python -m scripts.publicar --certificado\n\n"
+            "e informe esse nome em RADAR_FTP_TLS_NOME. A verificacao continua "
+            "completa; muda so' contra qual nome.") from exc
+
     except ssl.SSLError as exc:
         if os.environ.get("RADAR_FTP_INSEGURO") != "1":
             raise SystemExit(
@@ -96,6 +161,88 @@ def conectar(cfg: dict) -> ftplib.FTP:
         sessao.connect(cfg["host"], cfg["porta"], timeout=60)
         sessao.login(cfg["user"], cfg["senha"])
         return sessao
+
+
+# OID do subjectAltName (2.5.29.17) em DER. Achar a extensao e ler os nomes
+# `dNSName` (tag 0x82) e' varredura suficiente para um DIAGNOSTICO — nao ha'
+# decisao de seguranca apoiada neste parser, so' uma mensagem para gente ler.
+_OID_SAN = bytes([0x06, 0x03, 0x55, 0x1D, 0x11])
+
+
+def _nomes_do_certificado(der: bytes) -> list[str]:
+    i = der.find(_OID_SAN)
+    if i < 0:
+        return []
+    nomes: list[str] = []
+    # Depois do OID vem (opcionalmente) o booleano `critical`, entao um OCTET
+    # STRING que embrulha a SEQUENCE de GeneralName. Varrer os 400 bytes
+    # seguintes atras de tags 0x82 acha os dNSName sem implementar ASN.1.
+    trecho = der[i:i + 400]
+    j = 0
+    while j < len(trecho) - 2:
+        if trecho[j] == 0x82:
+            n = trecho[j + 1]
+            if 0 < n < 100 and j + 2 + n <= len(trecho):
+                try:
+                    nome = trecho[j + 2:j + 2 + n].decode("ascii")
+                except UnicodeDecodeError:
+                    j += 1
+                    continue
+                if all(c.isalnum() or c in ".-*" for c in nome) and "." in nome:
+                    nomes.append(nome)
+                    j += 2 + n
+                    continue
+        j += 1
+    return nomes
+
+
+def cmd_certificado(cfg: dict) -> int:
+    """Mostra que identidade o servidor apresenta, sem enviar credencial.
+
+    O handshake aqui NAO verifica — e' o unico ponto do modulo em que isso
+    acontece, e existe justamente para diagnosticar por que a verificacao de
+    verdade falhou. Nenhuma senha e' enviada: para em `auth()`, antes do login.
+    """
+    import hashlib  # noqa: PLC0415
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE  # noqa: S323 — so' leitura, sem credencial
+
+    sessao = ftplib.FTP_TLS(context=ctx)
+    sessao.connect(cfg["host"], cfg["porta"], timeout=30)
+    print(f"\n{cfg['host']}:{cfg['porta']}")
+    print(f"  banner  : {sessao.getwelcome()}")
+    sessao.auth()
+    cifra = sessao.sock.cipher()
+    der = sessao.sock.getpeercert(binary_form=True) or b""
+    sessao.close()
+
+    print(f"  TLS     : {cifra[1]} ({cifra[0]})")
+    print(f"  sha256  : {hashlib.sha256(der).hexdigest()}")
+
+    nomes = _nomes_do_certificado(der)
+    if nomes:
+        print(f"  cobre   : {', '.join(nomes)}")
+        cobre_host = any(
+            n == cfg["host"] or (n.startswith("*.")
+                                 and cfg["host"].endswith(n[1:])
+                                 and cfg["host"].count(".") == n.count("."))
+            for n in nomes)
+        if cobre_host:
+            print(f"\n  O certificado JA' cobre {cfg['host']} — nao ha' o que "
+                  "configurar.")
+        else:
+            sugerido = next((n.replace("*", "ftp") for n in nomes
+                             if n.startswith("*.")), nomes[0])
+            print(f"\n  NAO cobre {cfg['host']}. Para verificar contra a "
+                  "identidade real:\n"
+                  f"      RADAR_FTP_TLS_NOME={sugerido}")
+    else:
+        print("  cobre   : nao foi possivel ler os nomes do certificado.\n"
+              "            Use `openssl s_client -starttls ftp -connect "
+              f"{cfg['host']}:{cfg['porta']}`.")
+    return 0
 
 
 def garantir_pasta(sessao: ftplib.FTP, caminho: str, ja_feitas: set[str]) -> None:
@@ -153,7 +300,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--origem", default="site", type=Path)
     parser.add_argument("--dry-run", action="store_true",
                         help="lista o que subiria, sem conectar nem enviar")
+    parser.add_argument("--certificado", action="store_true",
+                        help="mostra a identidade TLS do servidor e sai; "
+                             "nao envia credencial")
     args = parser.parse_args(argv)
+
+    if args.certificado:
+        return cmd_certificado(_config())
 
     origem: Path = args.origem
     if not origem.is_dir():
