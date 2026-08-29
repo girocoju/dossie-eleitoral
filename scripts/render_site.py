@@ -16,6 +16,7 @@ REGRAS DE TELA QUE ESTE MODULO IMPLEMENTA (Constituicao 0)
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from scripts.gerar_site import BASE_URL, CARGOS, PROPORCIONAIS, Candidato, brl, e
@@ -389,6 +390,59 @@ def _ficha(c: Candidato, quando: str) -> str:
                    "".join(partes), quando, c.url, CARGOS[c.cod_cargo][0])
 
 
+_LIMITE_PARAGRAFO = 900
+_FIM_DE_FRASE = re.compile(r"(?<=[.;:!?])" + chr(92) + "s+")
+
+
+def _e_titulo(bloco: str) -> bool:
+    """Linha curta e predominantemente em caixa alta = titulo no PDF original.
+
+    Detectar isso e' FORMATACAO, nao edicao: nenhuma palavra muda, nenhuma ordem
+    muda. So' deixa de ser um paragrafo indistinguivel no meio do texto corrido.
+    """
+    if len(bloco) > 90 or len(bloco) < 3:
+        return False
+    letras = [ch for ch in bloco if ch.isalpha()]
+    if len(letras) < 3:
+        return False
+    return sum(1 for ch in letras if ch.isupper()) / len(letras) > 0.8
+
+
+def _quebrar(bloco: str) -> list[str]:
+    """Quebra bloco gigante em pedacos legiveis, sempre em fim de frase.
+
+    A extracao devolve trechos de milhares de caracteres sem uma quebra sequer —
+    o PDF diagramava em colunas e caixas que viram texto corrido. Reagrupar em fim
+    de frase nao altera palavra nem ordem: e' o mesmo que qualquer leitor faz ao
+    reformatar um documento para outra tela.
+    """
+    if len(bloco) <= _LIMITE_PARAGRAFO:
+        return [bloco]
+    saida, atual = [], ""
+    for frase in _FIM_DE_FRASE.split(bloco):
+        if atual and len(atual) + len(frase) > _LIMITE_PARAGRAFO:
+            saida.append(atual.strip())
+            atual = frase
+        else:
+            atual = (atual + " " + frase).strip()
+    if atual.strip():
+        saida.append(atual.strip())
+    return saida
+
+
+def _formatar_plano(texto: str) -> str:
+    partes = []
+    for bruto in texto.split("\n\n"):
+        bloco = bruto.strip()
+        if not bloco:
+            continue
+        if _e_titulo(bloco):
+            partes.append("<h2>" + e(bloco) + "</h2>")
+        else:
+            partes.extend("<p>" + e(x) + "</p>" for x in _quebrar(bloco))
+    return "".join(partes)
+
+
 def _pagina_plano(c: Candidato, quando: str) -> str:
     """Plano de governo em pagina propria, com URL propria.
 
@@ -400,10 +454,7 @@ def _pagina_plano(c: Candidato, quando: str) -> str:
     O texto sai em paragrafos, sem nenhuma edicao. Cabecalho de pagina e quebra
     tortas do PDF aparecem como estao: e' transcricao, nao diagramacao.
     """
-    blocos = (c.plano_texto or "").split("\n\n")
-    paragrafos = "".join(
-        f"<p>{e(b.strip())}</p>" for b in blocos if b.strip()
-    )
+    paragrafos = _formatar_plano(c.plano_texto or "")
     palavras = f"{len((c.plano_texto or '').split()):,}".replace(",", ".")
     original = (f'<a href="{e(c.plano_url_pdf)}" rel="nofollow noopener">'
                 f'Abrir o PDF original no TSE ↗</a>' if c.plano_url_pdf else "")
@@ -413,8 +464,10 @@ def _pagina_plano(c: Candidato, quando: str) -> str:
 {e(c.partido_completo)}</p>
 <p class="aviso"><b>Transcrição automática do PDF oficial</b> entregue ao TSE:
 {c.plano_paginas} páginas, {palavras} palavras. O texto está <b>íntegro e sem
-edição</b> — não foi resumido, corrigido nem reorganizado. Quebras de linha e
-cabeçalhos de página aparecem como saíram do arquivo. {original}</p>
+edição</b> — nenhuma palavra foi resumida, corrigida ou reordenada. As quebras
+de parágrafo foram refeitas em fim de frase para caber na tela, e títulos em
+caixa alta ganharam destaque; cabeçalhos e numeração de página aparecem como
+saíram do arquivo. {original}</p>
 <article class="plano">{paragrafos}</article>"""
     desc = (f"Plano de governo de {c.nome_urna}, candidatura a {c.cargo_nome} por "
             f"{c.sg_uf} em 2026. Texto integral entregue ao TSE.")
