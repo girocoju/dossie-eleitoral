@@ -1,7 +1,7 @@
 [project]
 name = "radar-brasil"
 version = "0.1.0"
-description = "Radar Brasil — Raio-X Eleitoral 2026: pipeline TSE/IBGE/IPEA -> BigQuery -> dbt -> Power BI"
+description = "Radar Brasil — Dossie Eleitoral 2026: pipeline TSE/IBGE/IPEA -> BigQuery -> dbt -> site estatico"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

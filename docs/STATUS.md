@@ -126,7 +126,7 @@ de 1998.
 | T-401 Pagina Metodologia + `docs/METODOLOGIA.md` | ✅ | Documento escrito; pagina do relatorio a montar |
 | T-402 Perfil de candidatos completo (F-08) | 🟡 | Medidas de perfil no modelo; filtros a montar no Desktop |
 | T-403 GitHub Actions **diario** (F-10) | ✅ | Rodou ponta a ponta em 28/08/2026: ingestao, `dbt build` (139), snapshot e trava de historico. Autenticacao sem chave via OIDC (ADR-011) |
-| T-404 Publish to web, README com prints, post | ⬜ | Depende de T-002 e do relatorio montado |
+| T-404 Publish to web, README com prints, post | 🟡 | Publicacao automatizada: job `publicar` envia `site/` para a Hostinger por FTPS a cada carga diaria (ADR-018). Falta o post |
 
 ## Fase 5 — Pos-eleicao
 

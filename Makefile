@@ -58,6 +58,12 @@ ingest-financiamento:  ## receitas e despesas de campanha (F-11, ADR-020)
 site:  ## gera o Dossie Eleitoral em site/ (F-07, ADR-018)
 	$(BIN)/python -m scripts.gerar_site --saida site
 
+publicar:  ## envia site/ para a Hostinger por FTPS (ADR-018)
+	$(BIN)/python -m scripts.publicar --origem site
+
+publicar-seco:  ## lista o que subiria, sem conectar
+	$(BIN)/python -m scripts.publicar --origem site --dry-run
+
 site-local:  ## gera com links para localhost e sobe um servidor em :8000
 	$(BIN)/python -m scripts.gerar_site --saida site --base http://localhost:8000
 	@echo "abra http://localhost:8000"

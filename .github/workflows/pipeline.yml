@@ -264,3 +264,89 @@ jobs:
             dbt/target/run_results.json
           retention-days: 30
           if-no-files-found: ignore
+
+  # ── Publicacao ───────────────────────────────────────────────────────────────
+  #
+  # JOB SEPARADO do `pipeline`, de proposito. Sao falhas de natureza diferente:
+  # o `pipeline` cuida do dado, e a publicacao cuida do site. Uma queda de FTP na
+  # Hostinger nao deve pintar de vermelho uma carga que deu certo — nem o
+  # contrario. Separados, cada um se re-executa sozinho.
+  #
+  # `needs: pipeline` garante que o site sai do BigQuery JA' recarregado do dia,
+  # e nao da versao anterior.
+  publicar:
+    name: gerar e publicar o dossie
+    runs-on: ubuntu-latest
+    needs: pipeline
+    # NUNCA em pull request: um PR de fork nao publica no site de producao.
+    if: >
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/main' &&
+      needs.pipeline.result == 'success'
+    concurrency:
+      group: publicar-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir se ha' credenciais
+        id: cred
+        run: |
+          if [ -z "${{ vars.RADAR_WIF_PROVIDER }}" ] || [ -z "${{ secrets.HOSTINGER_HOST }}" ]; then
+            echo "temos=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Credenciais de GCP ou de FTP ausentes — publicacao pulada."
+          else
+            echo "temos=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Autenticar no Google Cloud (Workload Identity Federation)
+        if: steps.cred.outputs.temos == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.RADAR_WIF_PROVIDER }}
+          service_account: ${{ vars.RADAR_WIF_SERVICE_ACCOUNT }}
+
+      - uses: actions/setup-python@v5
+        if: steps.cred.outputs.temos == 'true'
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependencias
+        if: steps.cred.outputs.temos == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "."
+
+      # SEM `--base`: o default de `gerar_site` ja' e' a URL de producao. Passar
+      # `--base` aqui e' justamente o erro que deixaria o site publicado cheio de
+      # links para localhost.
+      - name: Gerar o site
+        if: steps.cred.outputs.temos == 'true'
+        run: python -m scripts.gerar_site --saida site
+
+      # Trava contra publicar um site quebrado: se `gerar_site` falhar no meio,
+      # `site/` pode existir com um punhado de paginas. 529 fichas majoritarias +
+      # listagens; 600 e' um piso folgado que so' cai se algo deu errado de verdade.
+      - name: Conferir que o site esta' completo
+        if: steps.cred.outputs.temos == 'true'
+        run: |
+          n=$(find site -name '*.html' | wc -l)
+          echo "$n paginas HTML"
+          if [ "$n" -lt 600 ]; then
+            echo "::error::so' $n paginas — abaixo do piso de 600. Nao vai publicar."
+            exit 1
+          fi
+
+      - name: Publicar na Hostinger (FTPS)
+        if: steps.cred.outputs.temos == 'true'
+        env:
+          RADAR_FTP_HOST: ${{ secrets.HOSTINGER_HOST }}
+          RADAR_FTP_USER: ${{ secrets.HOSTINGER_USER }}
+          RADAR_FTP_PASSWORD: ${{ secrets.HOSTINGER_PASSWORD }}
+          RADAR_FTP_PORT: ${{ secrets.HOSTINGER_PORT }}
+          RADAR_FTP_DIR: "/"
+        run: python -m scripts.publicar --origem site
