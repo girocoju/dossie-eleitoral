@@ -60,7 +60,15 @@ with eleitos as (
         c.is_eleicao_suplementar,
         c.ano_eleicao_efetivo
     from {{ ref('stg_tse__candidaturas') }} as c
-    where c.foi_eleito
+    left join {{ ref('int_resultado_por_votos') }} as dv using (sk_candidatura)
+    -- O TSE primeiro; a apuracao por votos so' onde ele nao publicou (ADR-023).
+    -- E' o que devolve o segundo mandato do Lula, 2007-2010, ao bloco
+    -- socioeconomico: ele havia sumido junto com o resultado de 2006 (L-16).
+    --
+    -- NULL continua fora, e isso e' deliberado — sem resultado nao da' para
+    -- afirmar que houve mandato. Cargo proporcional nunca tem valor derivado,
+    -- entao deputado sem resultado publicado segue fora, como deve ser.
+    where coalesce(c.foi_eleito, dv.eleito_por_votos)
     qualify row_number() over (partition by c.sk_candidatura order by c.nr_turno desc) = 1
 
 ),

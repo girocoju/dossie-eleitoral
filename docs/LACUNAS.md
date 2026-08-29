@@ -289,21 +289,41 @@ passar de 0,5% — patamar que so' um bug de parsing alcanca.
 
 ---
 
-## L-16 · Resultado da eleicao presidencial de 2006 nao esta no `consulta_cand`
+## L-16 · O TSE nao publica o resultado de 2006 no cadastro de candidaturas
 
-**O que falta:** `DS_SIT_TOT_TURNO` das oito candidaturas a Presidente de 2006 vem
-vazio, e o pacote nao traz linhas de 2o turno para o cargo 1 — embora traga os 27
-governadores eleitos naquele mesmo ano. Conferido em 27/08/2026.
+**Estado:** parcialmente fechada em 29/08/2026 (ADR-023) · **Fonte:** S1
 
-**Impacto:** o mandato presidencial de 2007–2010 **nao existe** em `fct_mandato`.
-E' o unico ciclo presidencial ausente entre 1998 e 2022. O modulo
-"Durante o mandato" nao tem esse periodo no nivel Brasil.
+O `consulta_cand` traz `DS_SIT_TOT_TURNO = '#NULO#'`, `cd = -1`, para **todos os 8
+candidatos a Presidente de 2006**. Nao e' so' 2006 nem so' Presidente: sao 13.834
+candidaturas de 1998-2022 sem resultado publicado.
 
-**Como fechar:** cruzar com `votacao_candidato_munzona_2006` (S4, ver L-02), que
-traz a votacao apurada, ou com a serie de resultados do proprio TSE. Ate' la', a
-ausencia fica visivel na tela em vez de ser preenchida.
+### O que isso causou
 
----
+O macro `foi_eleito` fazia `COALESCE(..., FALSE)`, e a ausencia virava afirmacao.
+A ficha do Lula, publicada em `datadubaintel.com/dossie`, dizia:
+
+    2006 · Presidente · BR · PT · Nao eleito
+
+Ele foi eleito, em segundo turno, com 58.295.042 votos. **Nenhum teste pegou** —
+`dbt build` verde, 238 testes — e quem viu foi o usuario, abrindo a propria
+pagina. Foi tambem por isso que nao havia Presidente de 2006 em `fct_mandato`, e
+o segundo mandato do Lula (2007-2010) nao aparecia no bloco socioeconomico.
+
+### O que fechou
+
+`foi_eleito` passou a ter tres estados, e onde o TSE nao publica o resultado de
+cargo **majoritario** ele e' apurado dos votos oficiais + vagas em disputa
+(ADR-023). Conferido contra os anos publicados: 2.636 acertos em 2.640, 50 de 50
+em Presidente.
+
+### O que continua aberto
+
+**Cargo proporcional.** Deputado sem resultado publicado segue sem resultado, e
+vai seguir: cadeira proporcional depende de quociente e sobras, nao de quem teve
+mais voto pessoal. Apurar ali produziria lista errada com cara de certa.
+
+**1998.** Nao ha' votacao de 1998 no lake, entao nao ha' o que apurar. A regra
+devolve `NULL` em vez de chutar — com votos zerados, todos empatam em primeiro.
 
 ## L-17 · Plataforma de governo nao esta no portal de dados abertos
 

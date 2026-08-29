@@ -85,17 +85,40 @@
 
 {% macro foi_eleito(coluna_situacao_turno) -%}
   {#-
-    Traduz `DS_SIT_TOT_TURNO` para "ocupou a cadeira".
-    Os rotulos do TSE variam entre anos e acentuacao: ELEITO, ELEITO POR QP,
-    ELEITO POR MEDIA, MEDIA. `#NULO`/`-1` (eleicao ainda nao ocorrida, caso de
-    2026) devolve FALSE — nao NULL — porque "ainda nao eleito" nao e' "eleito".
+    Traduz `DS_SIT_TOT_TURNO` para "ocupou a cadeira". TRES estados, nao dois:
+
+        TRUE    o TSE publicou que foi eleito
+        FALSE   o TSE publicou que nao foi
+        NULL    o TSE NAO PUBLICOU o resultado
+
+    A versao anterior fazia `COALESCE(..., FALSE)`, com o argumento de que "ainda
+    nao eleito nao e' eleito". O argumento vale para 2026, onde a eleicao nem
+    ocorreu. Nao vale para o passado — e ali o COALESCE virava uma AFIRMACAO
+    FALSA sobre uma pessoa real.
+
+    Em 2006 o TSE nao publica `DS_SIT_TOT_TURNO` para NENHUM dos 8 candidatos a
+    Presidente: todos chegam `#NULO#`, `cd = -1` (lacuna L-16). Com o COALESCE, a
+    ficha do Lula dizia "2006 · Presidente · Nao eleito". Ele foi eleito, em
+    segundo turno, com 58,3 milhoes de votos. O erro esteve no ar e foi o proprio
+    usuario quem viu.
+
+    Sao 13.834 candidaturas de 1998-2022 nessa situacao, mais as 20.769 de 2026.
+    Ausencia de dado nunca vira afirmacao — e' a regra 5 do CLAUDE.md, e este
+    macro era o unico lugar do projeto que a violava.
+
+    Quem precisa de booleano para FILTRAR ("liste os eleitos") escreve o
+    `COALESCE(..., FALSE)` no ponto de uso, onde a intencao fica visivel.
+    `LOGICAL_OR` e `COUNTIF` ja' ignoram NULL e continuam corretos sem mudanca.
   -#}
-  COALESCE({{ sem_acento(limpa(coluna_situacao_turno)) }} IN (
-    'ELEITO',
-    'ELEITO POR QP',
-    'ELEITO POR MEDIA',
-    'MEDIA'
-  ), FALSE)
+  CASE
+    WHEN {{ limpa(coluna_situacao_turno) }} IS NULL THEN NULL
+    ELSE {{ sem_acento(limpa(coluna_situacao_turno)) }} IN (
+      'ELEITO',
+      'ELEITO POR QP',
+      'ELEITO POR MEDIA',
+      'MEDIA'
+    )
+  END
 {%- endmacro %}
 
 

@@ -126,6 +126,10 @@ class Candidato:
     financiamento: list[dict] = field(default_factory=list)
     doadores: list[dict] = field(default_factory=list)
     despesa_contratada: float | None = None
+    # O TSE publica mais de um registro para esta candidatura (re-inscricao).
+    # A tela mostra um e DIZ que ha' outro — esconder sem avisar seria decidir
+    # em silencio qual registro do TSE vale.
+    registros_no_tse: int = 1
 
     @property
     def partido_completo(self) -> str:
@@ -175,12 +179,20 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
             f.nome_coligacao, f.composicao_coligacao, f.sg_federacao,
             f.proposta_obrigatoria, f.tem_proposta_governo, f.url_proposta_oficial,
             f.despesa_max_campanha,
+            f.tem_registro_repetido, f.n_registros_no_tse,
             d.id_pessoa
         from `{p}.marts.dim_candidato` d
         join `{p}.marts.fct_candidatura` f using (sk_candidatura)
         left join `{p}.marts.dim_partido` pt
                on pt.sigla_partido = d.sigla_partido and pt.ano_eleicao = d.ano_eleicao
+        -- `e_registro_exibido` corta a re-inscricao repetida do TSE: 23
+        -- pessoas de 2026 tem DOIS registros para a mesma candidatura, e sem
+        -- este filtro a mesma pessoa aparece duas vezes na listagem — foi o que
+        -- aconteceu com GUTO SCHIAVETTO na pagina de senadores. As duas linhas
+        -- continuam no mart; a tela mostra uma. Ver a CTE `repetidos` em
+        -- `fct_candidatura`.
         where d.ano_eleicao = 2026 and d.cod_cargo in (1, 3, 5)
+          and f.e_registro_exibido
         order by d.cod_cargo, d.sg_uf, d.nome_urna
         {lim}
     """
@@ -201,6 +213,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
             tem_proposta=bool(r.tem_proposta_governo),
             url_proposta=r.url_proposta_oficial,
             limite_gasto=r.despesa_max_campanha,
+            registros_no_tse=r.n_registros_no_tse or 1,
         )
         saida.append(c)
         if r.id_pessoa:
@@ -223,11 +236,21 @@ def _anexar_trajetoria(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
     lista = "','".join(por_pessoa)
     sql = f"""
         select d.id_pessoa, d.ano_eleicao, g.descricao as cargo, d.sg_uf,
-               d.sigla_partido, f.foi_eleito, f.votos_nominais
+               d.sigla_partido, f.votos_nominais,
+               -- `resultado_final` = o TSE quando publicou; a apuracao por votos
+               -- onde ele nao publicou (ADR-023). `origem_do_resultado` diz qual
+               -- dos dois, e a tela mostra a diferenca em vez de escondê-la.
+               f.resultado_final as foi_eleito, f.origem_do_resultado,
+               f.nr_turno_decisivo, f.votos_no_turno_decisivo,
+               -- `situacao_candidatura` diz se a pessoa chegou a concorrer, e a
+               -- diferenca importa: Lula em 2018 aparece INAPTO — a candidatura
+               -- foi indeferida, ele nao perdeu a eleicao.
+               f.situacao_candidatura
         from `{p}.marts.dim_candidato` d
         join `{p}.marts.fct_candidatura` f using (sk_candidatura)
         join `{p}.marts.dim_cargo` g on g.cod_cargo = d.cod_cargo
         where d.id_pessoa in ('{lista}') and d.ano_eleicao < 2026
+          and f.e_registro_exibido
         order by d.ano_eleicao desc
     """
     n = 0
@@ -236,7 +259,9 @@ def _anexar_trajetoria(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
             c.trajetoria.append({
                 "ano": r.ano_eleicao, "cargo": r.cargo, "uf": r.sg_uf,
                 "partido": r.sigla_partido, "eleito": r.foi_eleito,
-                "votos": r.votos_nominais,
+                "votos": r.votos_nominais, "situacao": r.situacao_candidatura,
+                "origem": r.origem_do_resultado,
+                "turno": r.nr_turno_decisivo, "votos_turno": r.votos_no_turno_decisivo,
             })
             n += 1
     log.info("%d linhas de trajetoria anexadas", n)
@@ -472,6 +497,7 @@ def carregar_proporcionais(cliente) -> dict[str, list[dict]]:
         join `{p}.marts.fct_candidatura` f using (sk_candidatura)
         left join ativ a on a.id_pessoa = d.id_pessoa
         where d.ano_eleicao = 2026 and d.cod_cargo in (6, 7, 8)
+          and f.e_registro_exibido
         order by d.sg_uf, d.nome_urna
     """
     por_cargo: dict[str, list[dict]] = {}

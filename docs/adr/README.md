@@ -28,3 +28,4 @@ junto com qualquer arquivo daqui.
 | [ADR-020](ADR-020-financiamento-de-campanha.md) | Financiamento de campanha, com o CPF do doador fora | Proposta |
 | [ADR-021](ADR-021-tls-do-ftp-da-hostinger.md) | O nome que o certificado do FTP precisa cobrir | Aceita |
 | [ADR-022](ADR-022-fonte-indisponivel.md) | Fonte indisponivel nao derruba a carga diaria | Aceita |
+| [ADR-023](ADR-023-resultado-apurado-dos-votos.md) | Resultado apurado dos votos, onde o TSE nao publica | Aceita |

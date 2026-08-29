@@ -56,8 +56,13 @@ models:
       - name: sigla_partido
         tests: [not_null]
       - name: foi_eleito
-        description: "Derivado de situacao_turno. FALSE para 2026 ate' a apuracao."
-        tests: [not_null]
+        description: >
+          TRES estados. TRUE/FALSE quando o TSE publicou o resultado do turno;
+          NULL quando NAO publicou — 2026 inteiro, e 13.834 candidaturas de
+          1998-2022, entre elas os 8 presidenciaveis de 2006 (L-16).
+          NAO tem `not_null`, e isso e' deliberado: era o teste que obrigava o
+          macro a inventar FALSE, e o FALSE inventado dizia na ficha do Lula que
+          ele nao foi eleito em 2006.
       - name: data_nascimento
         description: "NULL quando a fonte traz data-sentinela."
       - name: despesa_max_campanha

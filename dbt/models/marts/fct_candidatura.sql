@@ -60,6 +60,10 @@ por_candidatura as (
 
         -- desfecho: vem do ultimo turno disputado
         any_value(situacao_turno having max nr_turno)             as situacao_turno,
+        -- `LOGICAL_OR` ignora NULL e devolve NULL so' quando TODOS sao NULL —
+        -- que e' exatamente a semantica de tres estados que se quer aqui:
+        --   eleito no 2o turno, sem resultado no 1o  -> TRUE
+        --   nenhum turno com resultado publicado     -> NULL (nao FALSE)
         logical_or(foi_eleito)                                    as foi_eleito,
 
         any_value(_extracted_at having max nr_turno)              as _extracted_at
@@ -83,6 +87,62 @@ pessoas as (
 
     select sk_candidatura, id_pessoa, link_confiavel
     from {{ ref('dim_candidato') }}
+
+),
+
+derivado as (
+
+    -- Resultado apurado dos votos oficiais, para cargo MAJORITARIO (ADR-023).
+    -- So' e' usado onde o TSE nao publicou. Ver `int_resultado_por_votos`.
+    select sk_candidatura, eleito_por_votos, nr_turno_decisivo,
+           votos_no_turno_decisivo, posicao, qt_vagas
+    from {{ ref('int_resultado_por_votos') }}
+
+),
+
+repetidos as (
+
+    -- O TSE as vezes publica DOIS registros para a MESMA candidatura: mesma
+    -- pessoa, mesmo cargo, mesma unidade eleitoral, mesmo numero de urna, mesmo
+    -- partido — e `sq_candidato` diferente. Sao re-inscricoes em que o registro
+    -- antigo continuou publicado. Em 2026 sao 23 pessoas e 46 registros, e um
+    -- deles chegou a' pagina de senadores: GUTO SCHIAVETTO apareceu duas vezes.
+    --
+    -- O que difere entre os pares e' ruido de cadastro: ocupacao declarada
+    -- (COMERCIANTE / EMPRESARIO) ou grafia do nome (CORONEL IVON / CORENEL
+    -- IVON, um erro de digitacao). Nada que sirva para distinguir duas
+    -- candidaturas, porque nao sao duas.
+    --
+    -- AS DUAS LINHAS FICAM. Apagar uma seria decidir qual registro do TSE vale,
+    -- e NAO HA' CAMPO que diga isso — nem data de registro, nem situacao, nem
+    -- detalhe; conferido campo a campo. O mart continua fiel a' fonte e quem
+    -- escolhe o que mostrar e' a tela.
+    --
+    -- `id_pessoa` NULO nao agrupa: sem CPF nao da' para afirmar que sao a mesma
+    -- pessoa, e juntar homonimos seria erro pior que o que isto corrige.
+    select
+        sk_candidatura,
+        count(*) over (partition by chave)                        as n_registros_no_tse,
+        -- Ordenar por `sq_candidato` e' ARBITRARIO, e serve so' para ser
+        -- ESTAVEL: sem criterio fixo, a ficha exibida mudaria a cada carga. O
+        -- sequencial do TSE nao e' cronologico de forma confiavel — no par do
+        -- CORONEL IVON, o maior numero e' justamente o que traz o erro de
+        -- digitacao.
+        row_number() over (partition by chave order by sq_candidato) = 1
+                                                                  as e_registro_exibido
+    from (
+        select
+            c.sk_candidatura,
+            c.sq_candidato,
+            case
+                when p.id_pessoa is null then concat('so:', c.sk_candidatura)
+                else concat(cast(c.ano_eleicao as string), '|',
+                            cast(c.cod_cargo as string), '|',
+                            coalesce(c.sg_ue, 'ND'), '|', p.id_pessoa)
+            end as chave
+        from por_candidatura c
+        left join pessoas p using (sk_candidatura)
+    )
 
 ),
 
@@ -145,7 +205,37 @@ select
     c.situacao_cassacao,
     c.turnos_disputados,
     c.situacao_turno,
+    -- ── resultado: o que o TSE PUBLICOU ──────────────────────────────────
+    --
+    -- Tres estados, e o NULL e' informacao: significa "o TSE nao publicou".
+    -- Fica separado do resultado final de proposito — apagar a distincao entre
+    -- "o TSE disse" e "nos apuramos" seria o comeco do proximo erro.
     c.foi_eleito,
+
+    -- ── resultado: o que se pode AFIRMAR ─────────────────────────────────
+    --
+    -- Quando o TSE publicou, vale o TSE, sempre — inclusive nos 3 casos em que
+    -- a apuracao por votos diverge (cassacao e eleicao suplementar mudam quem
+    -- ocupou a cadeira, e isso nao esta' na contagem de votos).
+    --
+    -- Quando NAO publicou, entra a apuracao por votos, que so' existe para
+    -- cargo majoritario. Foi medida contra os anos com gabarito: 2.155 acertos
+    -- em 2.158, e 10 de 10 em Presidente.
+    coalesce(c.foi_eleito, dv.eleito_por_votos)           as resultado_final,
+    case
+        when c.foi_eleito is not null              then 'TSE'
+        when dv.eleito_por_votos is not null       then 'apurado dos votos'
+    end                                                   as origem_do_resultado,
+    dv.nr_turno_decisivo,
+    dv.votos_no_turno_decisivo,
+    dv.posicao                                            as posicao_na_apuracao,
+    dv.qt_vagas                                           as vagas_em_disputa,
+
+    -- Registro repetido no TSE. Ver a CTE `repetidos` para o porque de as duas
+    -- linhas continuarem aqui e a tela mostrar so' uma.
+    coalesce(r.n_registros_no_tse, 1)                     as n_registros_no_tse,
+    coalesce(r.n_registros_no_tse, 1) > 1                 as tem_registro_repetido,
+    coalesce(r.e_registro_exibido, true)                  as e_registro_exibido,
 
     -- reeleicao derivada do historico; ver comentario no topo
     coalesce(m.id_pessoa is not null, false)              as is_reeleicao,
@@ -195,6 +285,8 @@ left join bens     as b using (sk_candidatura)
 left join pessoas  as p using (sk_candidatura)
 left join votos    as v  using (sk_candidatura)
 left join propostas as pr using (sk_candidatura)
+left join repetidos as r using (sk_candidatura)
+left join derivado  as dv using (sk_candidatura)
 left join mandatos_vigentes as m
   on  m.id_pessoa  = p.id_pessoa
   and m.cod_cargo  = c.cod_cargo

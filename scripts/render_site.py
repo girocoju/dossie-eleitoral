@@ -396,6 +396,56 @@ def _financiamento(c: Candidato) -> str:
     </section>"""
 
 
+# Situacoes de registro em que a pessoa NAO chegou a disputar. Sem isto, uma
+# candidatura barrada apareceria como "resultado nao publicado", quando o
+# resultado nao existe porque nao houve disputa — sao coisas diferentes.
+_NAO_DISPUTOU = {
+    "INAPTO": "candidatura indeferida",
+    "INDEFERIDO": "candidatura indeferida",
+    "INDEFERIDO COM RECURSO": "candidatura indeferida",
+    "CASSADO": "registro cassado",
+    "RENUNCIA": "renunciou",
+    "FALECIDO": "falecido",
+}
+
+
+# Marca de que o resultado NAO veio do TSE — foi apurado dos votos oficiais.
+# Aparece na propria celula, e nao so' num rodape: quem le' a linha precisa saber
+# de onde veio aquela palavra sem ter que procurar a explicacao.
+_APURADO = ("<span class='ajuda' tabindex='0' aria-label='Resultado apurado a "
+            "partir dos votos oficiais do TSE e do número de vagas em disputa. "
+            "O TSE não publica o desfecho desta eleição no cadastro de "
+            "candidaturas.' title='Apurado dos votos oficiais — o TSE não publica "
+            "o desfecho desta eleição no cadastro de candidaturas.'>apurado</span>")
+
+
+def _resultado(t: dict) -> str:
+    """O desfecho de uma candidatura, em TRES estados — nunca dois.
+
+    `eleito` e' `NULL` quando o TSE nao publicou `DS_SIT_TOT_TURNO`. Escrever
+    "Nao eleito" ali e' uma AFIRMACAO FALSA sobre uma pessoa real, e foi
+    exatamente o que este site fez: a ficha do Lula trazia "2006 · Presidente ·
+    Nao eleito". Ele foi eleito em segundo turno, com 58,3 milhoes de votos. O
+    TSE simplesmente nao publica o resultado de 2006 no `consulta_cand` — para
+    nenhum dos 8 candidatos (L-16).
+
+    Sao 13.834 candidaturas de 1998-2022 na mesma situacao.
+    """
+    derivado = t.get("origem") == "apurado dos votos"
+    if t["eleito"] is True:
+        return "Eleito" + (_APURADO if derivado else "")
+    if t["eleito"] is False:
+        return "Não eleito" + (_APURADO if derivado else "")
+
+    # Daqui para baixo o resultado NAO foi publicado. Se a candidatura sequer
+    # chegou a' disputa, dizer isso e' mais informativo que dizer "nao consta".
+    situacao = (t.get("situacao") or "").strip().upper()
+    for chave, rotulo in _NAO_DISPUTOU.items():
+        if chave in situacao:
+            return f"<span class='marca-dado m-ausente'>{rotulo}</span>"
+    return ("<span class='marca-dado m-ausente'>resultado não publicado</span>")
+
+
 def _ficha(c: Candidato, quando: str) -> str:
     partes = [f"""
 <a href="{BASE_URL}/{CARGOS[c.cod_cargo][0]}/" style="font-size:13.5px">← {e(c.cargo_nome)}</a>
@@ -426,11 +476,20 @@ def _ficha(c: Candidato, quando: str) -> str:
     # trajetoria
     if c.trajetoria:
         def _linha(t: dict) -> str:
-            votos = f"{t['votos']:,}".replace(",", ".") if t["votos"] else "—"
-            res = "Eleito" if t["eleito"] else "Não eleito"
+            # Em eleicao decidida em dois turnos, `votos_nominais` e' a SOMA
+            # dos dois — um numero que nao existe em lugar nenhum e que ninguem
+            # consegue conferir. Lula em 2022 aparecia com 117.605.503; o numero
+            # que o leitor reconhece e' 60.345.999, do segundo turno.
+            if t.get("turno") and t["turno"] > 1 and t.get("votos_turno"):
+                votos = (f"{t['votos_turno']:,}".replace(",", ".")
+                         + f"<small> · {t['turno']}º turno</small>")
+            elif t["votos"]:
+                votos = f"{t['votos']:,}".replace(",", ".")
+            else:
+                votos = "—"
             return (f"<tr><td class='num'>{t['ano']}</td><td>{e(t['cargo'])}</td>"
                     f"<td>{e(t['uf'])}</td><td>{e(t['partido']) or '—'}</td>"
-                    f"<td>{res}</td><td class='num'>{votos}</td></tr>")
+                    f"<td>{_resultado(t)}</td><td class='num'>{votos}</td></tr>")
 
         linhas = "".join(_linha(t) for t in c.trajetoria)
         partes.append(f"""<section class="bloco">
@@ -441,6 +500,19 @@ def _ficha(c: Candidato, quando: str) -> str:
       <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
         São <b>candidaturas</b>, não mandatos: disputas perdidas também
         aparecem. Série desde 1998.</p>
+      <p class="aviso" style="margin:10px 0 0">
+        <b>Sobre a eleição de 2006.</b> O TSE não publica o desfecho de 2006 no
+        cadastro de candidaturas — nenhum dos candidatos a Presidente daquele ano
+        tem resultado na fonte. Onde a linha diz <b>apurado</b>, o resultado foi
+        calculado aqui a partir de dois conjuntos oficiais do próprio TSE: a
+        votação por turno e o número de vagas em disputa. Em cargo majoritário a
+        regra é aritmética — elegem-se os mais votados do último turno. O método
+        foi conferido contra os anos em que o TSE <i>publica</i> o resultado:
+        acerta 2.636 de 2.640, e 50 de 50 nas eleições presidenciais.
+        <b>Cargos proporcionais (deputado) nunca são apurados assim</b>, porque
+        cadeira proporcional não vai para quem teve mais voto pessoal.
+        Onde se lê <b>resultado não publicado</b>, a fonte é omissa e nada foi
+        calculado — é ausência de dado, <b>não</b> derrota.</p>
     </section>""")
     else:
         partes.append("""<section class="bloco"><h2>Trajetória eleitoral</h2>
@@ -517,6 +589,16 @@ def _ficha(c: Candidato, quando: str) -> str:
         Capturado diariamente. A data é a da <b>captura</b>, não a do ato do TSE. O TSE publica
         apenas o estado atual — esta série não pode ser refeita depois de 04/10/2026.</p>
     </section>""")
+
+    if c.registros_no_tse > 1:
+        # Nao basta esconder a linha repetida: o leitor tem direito de saber que
+        # a fonte publica mais de um registro para esta candidatura.
+        partes.append(f"""<p class="aviso">
+      O TSE publica <b>{c.registros_no_tse} registros</b> para esta candidatura —
+      mesma pessoa, mesmo cargo, mesmo número de urna e mesmo partido, com
+      sequenciais diferentes. É uma reinscrição em que o registro anterior
+      continuou publicado. Esta página mostra um deles; nenhum campo da fonte
+      indica qual prevalece.</p>""")
 
     partes.append(_atividade(c))
     partes.append(_financiamento(c))
