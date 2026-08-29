@@ -30,7 +30,8 @@ FONTE = "TSE — Divulgação de Candidaturas"
 # num tooltip — sem simplificar o DADO, so' a forma de nomea-lo.
 _GLOSSARIO = {
     "PIB": ("PIB do estado",
-            "Soma de tudo que foi produzido no estado no ano, em reais correntes."),
+            "Soma de tudo que foi produzido no estado no ano, a preços correntes — "
+            "a variação inclui a inflação e não é crescimento real."),
     "PIB_PER_CAPITA": ("PIB por habitante",
             "O PIB dividido pela população. Não é renda das pessoas: é produção por cabeça."),
     "POPULACAO": ("População",
@@ -220,6 +221,25 @@ def _atividade(c: Candidato) -> str:
     </section>"""
 
 
+# Indicadores em REAIS CORRENTES. A variacao deles inclui a inflacao do periodo
+# e NAO e' crescimento real: entre 2022 e 2023 o PIB do Brasil sobe 8,6% nesta
+# serie, contra 3,2% de crescimento real medido pelo IBGE. A diferenca e' preco.
+#
+# Nao deflacionamos: o deflator correto do PIB nao e' o IPCA, e usar o indice
+# errado produziria um "valor real" que parece rigoroso e nao e'. O que se faz e'
+# DIZER que o numero e' nominal, na propria linha.
+_NOMINAIS = frozenset({
+    "PIB", "PIB_PER_CAPITA",
+    "RECEITA_ESTADUAL", "DESPESA_ESTADUAL", "RESULTADO_ORCAMENTARIO",
+    "RECEITA_LIQUIDA_UNIAO", "DESPESA_PRIMARIA_UNIAO", "RESULTADO_PRIMARIO_UNIAO",
+})
+
+_MARCA_NOMINAL = ("<span class='ajuda' tabindex='0' aria-label='Valor a preços "
+                  "correntes: a variação inclui a inflação do período e não é "
+                  "crescimento real.' title='A preços correntes — a variação "
+                  "inclui a inflação do período, não é crescimento real.'>nominal</span>")
+
+
 def _indicadores(c: Candidato) -> str:
     """Bloco socioeconomico — so' para quem ja' teve mandato executivo."""
     if not c.indicadores:
@@ -236,12 +256,15 @@ def _indicadores(c: Candidato) -> str:
         nome, ajuda = _GLOSSARIO.get(
             i["cod"], (i["indicador"], "Ver metodologia para a definição completa."))
         cargo = _CARGO_CURTO.get(i["cargo"], "—")
+        # Sem esta marca, "+8,6%" no PIB e' lido como crescimento economico.
+        nominal = _MARCA_NOMINAL if i["cod"] in _NOMINAIS else ""
         linhas.append(
             f"<tr><td>{e(nome)}<span class='ajuda' tabindex='0' "
             f"aria-label='{e(ajuda)}' title='{e(ajuda)}'>?</span>{incompleta}</td>"
             f"<td>{e(cargo)}</td>"
             f"<td class='num'>{janela}</td>"
-            f"<td class='num'>{pct}</td><td class='num'>{pct_br}</td></tr>")
+            f"<td class='num'>{pct}{nominal}</td>"
+            f"<td class='num'>{pct_br}</td></tr>")
     if not linhas:
         return ""
     primeiro = c.indicadores[0]
@@ -253,6 +276,8 @@ def _indicadores(c: Candidato) -> str:
         <tbody>{''.join(linhas)}</tbody></table></div>
       <p class="aviso" style="margin:10px 0 0">
         <b>Estes números descrevem o período, não o efeito do mandato.</b>
+        Valores marcados <b>nominal</b> estão a preços correntes: a variação
+        inclui a inflação e não é crescimento real.
         Cada variação aparece ao lado da variação nacional no mesmo intervalo,
         porque um número isolado vira nota de gestão. PIB, desemprego e homicídios
         dependem de fatores muito além do alcance de um governo estadual.</p>
@@ -853,8 +878,183 @@ Onde o dado não existe, o site diz que não existe — nunca preenche a lacuna.
                    corpo, quando, f"{BASE_URL}/")
 
 
+def _metodologia(quando: str) -> str:
+    """Pagina de metodologia e LIMITES — o rodape de toda pagina aponta para ca'.
+
+    Existe para dizer o que os numeros NAO dizem. Um site que so' mostra dado e
+    esconde a limitacao dele transfere para o leitor um risco que ele nao tem
+    como avaliar.
+    """
+    corpo = """
+    <div class="capa">
+      <h1>Metodologia, fontes e limites</h1>
+      <p class="sub">O que este dossiê mede, de onde vêm os números e onde eles
+        não alcançam.</p>
+    </div>
+    <div class="miolo"><div class="col">
+
+    <section class="bloco">
+      <h2>O que este site faz, e o que não faz</h2>
+      <p>Ele registra <b>o que foi declarado ao TSE</b> e o coloca ao lado de
+        indicadores públicos do período. Não avalia, não classifica e não ordena
+        candidatos.</p>
+      <ul>
+        <li>Não existe ranking de "melhor" ou "pior" em lugar nenhum.</li>
+        <li>Nenhum indicador é apresentado como <b>efeito</b> de um mandato — só
+          como o que aconteceu <b>durante</b> ele. PIB, desemprego e homicídios
+          dependem de fatores muito além do alcance de um governo.</li>
+        <li>Não expõe CPF, título de eleitor nem endereço de ninguém — incluindo
+          doadores de campanha, cujo CPF é publicado pelo TSE e <b>não</b> é
+          armazenado aqui.</li>
+        <li>Cor de partido nunca é usada como padrão visual.</li>
+      </ul>
+    </section>
+
+    <section class="bloco">
+      <h2>A eleição de 2006</h2>
+      <p class="aviso"><b>O TSE não publica o resultado de 2006 no cadastro de
+        candidaturas.</b> Nenhum dos oito candidatos a Presidente daquele ano tem
+        o campo de desfecho preenchido na fonte oficial — e o mesmo vale para
+        outras 13.834 candidaturas entre 1998 e 2022.</p>
+      <p>Isso já produziu um erro neste site: a ficha de um candidato eleito em
+        2006 dizia <b>“Não eleito”</b>, porque a ausência de dado estava sendo
+        tratada como negativa. O erro esteve publicado e foi corrigido em
+        29/08/2026.</p>
+      <p>Hoje há três estados possíveis, nunca dois:</p>
+      <dl class="campos">
+        <div><dt>Eleito / Não eleito</dt><dd>o TSE publicou o desfecho.</dd></div>
+        <div><dt>Eleito <span class="marca-dado">apurado</span></dt>
+          <dd>o TSE não publicou, e o resultado foi <b>calculado aqui</b> — veja
+            abaixo como.</dd></div>
+        <div><dt><span class="marca-dado m-ausente">resultado não publicado</span></dt>
+          <dd>a fonte é omissa e nada foi calculado. É ausência de dado,
+            <b>não</b> derrota.</dd></div>
+      </dl>
+    </section>
+
+    <section class="bloco">
+      <h2>Como o resultado é apurado quando o TSE não publica</h2>
+      <p>Só para cargos <b>majoritários</b> — Presidente, Governador e Senador —
+        onde a regra é aritmética e não admite interpretação: elegem-se os mais
+        votados do último turno realizado. Os dois insumos são oficiais e vêm do
+        próprio TSE:</p>
+      <dl class="campos">
+        <div><dt>Votação por turno</dt><dd>quantos votos cada candidatura teve.</dd></div>
+        <div><dt>Vagas em disputa</dt><dd>quantas cadeiras a unidade eleitoral
+          elegia naquele ano — o Senado renovou 1 por estado em 2006 e 2 em
+          2018.</dd></div>
+      </dl>
+      <p><b>Cargos proporcionais nunca são apurados assim.</b> Cadeira de
+        deputado não vai para quem teve mais voto pessoal: depende de quociente
+        eleitoral, quociente partidário e sobras. Aplicar "os mais votados" ali
+        produziria uma lista errada com aparência de certa.</p>
+      <p><b>O método foi conferido contra os anos em que o TSE publica o
+        resultado</b>, onde existe gabarito:</p>
+      <div class="rolagem"><table>
+        <thead><tr><th>Confronto</th><th>Resultado</th></tr></thead>
+        <tbody>
+          <tr><td>Candidaturas conferidas</td><td class="num">2.640</td></tr>
+          <tr><td>Acertos</td><td class="num">2.636</td></tr>
+          <tr><td>Divergências</td><td class="num">4</td></tr>
+          <tr><td>Eleições presidenciais</td><td class="num">50 de 50</td></tr>
+        </tbody></table></div>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        As quatro divergências são cassação e eleição suplementar — casos em que
+        quem ocupou a cadeira não foi quem teve mais voto na urna, e que contagem
+        nenhuma tem como saber. Onde o TSE publica, <b>o TSE prevalece sempre</b>;
+        a apuração só fala onde ele cala.</p>
+    </section>
+
+    <section class="bloco">
+      <h2>Valores em reais: o que está e o que não está descontado</h2>
+      <p class="aviso"><b>PIB, receitas, despesas e resultados orçamentários estão
+        a preços correntes.</b> A variação mostrada nas fichas <b>inclui a
+        inflação do período</b> e não é crescimento real.</p>
+      <p>Um exemplo concreto: entre 2022 e 2023 o PIB do Brasil sobe <b>8,6%</b>
+        nestes dados, enquanto o crescimento <i>real</i> medido pelo IBGE foi de
+        <b>3,2%</b>. A diferença é inflação, não economia.</p>
+      <p>A comparação que <b>faz</b> sentido é a que aparece ao lado de cada
+        linha: a variação da unidade da federação contra a do Brasil no mesmo
+        intervalo. A inflação afeta as duas igualmente, então a comparação
+        continua válida mesmo com o número absoluto inflado.</p>
+      <p>Não deflacionamos a série aqui de propósito: o deflator correto do PIB
+        não é o IPCA, e usar o índice errado produziria um "valor real" que
+        parece rigoroso e não é. <b>Rendimento médio do trabalho</b> é a exceção —
+        o IBGE já o publica em termos reais.</p>
+    </section>
+
+    <section class="bloco">
+      <h2>Até onde cada indicador alcança</h2>
+      <p>Séries públicas têm defasagem, e ela varia muito. Nenhum número é
+        estendido, estimado ou projetado para cobrir o buraco.</p>
+      <div class="rolagem"><table>
+        <thead><tr><th>Indicador</th><th>Último ano disponível</th><th>Fonte</th></tr></thead>
+        <tbody>
+          <tr><td>Desemprego, rendimento do trabalho</td><td class="num">2025</td>
+              <td>IBGE · PNAD Contínua</td></tr>
+          <tr><td>Inflação (IPCA), Selic</td><td class="num">2025</td>
+              <td>IBGE · Banco Central</td></tr>
+          <tr><td>Homicídios</td><td class="num">2024</td><td>IPEA · Atlas da Violência</td></tr>
+          <tr><td>Orçamento da União</td><td class="num">2025</td><td>Tesouro · RTN</td></tr>
+          <tr><td>IDEB</td><td class="num">2025</td><td>INEP</td></tr>
+          <tr><td>PIB estadual</td><td class="num">2023</td><td>IBGE · Contas Regionais</td></tr>
+          <tr><td>Orçamento dos estados</td><td class="num">2023</td><td>Tesouro · SICONFI</td></tr>
+          <tr><td>Mortalidade infantil</td><td class="num">2016</td><td>IPEA</td></tr>
+          <tr><td>IDHM</td><td class="num">2010</td><td>PNUD · Censo</td></tr>
+        </tbody></table></div>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        As duas últimas linhas explicam por que mandatos recentes aparecem sem
+        mortalidade infantil e sem IDHM: <b>a série não chegou lá</b>. O IDHM é
+        calculado a partir do Censo, de dez em dez anos.</p>
+    </section>
+
+    <section class="bloco">
+      <h2>O que este dossiê não tem</h2>
+      <ul>
+        <li><b>Dívida pública</b> (DBGG) e outras estatísticas do Banco Central.</li>
+        <li><b>Orçamento por ministério</b> — só o resultado consolidado da União
+          e os orçamentos estaduais.</li>
+        <li><b>Programas de governo</b> (Bolsa Família, Minha Casa Minha Vida):
+          são políticas, não indicadores, e medir a execução delas exigiria uma
+          fonte que este projeto não ingere.</li>
+        <li><b>Resultado das eleições de 2026</b>, que ainda não ocorreram.</li>
+        <li><b>Atividade legislativa do Senado</b> — a fonte não publica marca de
+          proponente, e uma contagem sem esse filtro pareceria comparável à da
+          Câmara sem ser.</li>
+      </ul>
+    </section>
+
+    <section class="bloco">
+      <h2>Prestação de contas de campanha</h2>
+      <p>O prazo legal de prestação vai até <b>depois de 04/10/2026</b>, então a
+        cobertura cresce a cada dia. Uma candidatura que não aparece
+        <b>não declarou zero</b> — não declarou nada, e a ficha diz exatamente
+        isso.</p>
+      <p>O nome do doador é publicado porque é dele que trata a prestação de
+        contas. <b>O CPF não</b>: o TSE o publica em texto puro, e aqui ele é
+        substituído por um código irreversível antes de ser gravado. CNPJ
+        aparece legível — identifica empresa, não pessoa.</p>
+    </section>
+
+    <section class="bloco">
+      <h2>Erros</h2>
+      <p>Este site é gerado por um pipeline aberto, com 240 verificações
+        automáticas sobre os dados. Elas não pegam tudo — o erro de 2006 descrito
+        acima passou por todas elas e foi encontrado por um leitor.</p>
+      <p>O código, os testes e o registro de cada decisão estão públicos em
+        <a href="https://github.com/girocoju/radar-brasil">github.com/girocoju/radar-brasil</a>.
+        Encontrou um número errado? Abra uma issue — a correção e o motivo dela
+        ficam registrados lá.</p>
+    </section>
+
+    </div></div>"""
+    return _pagina("Metodologia e fontes", "Como o Dossiê Eleitoral 2026 é feito: "
+                   "fontes, limites dos dados e o que os números não dizem.",
+                   corpo, quando, f"{BASE_URL}/metodologia/", "metodologia")
+
+
 def _sitemap(majoritarios: list[Candidato], quando: str) -> str:
-    urls = [f"{BASE_URL}/"]
+    urls = [f"{BASE_URL}/", f"{BASE_URL}/metodologia/"]
     urls += [f"{BASE_URL}/{s}/" for s, _, _ in CARGOS.values()]
     urls += [f"{BASE_URL}/{s}/" for s, _ in PROPORCIONAIS.values()]
     urls += [c.url for c in majoritarios]
@@ -897,4 +1097,5 @@ def escrever_site(destino: Path, majoritarios: list[Candidato],
             grava(f"dados/{chave}/{uf}.json", bruto)
         grava(f"{chave}/index.html", _listagem_proporcional(chave, nome, por_uf, quando))
 
+    grava("metodologia/index.html", _metodologia(quando))
     grava("sitemap.xml", _sitemap(majoritarios, quando))
