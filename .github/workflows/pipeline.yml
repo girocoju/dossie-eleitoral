@@ -179,16 +179,46 @@ jobs:
       #
       # O que REALMENTE muda todo dia e' o TSE (situacao das candidaturas), e essa
       # etapa continua diaria.
-      - name: Ingestao socioeconomica (semanal)
+      # MELHOR ESFORCO, e nao fatal — a assimetria e' deliberada.
+      #
+      # Estas cinco fontes sao ANUAIS e ja' estao no BigQuery: uma execucao que
+      # nao as atualiza deixa o dado do jeito que ja' estava, sem buraco nenhum.
+      # Ja' o TSE publica apenas o ESTADO ATUAL, sem historico — um dia sem rodar
+      # e' um dia perdido para sempre.
+      #
+      # Fatal, este passo inverte as prioridades: em 29/08/2026 um timeout da API
+      # do SIDRA derrubou o job inteiro, custou o snapshot do TSE do dia e ainda
+      # impediu a publicacao do site. Uma indisponibilidade do IBGE nao pode
+      # decidir se o dossie sai do ar.
+      #
+      # Cada fonte roda por conta propria, para que a queda de uma nao esconda as
+      # outras quatro, e o que falhou vira `::warning::` visivel na execucao — nao
+      # silencio. Nenhum dado e' inventado para cobrir a ausencia; o valor antigo
+      # simplesmente permanece, com o `_extracted_at` antigo, que e' o que a tela
+      # ja' mostra ao leitor.
+      - name: Ingestao socioeconomica (semanal, melhor esforco)
         if: >
           steps.cred.outputs.temos == 'true' &&
           (github.event_name != 'schedule' || github.event.schedule == '30 14 * * 0')
         run: |
-          python -m ingest.ibge_sidra load --somente-verificados
-          python -m ingest.ipeadata  load --somente-verificados
-          python -m ingest.siconfi   load
-          python -m ingest.ideb      load
-          python -m ingest.rtn       load
+          falhas=""
+          for fonte in ibge_sidra ipeadata siconfi ideb rtn; do
+            case "$fonte" in
+              ibge_sidra|ipeadata) args="load --somente-verificados" ;;
+              *)                   args="load" ;;
+            esac
+            echo "::group::$fonte"
+            if python -m "ingest.$fonte" $args; then
+              echo "$fonte ok"
+            else
+              falhas="$falhas $fonte"
+              echo "::warning title=Fonte anual nao atualizada::$fonte falhou nesta execucao. O dado anterior continua valendo no BigQuery, com o _extracted_at antigo."
+            fi
+            echo "::endgroup::"
+          done
+          if [ -n "$falhas" ]; then
+            echo "nao atualizadas nesta execucao:$falhas" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # O upload pula o que ja' esta' no bucket, entao a execucao diaria custa uma
       # listagem por UE e sobe so' foto de candidatura nova ou substituida.
