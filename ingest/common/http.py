@@ -119,6 +119,11 @@ class Artifact:
     sha256: str
     size_bytes: int
     extracted_at: str
+    # Assinatura que o servidor deu na hora do download. E' com ela que o cache
+    # e' REVALIDADO na execucao seguinte, em vez de aceito no escuro.
+    # `None` nos manifestos antigos, e ai' a revalidacao simplesmente rebaixa.
+    etag: str | None = None
+    last_modified: str | None = None
 
     @property
     def file(self) -> Path:
@@ -224,6 +229,55 @@ def _open(
     return urllib.request.urlopen(req, timeout=timeout, context=_contexto(host))
 
 
+def _mudou_no_servidor(url: str, cached: Artifact) -> bool | None:
+    """A copia local ainda corresponde ao que o servidor serve?
+
+    Devolve `True` (mudou), `False` (igual) ou `None` (nao deu para saber).
+
+    POR QUE ISTO EXISTE
+
+    O cache era CEGO: se o arquivo local batia com o proprio manifesto, `download`
+    devolvia na hora, sem falar com o servidor. Junto com o cache de `data/raw`
+    entre execucoes do GitHub Actions, isso produzia o pior resultado possivel
+    para este projeto — o pacote do TSE baixado uma vez e NUNCA MAIS reconferido.
+
+    Medido em 29/08/2026: a carga do dia rodou e gravou 20.769 linhas, mas
+    `_extracted_at` continuava em 28/08 18:23 e o snapshot nao tinha nenhuma
+    linha do dia. O pipeline diario estava recarregando o arquivo de ontem.
+
+    Isso derruba a razao de o pipeline ser diario. O TSE publica sempre o ESTADO
+    ATUAL, sem historico: a serie de alteracoes so' existe porque tiramos uma foto
+    por dia, e no dia 28 foram 819 mudancas detectadas. Um dia sem reconferir e'
+    um dia que nao volta.
+
+    Um `HEAD` custa alguns bytes e responde a pergunta. Quando o servidor nao
+    coopera — sem `ETag`, sem `Last-Modified`, ou o `HEAD` falha — devolve `None`
+    e quem chama decide; aqui, decide rebaixar, porque o risco de perder uma
+    mudanca e' maior que o custo de um download repetido.
+    """
+    req = urllib.request.Request(url, headers=BASE_HEADERS, method="HEAD")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            etag = resp.headers.get("ETag")
+            modificado = resp.headers.get("Last-Modified")
+            tamanho = resp.headers.get("Content-Length")
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
+        log.warning("nao deu para revalidar %s (%s)", url, type(exc).__name__)
+        return None
+
+    # Tamanho diferente e' resposta definitiva, e nao depende de o servidor
+    # mandar validador nenhum.
+    if tamanho and tamanho.isdigit() and int(tamanho) != cached.size_bytes:
+        return True
+    if etag and cached.etag:
+        return etag != cached.etag
+    if modificado and cached.last_modified:
+        return modificado != cached.last_modified
+    # Sem validador guardado (manifesto antigo) nao da' para afirmar que esta'
+    # igual. `None` faz rebaixar — o lado seguro do erro.
+    return None if (etag or modificado) else False
+
+
 def download(
     url: str,
     dest: Path,
@@ -241,10 +295,23 @@ def download(
 
     cached = _read_manifest(dest)
     if cached and not force:
-        if cached.size_bytes == dest.stat().st_size and cached.sha256 == sha256_file(dest):
+        intacto = (cached.size_bytes == dest.stat().st_size
+                   and cached.sha256 == sha256_file(dest))
+        if not intacto:
+            log.warning("cache corrompido para %s — rebaixando", dest.name)
+        elif dry_run:
             log.info("cache hit  %s (%s bytes)", dest.name, cached.size_bytes)
             return cached
-        log.warning("cache invalido para %s — rebaixando", dest.name)
+        else:
+            # O arquivo local esta' integro; a pergunta que falta e' se ele ainda
+            # e' o que o servidor serve. Ver `_mudou_no_servidor`.
+            mudou = _mudou_no_servidor(url, cached)
+            if mudou is False:
+                log.info("cache valido %s (%s bytes) — servidor confirma",
+                         dest.name, cached.size_bytes)
+                return cached
+            log.info("cache desatualizado %s (%s) — rebaixando",
+                     dest.name, "mudou no servidor" if mudou else "sem validador")
 
     if dry_run:
         log.info("[dry-run] baixaria %s -> %s", url, dest)
@@ -258,6 +325,9 @@ def download(
 
     last_error: Exception | None = None
     ok = False
+    # Validadores que o servidor devolver: e' com eles que a proxima execucao
+    # revalida este arquivo em vez de aceitar o cache no escuro.
+    etag = modificado = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
         offset = part.stat().st_size if part.exists() else 0
         try:
@@ -270,6 +340,8 @@ def download(
                 log.info(
                     "baixando  %s (tentativa %d, offset %d, %s)", dest.name, attempt, offset, total
                 )
+                etag = resp.headers.get("ETag")
+                modificado = resp.headers.get("Last-Modified")
                 with part.open("ab" if offset else "wb") as fh:
                     while chunk := resp.read(CHUNK):
                         fh.write(chunk)
@@ -313,6 +385,8 @@ def download(
         sha256=digest,
         size_bytes=dest.stat().st_size,
         extracted_at=utc_now(),
+        etag=etag,
+        last_modified=modificado,
     )
     _write_manifest(dest, art)
     log.info("ok        %s (%s bytes, sha256 %s...)", dest.name, art.size_bytes, digest[:12])
