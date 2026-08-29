@@ -159,12 +159,53 @@ jobs:
           key: fontes-${{ hashFiles('ingest/layouts/*.yml') }}-${{ github.run_id }}
           restore-keys: fontes-${{ hashFiles('ingest/layouts/*.yml') }}-
 
+      # `carga` roda um modulo de ingestao e traduz o codigo de saida:
+      #
+      #     0    ok
+      #    75    falha TRANSITORIA de rede -> aviso, e a execucao segue
+      #  outro   erro de verdade -> derruba o job
+      #
+      # Quem classifica e' `ingest/common/cli.py`, pela CAUSA da excecao: timeout
+      # e 5xx sao instabilidade, 404 e 403 significam que a fonte mudou. A
+      # diferenca importa — tratar tudo como transitorio faria uma fonte movida
+      # parar de atualizar em silencio, que e' pior que o job vermelho.
+      #
+      # Sem isto, em 29/08/2026 um timeout de tres minutos do SIDRA e depois um
+      # da API da Camara derrubaram a carga do TSE do dia e a publicacao junto.
+      - name: Preparar o executor de cargas
+        if: steps.cred.outputs.temos == 'true'
+        run: |
+          cat > "$RUNNER_TEMP/carga.sh" <<'SH'
+          #!/usr/bin/env bash
+          rotulo="$1"; shift
+          set +e
+          python -m "$@"
+          codigo=$?
+          set -e
+          if [ "$codigo" -eq 0 ]; then
+            exit 0
+          elif [ "$codigo" -eq 75 ]; then
+            echo "::warning title=Fonte indisponivel::$rotulo nao atualizou: falha transitoria de rede. O dado anterior continua valendo no BigQuery."
+            echo "nao atualizou (rede): $rotulo" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          else
+            echo "::error::$rotulo falhou com codigo $codigo — nao e' instabilidade de rede."
+            exit "$codigo"
+          fi
+          SH
+          chmod +x "$RUNNER_TEMP/carga.sh"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
       # Recarregar 2026 substitui APENAS a particao de 2026 (ADR-010); o historico
       # 1998-2022 no BigQuery nao e' tocado e nao precisa estar em disco aqui.
       - name: Ingestao TSE
         if: steps.cred.outputs.temos == 'true'
         run: |
           for ano in ${{ github.event.inputs.anos || '2026' }}; do
+            # FATAL de proposito, mesmo em falha de rede: o TSE publica so' o
+            # ESTADO ATUAL, e o snapshot do dia alimenta a serie de alteracoes
+            # que nao da' para reconstruir depois. Perder isso em silencio seria
+            # pior que o job vermelho — o vermelho da' chance de re-executar.
             python -m ingest.tse load --ano "$ano"
           done
 
@@ -208,11 +249,20 @@ jobs:
               *)                   args="load" ;;
             esac
             echo "::group::$fonte"
-            if python -m "ingest.$fonte" $args; then
+            set +e
+            python -m "ingest.$fonte" $args
+            codigo=$?
+            set -e
+            if [ "$codigo" -eq 0 ]; then
               echo "$fonte ok"
-            else
+            elif [ "$codigo" -eq 75 ]; then
               falhas="$falhas $fonte"
-              echo "::warning title=Fonte anual nao atualizada::$fonte falhou nesta execucao. O dado anterior continua valendo no BigQuery, com o _extracted_at antigo."
+              echo "::warning title=Fonte anual nao atualizada::$fonte nao respondeu nesta execucao. O dado anterior continua valendo no BigQuery, com o _extracted_at antigo."
+            else
+              # Nao e' instabilidade: fonte que mudou de endereco, layout novo,
+              # bug. Engolir isso faria a serie parar de atualizar em silencio.
+              echo "::error::$fonte falhou com codigo $codigo — nao e' rede."
+              exit "$codigo"
             fi
             echo "::endgroup::"
           done
@@ -224,39 +274,39 @@ jobs:
       # listagem por UE e sobe so' foto de candidatura nova ou substituida.
       - name: Ingestao das fotos (F-13)
         if: steps.cred.outputs.temos == 'true'
-        run: python -m ingest.fotos load --ano 2026
+        run: carga.sh "Fotos (F-13)" ingest.fotos load --ano 2026
 
       # Reconsulta so' registros com mais de 7 dias, entao na maioria dos dias
       # esta etapa faz zero requisicoes ao DivulgaCandContas.
       - name: Proposta de governo dos majoritarios (F-14)
         if: steps.cred.outputs.temos == 'true'
-        run: python -m ingest.propostas load --ano 2026
+        run: carga.sh "Propostas de governo (F-14)" ingest.propostas load --ano 2026
 
       # Baixa o PDF e extrai o texto so' de quem ainda nao tem transcricao —
       # 206 planos, mas a maioria ja' esta' no BigQuery na execucao seguinte.
       - name: Texto integral dos planos (ADR-019)
         if: steps.cred.outputs.temos == 'true'
-        run: python -m ingest.planos load
+        run: carga.sh "Texto dos planos (ADR-019)" ingest.planos load
 
       # A ponte de identidade muda a cada licenca e suplencia, entao vale rodar
       # diariamente: sao ~600 requisicoes leves.
       - name: Parlamentares em exercicio (F-15)
         if: steps.cred.outputs.temos == 'true'
-        run: python -m ingest.legislativo load
+        run: carga.sh "Parlamentares (F-15)" ingest.legislativo load
 
       # Os arquivos anuais da Camara sao grandes (~500 MB na legislatura inteira),
       # mas o download e' idempotente por sha256: so' rebaixa o do ano corrente,
       # que e' o unico que muda.
       - name: Atividade legislativa da Camara (F-16)
         if: steps.cred.outputs.temos == 'true'
-        run: python -m ingest.proposicoes load
+        run: carga.sh "Atividade legislativa (F-16)" ingest.proposicoes load
 
       # Um ZIP de 15 MB com 27 CSV por tipo. Ate' 04/10 o TSE republica conforme as
       # campanhas prestam contas, entao a cobertura sobe a cada dia — em 28/08/2026
       # eram 7.722 das 20.765 candidaturas.
       - name: Financiamento de campanha (F-11, ADR-020)
         if: steps.cred.outputs.temos == 'true'
-        run: python -m ingest.financiamento load --ano 2026
+        run: carga.sh "Financiamento (F-11)" ingest.financiamento load --ano 2026
 
       - name: dbt build
         if: steps.cred.outputs.temos == 'true'

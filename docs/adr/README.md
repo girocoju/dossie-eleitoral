@@ -27,3 +27,4 @@ junto com qualquer arquivo daqui.
 | [ADR-019](ADR-019-texto-integral-dos-planos.md) | Texto integral dos planos de governo, transcrito do PDF oficial | Aceita |
 | [ADR-020](ADR-020-financiamento-de-campanha.md) | Financiamento de campanha, com o CPF do doador fora | Proposta |
 | [ADR-021](ADR-021-tls-do-ftp-da-hostinger.md) | O nome que o certificado do FTP precisa cobrir | Aceita |
+| [ADR-022](ADR-022-fonte-indisponivel.md) | Fonte indisponivel nao derruba a carga diaria | Aceita |

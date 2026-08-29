@@ -22,6 +22,7 @@ import sys
 import unicodedata
 from typing import Any
 
+from ingest.common.cli import executar
 from ingest.common.config import DATASET_RAW_IPEA, get_settings
 from ingest.common.http import DownloadError, download, get_json, utc_now
 from ingest.common.indicadores import (
@@ -290,7 +291,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return int(args.func(args))
+    return executar(args.func, args)
 
 
 if __name__ == "__main__":

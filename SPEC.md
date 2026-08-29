@@ -402,6 +402,7 @@ radar-brasil/
 | ADR-017 | Orçamento federal pelo RTN, não pela DCA | A receita da DCA inclui operações de crédito (45% da União em 2020); o resultado tendia a zero por identidade contábil | Aceita |
 | ADR-020 | Financiamento de campanha, com o CPF do doador fora | O TSE publica CPF de doador em texto puro; o nome basta para prestar contas, o número só acrescenta risco | Aceita |
 | ADR-021 | O nome que o certificado do FTP precisa cobrir | A Hostinger apresenta certificado de `*.hstgr.io`, nao do dominio do cliente; verificar contra o nome real mantem a validacao completa, e fixar o certificado quebraria na renovacao | Aceita |
+| ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-019 | Texto integral dos planos de governo | O endpoint certo do TSE estava no bundle do próprio app; 201 de 206 planos transcrevem, 19,3 mi de caracteres | Aceita |
 | ADR-018 | Site estático gerado do lake, em vez de ferramenta de BI | *Publish to web* não tem layout mobile, URL por candidato nem indexação; e 20 mil candidatos que mudam 1x/dia são geração estática, não consulta ao vivo | Aceita |
 

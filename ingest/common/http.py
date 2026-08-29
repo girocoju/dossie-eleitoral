@@ -74,7 +74,40 @@ BACKOFF_BASE = 4.0  # segundos; 4, 8, 16, 32, 64, 128
 
 
 class DownloadError(RuntimeError):
-    """Falha definitiva de download apos todas as tentativas."""
+    """Falha ao obter um recurso, depois de esgotadas as tentativas.
+
+    Carrega a causa para que quem chama possa separar duas coisas MUITO
+    diferentes que antes chegavam iguais:
+
+        transitoria   timeout, conexao recusada, 502, 503, 429
+                      -> a fonte esta' de pe', so' nao respondeu agora
+
+        permanente    404, 403, 410
+                      -> a fonte MUDOU. Tratar como transitoria esconderia
+                         justamente o caso em que o projeto quebrou de verdade,
+                         e o dado pararia de atualizar sem ninguem notar.
+
+    A distincao existe para o pipeline diario decidir entre "avisa e segue" e
+    "para tudo". Sem ela, so' havia a escolha entre derrubar a carga inteira a
+    cada instabilidade de API publica e engolir qualquer erro em silencio.
+    """
+
+    # Nem todo 5xx e' transitorio e nem todo 4xx e' permanente. Esta lista e' a
+    # intersecao util: codigos em que tentar de novo amanha e' a resposta certa.
+    TRANSITORIOS = frozenset({408, 425, 429, 500, 502, 503, 504})
+
+    def __init__(self, mensagem: str, causa: BaseException | None = None):
+        super().__init__(mensagem)
+        self.causa = causa
+
+    @property
+    def transitoria(self) -> bool:
+        c = self.causa
+        # HTTPError E' subclasse de URLError, entao vem primeiro: invertida, a
+        # ordem classificaria todo 404 como transitorio.
+        if isinstance(c, urllib.error.HTTPError):
+            return c.code in self.TRANSITORIOS
+        return isinstance(c, (urllib.error.URLError, TimeoutError, OSError))
 
 
 @dataclass(frozen=True)
@@ -307,7 +340,7 @@ def get_texto(url: str, *, timeout: float = 120.0, attempts: int = MAX_ATTEMPTS)
             last_error = exc
             if attempt < attempts:
                 time.sleep(BACKOFF_BASE * attempt)
-    raise DownloadError(f"nao foi possivel obter {url}: {last_error}")
+    raise DownloadError(f"nao foi possivel obter {url}: {last_error}", last_error)
 
 
 def get_json(url: str, *, timeout: float = 120.0, attempts: int = MAX_ATTEMPTS):
@@ -329,4 +362,4 @@ def get_json(url: str, *, timeout: float = 120.0, attempts: int = MAX_ATTEMPTS):
             wait = BACKOFF_BASE * (2 ** (attempt - 1))
             log.warning("falha em %s (%s) — retry em %.0fs", url, type(exc).__name__, wait)
             time.sleep(wait)
-    raise DownloadError(f"nao foi possivel obter {url}: {last_error}") from last_error
+    raise DownloadError(f"nao foi possivel obter {url}: {last_error}", last_error) from last_error
