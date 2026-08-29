@@ -871,21 +871,161 @@ Onde o dado não existe, o site diz que não existe — nunca preenche a lacuna.
   <li>Não atribui indicador socioeconômico ao efeito de um mandato — apenas ao período dele.</li>
   <li>Não expõe CPF, título de eleitor nem endereço.</li>
   <li>Não usa cor de partido como padrão visual.</li>
-</ul>"""
+</ul>
+<h2 style="margin:28px 0 10px">Antes de usar um número daqui</h2>
+<p>Cada indicador tem alcance, unidade e ressalvas próprias — e algumas importam
+muito: valores em reais estão a <b>preços correntes</b>, a série de mortalidade
+infantil <b>termina em 2016</b>, e o TSE <b>não publica</b> o resultado da eleição
+de 2006 no cadastro de candidaturas.</p>
+<p><a class="cta" href="{BASE_URL}/metodologia/">Metodologia, fontes e glossário
+dos indicadores &rarr;</a></p>"""
     return _pagina("Dossiê Eleitoral 2026",
                    "O que cada candidatura de 2026 declarou ao TSE: perfil, trajetória eleitoral "
                    "e plano de governo. Apartidário, com fonte e data em toda tela.",
                    corpo, quando, f"{BASE_URL}/")
 
 
-def _metodologia(quando: str) -> str:
+# Uma explicacao por indicador, para a pagina de metodologia. O que NAO esta'
+# aqui — cobertura, fonte, unidade — vem do proprio lake, para nao envelhecer.
+#
+# Cada entrada e' (o que mede, como o ano e' formado, ressalva). A ressalva e' a
+# parte que importa: e' onde mora a diferenca entre o numero desta pagina e o
+# numero que a pessoa viu no jornal.
+_NOTAS_INDICADOR: dict[str, tuple[str, str, str]] = {
+    "PIB": (
+        "Valor de tudo o que foi produzido na unidade da federação no ano.",
+        "Já vem anual das Contas Regionais do IBGE.",
+        "A preços correntes: a variação <b>inclui a inflação</b> e não é "
+        "crescimento real. Divulgado com cerca de dois anos de defasagem."),
+    "PIB_PER_CAPITA": (
+        "O PIB dividido pela população estimada.",
+        "Calculado aqui, a partir de duas tabelas do IBGE.",
+        "<b>Não é renda das pessoas</b> — é produção por cabeça. Termina um ano "
+        "antes do PIB porque depende também da estimativa populacional."),
+    "POPULACAO": (
+        "Quantas pessoas o IBGE estima que moram na unidade da federação.",
+        "Estimativa anual, publicada em 1º de julho.",
+        "É <b>estimativa</b>, não contagem. Nos anos de Censo as duas diferem."),
+    "POPULACAO_CENSO": (
+        "Contagem do Censo Demográfico, feita de porta em porta.",
+        "Decenal — existe apenas para 2022 nesta base.",
+        "Mais precisa que a estimativa, e disponível só no ano censitário."),
+    "DESOCUPACAO": (
+        "Percentual de quem tem 14 anos ou mais, procura trabalho e não encontra.",
+        "<b>Média dos quatro trimestres</b> da PNAD Contínua. Um ano com menos de "
+        "quatro trimestres publicados não vira ano.",
+        "Pode diferir da <i>taxa anual</i> que o IBGE divulga, que é calculada por "
+        "outro caminho. Diferenças de duas a três décimas são esperadas."),
+    "RENDIMENTO_MEDIO": (
+        "Quanto ganha por mês, em média, quem está ocupado.",
+        "Média dos trimestres da PNAD Contínua.",
+        "<b>É a única série monetária já em valores reais</b> aqui: o IBGE publica "
+        "com a inflação descontada. Todas as outras estão a preços correntes."),
+    "IPCA": (
+        "Índice oficial de inflação ao consumidor.",
+        "<b>Acumulado no ano</b> — o valor de dezembro, não a média dos meses.",
+        "Média mensal daria aproximadamente metade da inflação real e seria "
+        "simplesmente errada."),
+    "SELIC": (
+        "Taxa básica de juros da economia (Over/Selic).",
+        "Média do ano.",
+        "Série macroeconômica: existe só para o Brasil, nunca por estado."),
+    "HOMICIDIOS": (
+        "Mortes por agressão a cada 100 mil habitantes.",
+        "Já vem anual do Atlas da Violência.",
+        "O IPEA <b>revisa anos anteriores</b> a cada edição, então a série pode "
+        "mudar retroativamente entre uma carga e outra."),
+    "MORTALIDADE_INFANTIL": (
+        "Óbitos de crianças com menos de um ano a cada mil nascidas vivas.",
+        "Já vem anual.",
+        "<b>A série disponível termina em 2016.</b> Mandatos posteriores aparecem "
+        "sem este indicador — não porque não houve mortes, mas porque a fonte não "
+        "publicou o dado."),
+    "IDEB": (
+        "Nota da educação básica pública, de 0 a 10 — anos finais do ensino "
+        "fundamental.",
+        "Bienal: medido a cada dois anos.",
+        "É a série que melhor cabe numa janela de mandato: um mandato de "
+        "governador contém duas ou três medições."),
+    "IDHM": (
+        "Índice de desenvolvimento humano, de 0 a 1.",
+        "Decenal — calculado a partir do Censo.",
+        "<b>A última medição é de 2010.</b> Nenhum mandato recente é coberto, e "
+        "isso não tem conserto pelo lado dos dados: o índice depende do Censo."),
+    "RECEITA_ESTADUAL": (
+        "Quanto o governo estadual arrecadou no ano, já descontadas as deduções.",
+        "Declaração de Contas Anuais entregue ao Tesouro.",
+        "A preços correntes. Depende de o estado ter entregue a declaração."),
+    "DESPESA_ESTADUAL": (
+        "Quanto o governo estadual empenhou no ano.",
+        "Declaração de Contas Anuais entregue ao Tesouro.",
+        "A preços correntes. É despesa <b>empenhada</b>, não paga."),
+    "RESULTADO_ORCAMENTARIO": (
+        "Receita menos despesa do governo estadual.",
+        "Calculado aqui, a partir das duas séries acima.",
+        "<b>Positivo não é bom nem ruim</b>: déficit pode ser investimento, "
+        "superávit pode ser gasto que não saiu do papel."),
+    "RECEITA_LIQUIDA_UNIAO": (
+        "Receita líquida do Governo Central.",
+        "Resultado do Tesouro Nacional, tabela 2.1.",
+        "<b>Governo Central</b> — Tesouro, Previdência e Banco Central. Não é o "
+        "setor público consolidado, que inclui estados e municípios."),
+    "DESPESA_PRIMARIA_UNIAO": (
+        "Despesa primária do Governo Central.",
+        "Resultado do Tesouro Nacional, tabela 2.1.",
+        "Primária: exclui juros da dívida."),
+    "RESULTADO_PRIMARIO_UNIAO": (
+        "Receita menos despesa primária do Governo Central.",
+        "Resultado do Tesouro Nacional, tabela 2.1 (acima da linha).",
+        "<b>É o resultado cheio, sem ajustes.</b> Não é o mesmo número que se lê "
+        "quando o resultado é medido <i>contra a meta fiscal</i>, que exclui itens "
+        "que o arcabouço permite excluir — os dois são oficiais e medem coisas "
+        "diferentes. Também não inclui estados e municípios."),
+}
+
+
+def _linha_catalogo(ind: dict) -> str:
+    """Uma linha da tabela de indicadores, com a cobertura vinda do lake."""
+    cod = ind["cod_indicador"]
+    nome, _ = _GLOSSARIO.get(cod, (ind["nome"], ""))
+    mede, agrega, ressalva = _NOTAS_INDICADOR.get(
+        cod, (ind["nome"], "—", "Ver a documentação técnica do projeto."))
+
+    if ind["ano_ini"] is None:
+        alcance = "<span class='marca-dado m-ausente'>sem dados</span>"
+    elif ind["ano_ini"] == ind["ano_fim"]:
+        alcance = str(ind["ano_ini"])
+    else:
+        alcance = f"{ind['ano_ini']}–{ind['ano_fim']}"
+
+    # 28 unidades = 26 estados + DF + Brasil. Menos que isso e' cobertura parcial,
+    # e a tabela precisa dizer, nao esconder.
+    n = ind["n_ues"] or 0
+    if n >= 28:
+        onde = "Brasil e todas as UFs"
+    elif ind["tem_br"] and n <= 1:
+        onde = "só Brasil"
+    else:
+        onde = f"{n} unidades"
+
+    return (
+        f"<tr><td><b>{e(nome)}</b><br>"
+        f"<small>{mede}</small></td>"
+        f"<td class='num'>{alcance}<br><small>{e(onde)}</small></td>"
+        f"<td><small>{e(str(ind['unidade'] or '—'))} · {agrega}<br>"
+        f"{ressalva}</small></td>"
+        f"<td><small>{e(str(ind['fonte'] or '—'))}</small></td></tr>")
+
+
+def _metodologia(quando: str, catalogo: list[dict]) -> str:
     """Pagina de metodologia e LIMITES — o rodape de toda pagina aponta para ca'.
 
     Existe para dizer o que os numeros NAO dizem. Um site que so' mostra dado e
     esconde a limitacao dele transfere para o leitor um risco que ele nao tem
     como avaliar.
     """
-    corpo = """
+    linhas_catalogo = "".join(_linha_catalogo(i) for i in catalogo)
+    corpo = f"""
     <div class="capa">
       <h1>Metodologia, fontes e limites</h1>
       <p class="sub">O que este dossiê mede, de onde vêm os números e onde eles
@@ -984,28 +1124,19 @@ def _metodologia(quando: str) -> str:
     </section>
 
     <section class="bloco">
-      <h2>Até onde cada indicador alcança</h2>
-      <p>Séries públicas têm defasagem, e ela varia muito. Nenhum número é
-        estendido, estimado ou projetado para cobrir o buraco.</p>
-      <div class="rolagem"><table>
-        <thead><tr><th>Indicador</th><th>Último ano disponível</th><th>Fonte</th></tr></thead>
-        <tbody>
-          <tr><td>Desemprego, rendimento do trabalho</td><td class="num">2025</td>
-              <td>IBGE · PNAD Contínua</td></tr>
-          <tr><td>Inflação (IPCA), Selic</td><td class="num">2025</td>
-              <td>IBGE · Banco Central</td></tr>
-          <tr><td>Homicídios</td><td class="num">2024</td><td>IPEA · Atlas da Violência</td></tr>
-          <tr><td>Orçamento da União</td><td class="num">2025</td><td>Tesouro · RTN</td></tr>
-          <tr><td>IDEB</td><td class="num">2025</td><td>INEP</td></tr>
-          <tr><td>PIB estadual</td><td class="num">2023</td><td>IBGE · Contas Regionais</td></tr>
-          <tr><td>Orçamento dos estados</td><td class="num">2023</td><td>Tesouro · SICONFI</td></tr>
-          <tr><td>Mortalidade infantil</td><td class="num">2016</td><td>IPEA</td></tr>
-          <tr><td>IDHM</td><td class="num">2010</td><td>PNUD · Censo</td></tr>
-        </tbody></table></div>
-      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
-        As duas últimas linhas explicam por que mandatos recentes aparecem sem
-        mortalidade infantil e sem IDHM: <b>a série não chegou lá</b>. O IDHM é
-        calculado a partir do Censo, de dez em dez anos.</p>
+      <h2>Glossário dos indicadores</h2>
+      <p>Um por linha: o que mede, até onde a série alcança, como o valor do ano
+        é formado e de onde vem. <b>A cobertura desta tabela é lida dos próprios
+        dados a cada geração do site</b> — se uma série avançar ou parar, a
+        tabela muda junto.</p>
+      <div class="rolagem"><table class="glossario">
+        <thead><tr><th>Indicador</th><th>Alcance</th>
+        <th>Unidade, agregação e ressalvas</th><th>Fonte</th></tr></thead>
+        <tbody>{linhas_catalogo}</tbody></table></div>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:10px 0 0">
+        Nenhum valor é estendido, estimado ou projetado para cobrir o intervalo
+        que a fonte não publica. Onde a série termina, a ficha fica sem o
+        indicador — e diz isso.</p>
     </section>
 
     <section class="bloco">
@@ -1066,7 +1197,7 @@ def _sitemap(majoritarios: list[Candidato], quando: str) -> str:
 
 
 def escrever_site(destino: Path, majoritarios: list[Candidato],
-                  proporcionais: dict[str, list[dict]], quando: str) -> None:
+                  proporcionais: dict[str, list[dict]], quando: str, catalogo: list[dict]) -> None:
     def grava(caminho: str, conteudo: str) -> None:
         alvo = destino / caminho
         alvo.parent.mkdir(parents=True, exist_ok=True)
@@ -1097,5 +1228,5 @@ def escrever_site(destino: Path, majoritarios: list[Candidato],
             grava(f"dados/{chave}/{uf}.json", bruto)
         grava(f"{chave}/index.html", _listagem_proporcional(chave, nome, por_uf, quando))
 
-    grava("metodologia/index.html", _metodologia(quando))
+    grava("metodologia/index.html", _metodologia(quando, catalogo))
     grava("sitemap.xml", _sitemap(majoritarios, quando))

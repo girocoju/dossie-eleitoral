@@ -228,6 +228,36 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     return saida
 
 
+def catalogo_indicadores(cliente) -> list[dict]:
+    """Catalogo de indicadores COM a cobertura real, lida do lake.
+
+    A cobertura nao e' digitada em lugar nenhum: sai de `count`/`min`/`max` sobre
+    os dados que existem. Se uma serie avancar um ano, a pagina de metodologia
+    avanca junto; se uma parar, a pagina passa a dizer que parou.
+
+    A alternativa — escrever "IDEB: ate' 2025" no HTML — envelhece em silencio, e
+    uma pagina de metodologia desatualizada e' pior que nenhuma: ela promete
+    rigor e entrega desinformacao.
+    """
+    p = cliente.project
+    sql = f"""
+        select
+            d.cod_indicador, d.nome, d.unidade, d.fonte, d.direcao_desejavel,
+            min(f.ano)                          as ano_ini,
+            max(f.ano)                          as ano_fim,
+            count(distinct f.ano)               as n_anos,
+            count(distinct f.sg_uf)             as n_ues,
+            logical_or(f.sg_uf = 'BR')          as tem_br
+        from `{p}.marts.dim_indicador` d
+        left join `{p}.marts.fct_indicador_uf_ano` f using (cod_indicador)
+        group by 1, 2, 3, 4, 5
+        order by d.nome
+    """
+    saida = [dict(r) for r in cliente.query(sql).result()]
+    log.info("%d indicadores no catalogo", len(saida))
+    return saida
+
+
 def _anexar_trajetoria(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
     """Candidaturas anteriores da mesma pessoa. Nao sao mandatos: quem perdeu entra."""
     if not por_pessoa:
@@ -543,9 +573,10 @@ def main(argv: list[str] | None = None) -> int:
     quando = extraido_em(cliente)
     majoritarios = carregar_majoritarios(cliente, args.limite)
     proporcionais = carregar_proporcionais(cliente)
+    catalogo = catalogo_indicadores(cliente)
 
     destino = Path(args.saida)
-    escrever_site(destino, majoritarios, proporcionais, quando)
+    escrever_site(destino, majoritarios, proporcionais, quando, catalogo)
     n = sum(1 for _ in destino.rglob("*.html"))
     log.info("site em %s — %d paginas HTML", destino.resolve(), n)
     return 0
