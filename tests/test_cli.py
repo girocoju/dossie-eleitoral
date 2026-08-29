@@ -79,3 +79,30 @@ class TestExecutar:
             raise KeyError("coluna sumiu do layout")
         with pytest.raises(KeyError):
             executar(falha, None)
+
+
+class TestNinguemEngoleACausa:
+    """A classificacao so' funciona se a `DownloadError` CHEGAR ate' `executar`.
+
+    Em 29/08/2026 ela nao chegou: `ipeadata` capturava e devolvia `return 1`, e o
+    workflow anunciou "nao e' rede" para um timeout. O modulo tinha razao sobre o
+    que reportou; a informacao e' que se perdia no caminho.
+    """
+
+    def _ipea(self, causa):
+        from unittest.mock import patch
+
+        import ingest.ipeadata as ipea
+        def morre(*a, **k):
+            raise _erro(causa)
+        with patch.object(ipea, "coletar", morre):
+            return ipea.main(["load", "--somente-verificados", "--target", "local"])
+
+    def test_timeout_do_ipeadata_chega_como_ex_rede(self):
+        assert self._ipea(TimeoutError("timed out")) == EX_REDE
+
+    def test_serie_que_saiu_do_ar_derruba(self):
+        # 404 NAO pode virar aviso: seria a serie parando de atualizar em
+        # silencio, com o site mostrando dado velho como novo.
+        with pytest.raises(DownloadError):
+            self._ipea(urllib.error.HTTPError("u", 404, "Not Found", {}, None))

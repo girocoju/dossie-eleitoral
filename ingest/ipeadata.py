@@ -181,7 +181,16 @@ def cmd_load(args: argparse.Namespace) -> int:
         for ind in alvos:
             try:
                 observacoes = coletar(ind, dry_run=args.dry_run)
-            except (IpeadataError, DownloadError) as exc:
+            except DownloadError:
+                # NAO vira `return 1`. Quem decide se isto derruba o pipeline e'
+                # `ingest.common.cli.executar`, olhando a CAUSA: timeout do
+                # Ipeadata e' instabilidade, 404 e' serie que saiu do ar
+                # (ADR-022). Engolir aqui apagava a diferenca — e foi o que fez o
+                # job cair em 29/08/2026 anunciando "nao e' rede" quando era.
+                log.error("%s: a fonte nao respondeu", ind.cod_indicador)
+                raise
+            except IpeadataError as exc:
+                # Este sim e' problema de DADO, e para a carga.
                 log.error("%s: %s", ind.cod_indicador, exc)
                 return 1
             for obs in observacoes:
