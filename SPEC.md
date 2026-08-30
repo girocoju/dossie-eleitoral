@@ -206,6 +206,28 @@ Silva soma R$ 35.267.670,96 no pipeline e R$ 35.267.670,96 na página oficial.
 
 ---
 
+**F-19 — Atividade legislativa de mandatos anteriores** · P1 · **Implementada em 30/08/2026**
+
+> Ver [ADR-024](docs/adr/ADR-024-atividade-de-mandatos-anteriores.md).
+
+**Por que entra:** 118 dos 529 majoritários de 2026 já foram deputados federais,
+e só 48 tinham atividade na ficha. As proposições dos outros 70 existiam desde
+2003; faltava a identidade — a ponte só conhecia quem está em exercício hoje.
+
+**Alcance real:** ponte de 513 para 1.992 parlamentares (100% casados por CPF),
+período de 2023-2026 para 2003-2026, 817.822 proposições, e **117 de 118**
+majoritários possíveis com atividade.
+
+**O que NÃO entra, de propósito:** taxa de presença. A API não publica, e derivar
+de eventos confunde falta com comissão, missão oficial e licença médica.
+
+**Distinção que a feature obrigou a criar:** atividade registrada na Câmara não
+prova mandato de deputado. Senador apresenta emenda a MP na comissão mista e a
+Câmara registra a autoria. A ficha marca esses períodos como *sem mandato de
+deputado* em vez de rotulá-los como legislatura.
+
+---
+
 **F-18 — Ficha própria para as candidaturas proporcionais** · P1 · **backlog, aprovada em 29/08/2026**
 
 **Por que entra.** O projeto foi mostrado a pessoas reais e a falta mais citada

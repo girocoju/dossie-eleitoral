@@ -29,7 +29,39 @@
   impossivel, e o painel nao pode afirmar o que a fonte nao afirma.
 */
 
-with base as (
+with atual as (
+
+    -- Quem esta' em exercicio HOJE. Recarregado todo dia.
+    select
+        casa, id_casa, nome_parlamentar, nome_completo, nome_normalizado,
+        data_nascimento, sexo, sigla_partido, sg_uf, cpf_hash,
+        metodo_casamento, casamento_confiavel, url_perfil, _extracted_at,
+        true as em_exercicio
+    from {{ source('raw_legislativo', 'parlamentares') }}
+
+),
+
+encerradas as (
+
+    -- Quem exerceu em legislatura JA' ENCERRADA (ADR-024).
+    --
+    -- Sem isto, 70 dos 118 majoritarios de 2026 que ja' foram deputados federais
+    -- ficavam sem `id_pessoa`: nao estao na lista de hoje, entao a atividade
+    -- deles — que existe nos arquivos da Camara desde 2003 — nao chegava a
+    -- ficha de ninguem. O dado estava la'; faltava saber de quem era.
+    --
+    -- Carga separada e manual: legislatura encerrada nao muda, e a varredura
+    -- custa uma requisicao por deputado. Ver `ingest.legislativo historico`.
+    select
+        casa, id_casa, nome_parlamentar, nome_completo, nome_normalizado,
+        data_nascimento, sexo, sigla_partido, sg_uf, cpf_hash,
+        metodo_casamento, casamento_confiavel, url_perfil, _extracted_at,
+        false as em_exercicio
+    from {{ source('raw_legislativo', 'parlamentares_historico') }}
+
+),
+
+base as (
 
     select
         casa,
@@ -45,8 +77,17 @@ with base as (
         metodo_casamento,
         casamento_confiavel,
         url_perfil,
-        _extracted_at
-    from {{ source('raw_legislativo', 'parlamentares') }}
+        _extracted_at,
+        em_exercicio
+    from (select * from atual union all select * from encerradas)
+    -- A MESMA pessoa aparece em varias legislaturas, e a ponte precisa de UMA
+    -- linha por pessoa. Fica a mais recente: quem esta' em exercicio vence, e
+    -- entre as encerradas, a extracao mais nova. Sem isto, `dim_parlamentar`
+    -- multiplicaria a atividade de quem serviu por varios mandatos.
+    qualify row_number() over (
+        partition by casa, coalesce(cpf_hash, nome_normalizado, id_casa)
+        order by em_exercicio desc, _extracted_at desc
+    ) = 1
 
 )
 
@@ -72,5 +113,8 @@ select
                 {{ sem_acento('nome_completo') }}, '|', cast(data_nascimento as string)
             )))
     end                                               as chave_nome_nascimento,
+    -- Distingue quem esta' NO MANDATO de quem apenas ja' esteve. Sem isto,
+    -- todo ex-deputado seria tratado como parlamentar da legislatura atual.
+    em_exercicio,
     _extracted_at
 from base

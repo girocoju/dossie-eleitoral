@@ -98,6 +98,10 @@ select
     */
     (c.id_pessoa is null and coalesce(n.pessoas_distintas, 0) > 1) as id_ambiguo,
 
+    -- Distingue quem esta NO MANDATO de quem apenas ja esteve. A ponte agora
+    -- inclui legislaturas encerradas (ADR-024), e sem esta marca todo ex-deputado
+    -- seria tratado como parlamentar de hoje.
+    p.em_exercicio,
     p._extracted_at
 from parlamentares as p
 left join por_cpf  as c on p.cpf_hash = c.cpf_hash

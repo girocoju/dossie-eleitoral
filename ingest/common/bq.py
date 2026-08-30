@@ -141,6 +141,59 @@ def load_ano(
     return int(job.output_rows or 0)
 
 
+def load_intervalo(
+    ndjson_path: Path,
+    dataset: str,
+    tabela: str,
+    *,
+    schema: list[Any],
+    coluna: str,
+    valor: int,
+    clustering: Sequence[str] = (),
+    settings: Settings | None = None,
+) -> int:
+    """Substitui UMA particao de tabela particionada por INTERVALO DE INTEIRO.
+
+    Irma de `load_ano`, para o outro esquema de particionamento que o projeto
+    usa. `load_ano` vale para tabela particionada por DIA sobre `data_particao`,
+    com decorador `$YYYY0101`; esta vale para particionamento por intervalo sobre
+    uma coluna inteira, com decorador `$<valor>`.
+
+    Existe por causa das proposicoes da Camara. A tabela ja' era particionada por
+    `ano`, e a carga trocava a tabela INTEIRA — o que funcionava enquanto so'
+    havia 2023-2026. Com os anos historicos (2003-2022), a carga diaria passaria
+    a apagar vinte anos de dado todo dia. Trocar o esquema da tabela para agradar
+    `load_ano` seria reescrever o que ja' estava certo; mais simples e' ter o
+    carregador do esquema que a tabela tem (ADR-024).
+    """
+    from google.cloud import bigquery
+
+    settings = settings or get_settings()
+    client = _client(settings)
+    table_id = f"{settings.project}.{dataset}.{tabela}"
+    nomes = {campo.name for campo in schema}
+    clustering = [c for c in clustering if c in nomes]
+
+    job_config = bigquery.LoadJobConfig(
+        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        schema=schema,
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+        range_partitioning=bigquery.RangePartitioning(
+            field=coluna,
+            range_=bigquery.PartitionRange(start=1990, end=2040, interval=1),
+        ),
+        clustering_fields=list(clustering) or None,
+        ignore_unknown_values=False,
+        max_bad_records=0,
+    )
+    destino = f"{table_id}${valor}"
+    with ndjson_path.open("rb") as fh:
+        job = client.load_table_from_file(fh, destino, job_config=job_config)
+    job.result()
+    log.info("carregado %s <- %s (%s linhas)", destino, ndjson_path.name, job.output_rows)
+    return int(job.output_rows or 0)
+
+
 def load_ndjson(
     ndjson_paths: Path | Sequence[Path],
     dataset: str,

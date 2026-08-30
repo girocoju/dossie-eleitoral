@@ -258,56 +258,71 @@ def cmd_load(args: argparse.Namespace) -> int:
     bruto = settings.download_dir / "camara"
     bruto.mkdir(parents=True, exist_ok=True)
 
-    todas: list[dict[str, Any]] = []
+    # UM NDJSON POR ANO, e uma carga por particao.
+    #
+    # A versao anterior juntava tudo e chamava `load_ndjson`, que SUBSTITUI a
+    # tabela inteira. Funcionava enquanto so' havia 2023-2026, e passou a ser um
+    # problema quando os anos historicos entraram: a carga diaria, que so' olha
+    # os anos recentes, apagaria 2003-2022 todo dia (ADR-024).
+    #
+    # `load_ano` troca APENAS a particao daquele ano (ADR-010), entao carregar
+    # 2026 nao encosta em 2011.
+    extraido_em = utc_now()
+    total = 0
+    por_classe: Counter[str] = Counter()
+    deputados: set[str] = set()
+    carregados: list[int] = []
+    indisponiveis: list[int] = []
+
     for ano in anos:
         try:
-            todas.extend(coletar_ano(ano, bruto, force=args.force))
+            linhas = coletar_ano(ano, bruto, force=args.force)
         except Exception as exc:  # noqa: BLE001
-            # O arquivo de 2026 so' existe depois da primeira publicacao do ano.
+            # O arquivo do ano corrente so' existe depois da primeira publicacao.
             log.warning("%d indisponivel: %s", ano, str(exc)[:120])
+            indisponiveis.append(ano)
+            continue
 
-    if not todas:
-        log.error("nenhuma proposicao coletada — a carga nao substitui a tabela por vazio")
-        return 1
+        if not linhas:
+            log.warning("%d veio vazio — particao preservada como estava", ano)
+            indisponiveis.append(ano)
+            continue
 
-    destino = settings.staging_dir / "legislativo" / "proposicoes.ndjson.gz"
-    extraido_em = utc_now()
-    with NdjsonWriter(destino) as writer:
-        for linha in todas:
-            writer.write(
-                {
+        destino = settings.staging_dir / "legislativo" / f"proposicoes-{ano}.ndjson.gz"
+        with NdjsonWriter(destino) as writer:
+            for linha in linhas:
+                writer.write({
                     **linha,
                     "_extracted_at": extraido_em,
                     "_source_url": BASE,
-                    "_source_file": f"proposicoes-{linha['ano']}.csv",
+                    "_source_file": f"proposicoes-{ano}.csv",
                     "_source_sha256": "",
-                }
-            )
+                })
 
-    por_classe = Counter(x["classe_proposicao"] for x in todas)
-    deputados = len({x["id_deputado"] for x in todas})
-    log.info(
-        "%d proposicoes de %d deputados | %s",
-        len(todas),
-        deputados,
-        " ".join(f"{c}={n}" for c, n in por_classe.most_common()),
-    )
+        total += len(linhas)
+        por_classe.update(x["classe_proposicao"] for x in linhas)
+        deputados.update(x["id_deputado"] for x in linhas)
 
-    if args.target == "local":
-        log.info("NDJSON em %s", destino)
-        return 0
+        if args.target != "local":
+            from ingest.common.bq import ensure_datasets, load_intervalo  # noqa: PLC0415
 
-    from ingest.common.bq import ensure_datasets, load_ndjson
+            ensure_datasets()
+            load_intervalo(destino, DATASET_RAW_LEGISLATIVO, "proposicoes",
+                           schema=_schema(), coluna="ano", valor=ano,
+                           clustering=("id_deputado", "classe_proposicao"))
+        carregados.append(ano)
 
-    ensure_datasets()
-    load_ndjson(
-        destino,
-        DATASET_RAW_LEGISLATIVO,
-        "proposicoes",
-        schema=_schema(),
-        particionar_por="ano",
-        clustering=("id_deputado", "classe_proposicao"),
-    )
+    if not carregados:
+        log.error("nenhum ano carregado — a carga nao substitui a tabela por vazio")
+        return 1
+
+    log.info("%d proposicoes de %d deputados em %d anos (%s) | %s",
+             total, len(deputados), len(carregados),
+             f"{min(carregados)}-{max(carregados)}",
+             " ".join(f"{c}={n}" for c, n in por_classe.most_common()))
+    if indisponiveis:
+        log.warning("anos sem dado nesta execucao: %s — particoes preservadas",
+                    indisponiveis)
     return 0
 
 

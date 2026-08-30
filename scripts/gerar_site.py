@@ -390,14 +390,43 @@ def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
     p = cliente.project
     lista = "','".join(por_pessoa)
     sql = f"""
+        with atividade as (
+        -- POR LEGISLATURA, e nao pela vida inteira.
+        --
+        -- Agregado, alguem que serviu de 2003 a 2010 e voltou em 2019 aparecia
+        -- como "2003-2023", sugerindo mandato continuo que nao houve. A
+        -- legislatura e' a unidade real do mandato de deputado, e quebrar por
+        -- ela e' o que permite ler "o que fez em cada passagem".
+        --
+        -- A legislatura e' derivada do ano: a 52a comeca em 2003 e cada uma dura
+        -- quatro anos. Nao ha' tabela de legislatura no lake, e a aritmetica e'
+        -- exata para todo o periodo coberto.
         select id_pessoa, classe_proposicao,
+               52 + div(ano - 2003, 4)          as legislatura,
+               2003 + 4 * div(ano - 2003, 4)    as leg_inicio,
+               2006 + 4 * div(ano - 2003, 4)    as leg_fim,
                sum(qt_proposicoes) as total,
                sum(qt_virou_norma) as virou_norma,
                min(ano) as a1, max(ano) as a2
         from `{p}.marts.fct_atividade_legislativa`
-        where id_pessoa in ('{lista}') and ligado_ao_tse
-        group by 1, 2
-        order by total desc
+        where id_pessoa in ('{lista}') and ligado_ao_tse and ano >= 2003
+        group by 1, 2, 3, 4, 5
+    ),
+    com_mandato as (
+        -- Ter atividade registrada na Camara num ano NAO significa ter sido
+        -- deputado naquele ano. Senador atua na comissao mista de Medida
+        -- Provisoria, e a Camara registra a autoria: Ronaldo Caiado tem 102
+        -- emendas a MP entre 2015 e 2017, quando era SENADOR. O dado e' certo;
+        -- rotular aquilo de "legislatura da Camara" e' que seria falso.
+        select a.*, l.id_legislatura is not null as teve_mandato
+        from atividade a
+        left join `{p}.marts.dim_legislatura_parlamentar` l
+               on l.id_pessoa = a.id_pessoa
+              and l.casa = 'camara'
+              and l.id_legislatura = a.legislatura
+    )
+    select * from com_mandato
+    order by legislatura desc, total desc
     """
     n = 0
     for r in cliente.query(sql).result():
@@ -405,6 +434,8 @@ def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
             c.atividade.append({
                 "classe": r.classe_proposicao, "total": r.total,
                 "norma": r.virou_norma, "a1": r.a1, "a2": r.a2,
+                "leg": r.legislatura, "leg_ini": r.leg_inicio, "leg_fim": r.leg_fim,
+                "mandato": bool(r.teve_mandato),
             })
             n += 1
     log.info("%d linhas de atividade legislativa anexadas", n)

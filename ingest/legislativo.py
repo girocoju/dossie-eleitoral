@@ -56,6 +56,22 @@ PAUSA = 0.4
 # muito menos, alguma coisa mudou na fonte e a ficha de dezenas de candidatos
 # ficaria silenciosamente sem atividade.
 ESPERADO = {"camara": 513, "senado": 81}
+
+# Legislaturas da Camara e o periodo de cada uma. A 57a e' a atual; as anteriores
+# so' sao varridas com `--historico`, porque nao mudam mais e a varredura custa
+# uma requisicao por deputado.
+#
+# 2003 e' onde a Camara comeca a publicar arquivo em lote de proposicoes, entao
+# nao adianta identificar deputado de antes: nao haveria atividade para mostrar.
+LEGISLATURAS = {
+    52: (2003, 2007),
+    53: (2007, 2011),
+    54: (2011, 2015),
+    55: (2015, 2019),
+    56: (2019, 2023),
+    57: (2023, 2027),
+}
+LEGISLATURA_ATUAL = 57
 TOLERANCIA = 0.9  # aceita ate' 10% a menos (licencas, vagas em aberto)
 
 _ESPACOS = re.compile(r"\s+")
@@ -81,6 +97,11 @@ class Parlamentar:
     cpf_hash: str | None
     metodo_casamento: str
     url_perfil: str | None
+    # Em qual legislatura esta linha foi observada. `None` para o Senado, que nao
+    # e' varrido historicamente (L-20: nao ha' atividade legislativa do Senado no
+    # projeto, entao identificar ex-senador nao levaria a lugar nenhum).
+    id_legislatura: int | None = None
+    em_exercicio: bool = True
 
     @property
     def casamento_confiavel(self) -> bool:
@@ -93,12 +114,32 @@ def _json(url: str) -> dict[str, Any]:
     return dados
 
 
-def coletar_camara() -> list[Parlamentar]:
-    """Deputados em exercicio. O CPF vem no detalhe, nao na lista."""
+def coletar_camara(id_legislatura: int | None = None) -> list[Parlamentar]:
+    """Deputados da Camara. O CPF vem no DETALHE, nunca na lista.
+
+    Sem `id_legislatura`, traz quem esta' em exercicio hoje. Com, traz quem
+    exerceu naquela legislatura — inclusive quem ja' saiu.
+
+    POR QUE VARRER O PASSADO
+
+    118 dos 529 majoritarios de 2026 ja' foram deputados federais, mas so' 48
+    apareciam com atividade na ficha: os outros 70 exerceram em legislaturas
+    anteriores e nao estao na lista de hoje, entao nao tinham `id_pessoa` e a
+    atividade nao chegava a lugar nenhum. O dado das proposicoes existia desde
+    2003; o que faltava era saber de QUEM era.
+
+    CUSTO: uma requisicao de detalhe por deputado por legislatura, e sao ~1.000
+    por legislatura. Nao cabe no pipeline diario — e nem precisa: legislatura
+    encerrada nao muda. Por isso `--historico` e' um comando separado, que grava
+    em tabela propria.
+    """
     saida: list[Parlamentar] = []
     pagina = 1
+    filtro = f"&idLegislatura={id_legislatura}" if id_legislatura else ""
     while True:
-        lote = _json(f"{API_CAMARA}/deputados?itens=100&pagina={pagina}&ordem=ASC&ordenarPor=nome")
+        lote = _json(
+            f"{API_CAMARA}/deputados?itens=100&pagina={pagina}"
+            f"&ordem=ASC&ordenarPor=nome{filtro}")
         dados = lote.get("dados") or []
         if not dados:
             break
@@ -118,9 +159,12 @@ def coletar_camara() -> list[Parlamentar]:
                     cpf_hash=cpf_hash(det.get("cpf")),
                     metodo_casamento="cpf" if cpf_hash(det.get("cpf")) else "nome_nascimento",
                     url_perfil=dep.get("uri"),
+                    id_legislatura=id_legislatura or LEGISLATURA_ATUAL,
+                    em_exercicio=id_legislatura in (None, LEGISLATURA_ATUAL),
                 )
             )
-        log.info("camara: %d deputados coletados", len(saida))
+        log.info("camara leg %s: %d deputados coletados",
+                 id_legislatura or "atual", len(saida))
         if len(dados) < 100:
             break
         pagina += 1
@@ -186,9 +230,101 @@ def _schema():
     corte = len(campos)
     return (
         schema[:corte]
-        + [bigquery.SchemaField("casamento_confiavel", "BOOL")]
+        + [
+            bigquery.SchemaField("casamento_confiavel", "BOOL"),
+            bigquery.SchemaField("id_legislatura", "INT64"),
+            bigquery.SchemaField("em_exercicio", "BOOL"),
+        ]
         + schema[corte:]
     )
+
+
+def cmd_historico(args: argparse.Namespace) -> int:
+    """Varre legislaturas ENCERRADAS da Camara e grava em tabela propria.
+
+    Separado de `load` de proposito, por dois motivos.
+
+    **Custo.** Uma requisicao de detalhe por deputado por legislatura, cerca de
+    mil por legislatura. Cinco legislaturas passam de uma hora — nao cabe num
+    pipeline que roda todo dia, e nao precisa caber.
+
+    **Imutabilidade.** Legislatura encerrada nao muda. Rodar isto uma vez basta;
+    a carga diaria continua cuidando so' de quem esta' em exercicio.
+
+    A tabela e' outra (`parlamentares_historico`) para que a carga diaria, que
+    SUBSTITUI `parlamentares` inteira, nao apague este trabalho de uma hora.
+    """
+    settings = get_settings()
+    settings.ensure_dirs()
+
+    legs = args.legislaturas or [
+        n for n in sorted(LEGISLATURAS) if n != LEGISLATURA_ATUAL
+    ]
+    desconhecidas = [n for n in legs if n not in LEGISLATURAS]
+    if desconhecidas:
+        log.error("legislatura fora do catalogo: %s. Conhecidas: %s",
+                  desconhecidas, sorted(LEGISLATURAS))
+        return 1
+
+    if args.dry_run:
+        for n in legs:
+            ini, fim = LEGISLATURAS[n]
+            log.info("[dry-run] varreria a %da legislatura (%d-%d), ~1.000 deputados",
+                     n, ini, fim)
+        return 0
+
+    todos: list[Parlamentar] = []
+    for n in legs:
+        ini, fim = LEGISLATURAS[n]
+        log.info("varrendo a %da legislatura (%d-%d)", n, ini, fim)
+        coletados = coletar_camara(id_legislatura=n)
+        # Piso generoso: legislatura antiga tem menos suplente registrado, e
+        # travar em 513 recusaria dado legitimo. Abaixo de 400 e' erro de API.
+        if len(coletados) < 400:
+            log.error("legislatura %d devolveu so' %d deputados — a API falhou. "
+                      "Seguir gravaria uma ponte incompleta em silencio.",
+                      n, len(coletados))
+            return 1
+        todos.extend(coletados)
+
+    if not todos:
+        log.error("nada coletado — a carga nao substitui a tabela por vazio")
+        return 1
+
+    destino = settings.staging_dir / "legislativo" / "parlamentares_historico.ndjson.gz"
+    extraido_em = utc_now()
+    with NdjsonWriter(destino) as writer:
+        for p in todos:
+            writer.write({
+                "casa": p.casa, "id_casa": p.id_casa,
+                "id_legislatura": p.id_legislatura, "em_exercicio": p.em_exercicio,
+                "nome_parlamentar": p.nome_parlamentar,
+                "nome_completo": p.nome_completo,
+                "nome_normalizado": p.nome_normalizado,
+                "data_nascimento": p.data_nascimento, "sexo": p.sexo,
+                "sigla_partido": p.sigla_partido, "sg_uf": p.sg_uf,
+                "cpf_hash": p.cpf_hash, "metodo_casamento": p.metodo_casamento,
+                "casamento_confiavel": p.casamento_confiavel,
+                "url_perfil": p.url_perfil,
+                "_extracted_at": extraido_em, "_source_url": API_CAMARA,
+                "_source_file": "deputados?idLegislatura", "_source_sha256": "",
+            })
+
+    com_cpf = sum(1 for p in todos if p.cpf_hash)
+    pessoas = len({p.cpf_hash for p in todos if p.cpf_hash})
+    log.info("%d registros em %d legislaturas | %d com CPF (%.0f%%) | %d pessoas distintas",
+             len(todos), len(legs), com_cpf, 100 * com_cpf / len(todos), pessoas)
+
+    if args.target == "local":
+        log.info("NDJSON em %s", destino)
+        return 0
+
+    from ingest.common.bq import ensure_datasets, load_ndjson  # noqa: PLC0415
+
+    ensure_datasets()
+    load_ndjson(destino, DATASET_RAW_LEGISLATIVO, "parlamentares_historico",
+                schema=_schema(), clustering=("casa", "sg_uf"))
+    return 0
 
 
 def cmd_load(args: argparse.Namespace) -> int:
@@ -224,6 +360,8 @@ def cmd_load(args: argparse.Namespace) -> int:
                 {
                     "casa": p.casa,
                     "id_casa": p.id_casa,
+                    "id_legislatura": p.id_legislatura,
+                    "em_exercicio": p.em_exercicio,
                     "nome_parlamentar": p.nome_parlamentar,
                     "nome_completo": p.nome_completo,
                     "nome_normalizado": p.nome_normalizado,
@@ -311,6 +449,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_load.add_argument("--dry-run", action="store_true")
     p_load.add_argument("--target", choices=("bigquery", "local"), default="bigquery")
     p_load.set_defaults(func=cmd_load)
+
+    p_hist = sub.add_parser(
+        "historico",
+        help="varre legislaturas encerradas da Camara (lento; roda uma vez)")
+    p_hist.add_argument("--legislaturas", type=int, nargs="*",
+                        help="por padrao, todas menos a atual")
+    p_hist.add_argument("--ano", type=int, help="aceito por convencao do SPEC 9; nao filtra")
+    p_hist.add_argument("--dry-run", action="store_true")
+    p_hist.add_argument("--target", choices=("bigquery", "local"), default="bigquery")
+    p_hist.set_defaults(func=cmd_historico)
 
     p_ver = sub.add_parser("verify", help="mede a taxa de casamento contra dim_candidato")
     p_ver.set_defaults(func=cmd_verify)

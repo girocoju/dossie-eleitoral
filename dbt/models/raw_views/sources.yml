@@ -153,6 +153,21 @@ sources:
     tables:
       - name: parlamentares
         description: "513 deputados + 81 senadores em exercicio, com o metodo de casamento."
+      - name: parlamentares_historico
+        description: >
+          S15b — deputados de legislaturas JA' ENCERRADAS (52a a 56a, 2003-2023),
+          com CPF. Carga manual e' de proposito: legislatura encerrada nao muda, e
+          a varredura custa uma requisicao por deputado (~50 min no total).
+          Tabela separada de `parlamentares` porque a carga diaria SUBSTITUI
+          aquela, e apagaria este trabalho (ADR-024).
+        columns:
+          - name: id_legislatura
+            description: "52 a 56. A 57a (atual) vive em `parlamentares`."
+          - name: cpf_hash
+            description: >
+              100% preenchido na medicao de 29/08/2026 — a Camara publica CPF no
+              detalhe do deputado, inclusive de quem ja' saiu. E' o que permite
+              casar com o TSE sem risco de homonimia.
       - name: proposicoes
         description: >
           Proposicoes da legislatura 2023-2026 em que um deputado e PROPONENTE.

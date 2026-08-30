@@ -200,19 +200,52 @@ def _atividade(c: Candidato) -> str:
         "procedimental": "Rito, homenagem, emenda",
         "outra": "Outros tipos",
     }
-    linhas = "".join(
-        f"<tr><td>{rotulos.get(a['classe'], a['classe'])}</td>"
-        f"<td class='num'>{a['total']:,}</td>"
-        f"<td class='num'>{a['norma'] or '—'}</td></tr>".replace(",", ".")
-        for a in c.atividade
-    )
-    anos = f"{min(a['a1'] for a in c.atividade)}–{max(a['a2'] for a in c.atividade)}"
-    return f"""<section class="bloco">
-      <h2>Atividade na Câmara dos Deputados — {anos}</h2>
+    # Uma tabela por LEGISLATURA. Somar as passagens de alguem que serviu de
+    # 2003 a 2010 e voltou em 2019 esconderia justamente o que interessa: o que
+    # ele fez em CADA mandato, e que houve um intervalo.
+    por_leg: dict[int, list[dict]] = {}
+    for a in c.atividade:
+        por_leg.setdefault(a.get("leg") or 0, []).append(a)
+
+    blocos = []
+    for leg in sorted(por_leg, reverse=True):
+        itens = sorted(por_leg[leg], key=lambda x: -x["total"])
+        ini, fim = itens[0].get("leg_ini"), itens[0].get("leg_fim")
+        periodo = f"{ini}–{fim}" if ini else "período não identificado"
+        # Atividade registrada SEM mandato de deputado no periodo. Nao e' erro do
+        # dado: senador apresenta emenda a Medida Provisoria na comissao mista, e
+        # a Camara registra. Apresentar isso como legislatura afirmaria um mandato
+        # que nao houve — o mesmo tipo de erro do "2006 · Nao eleito".
+        sem_mandato = not itens[0].get("mandato", True)
+        marca = ("" if not sem_mandato else
+                 " <span class='marca-dado m-ausente'>sem mandato de deputado "
+                 "neste período</span>")
+        linhas = "".join(
+            f"<tr><td>{rotulos.get(a['classe'], a['classe'])}</td>"
+            f"<td class='num'>{a['total']:,}</td>"
+            f"<td class='num'>{a['norma'] or '—'}</td></tr>".replace(",", ".")
+            for a in itens
+        )
+        total = sum(a["total"] for a in itens)
+        blocos.append(f"""
+      <h3 style="margin:24px 0 8px;font-size:15px">{leg}ª legislatura · {periodo}
+        <small style="font-weight:400;color:var(--ink-3)"> — {total:,} proposições</small>
+        {marca}</h3>
       <div class="rolagem"><table>
         <thead><tr><th>Tipo de proposição</th><th>Apresentadas</th>
-        <th>Viraram norma</th></tr></thead><tbody>{linhas}</tbody></table></div>
-      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        <th>Viraram norma</th></tr></thead><tbody>{linhas}</tbody></table></div>""".replace(
+            f"{total:,}", f"{total:,}".replace(",", ".")))
+
+    return f"""<section class="bloco">
+      <h2>Atividade na Câmara dos Deputados</h2>
+      <p style="font-size:13px;color:var(--ink-3);margin:0 0 4px">
+        Separado por legislatura: somá-las esconderia o intervalo entre
+        passagens. Onde se lê <b>sem mandato de deputado neste período</b>, a
+        atividade é real mas não vem de mandato na Câmara — senador apresenta
+        emenda a Medida Provisória na comissão mista, e a Câmara registra a
+        autoria.</p>
+      {"".join(blocos)}
+      <p style="font-size:12.5px;color:var(--ink-3);margin:12px 0 0">
         Só entram proposições em que a pessoa é <b>proponente</b> — assinatura de
         apoio não conta. Os tipos aparecem separados porque somá-los não significa
         nada: um projeto de lei e um requerimento de retirada de pauta custam
