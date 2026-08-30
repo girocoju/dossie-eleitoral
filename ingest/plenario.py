@@ -46,7 +46,7 @@ from typing import Any
 
 from ingest.common.cli import executar
 from ingest.common.config import DATASET_RAW_LEGISLATIVO, get_settings
-from ingest.common.http import download, utc_now
+from ingest.common.http import DownloadError, download, utc_now
 from ingest.common.log import get_logger
 from ingest.common.writer import NdjsonWriter
 
@@ -224,12 +224,18 @@ def cmd_load(args: argparse.Namespace) -> int:
     bruto.mkdir(parents=True, exist_ok=True)
     quando = utc_now()
     houve_carga = False
+    rede: DownloadError | None = None
 
     for q in quais:
         cfg = TABELAS[q]
         for ano in anos:
             try:
                 linhas = cfg["coletar"](ano, bruto, force=args.force)
+            except DownloadError as exc:
+                # Sobe intacta para `executar` classificar pela CAUSA (ADR-022).
+                log.warning("rede: %s", str(exc)[:100])
+                rede = exc
+                continue
             except Exception as exc:  # noqa: BLE001
                 # O arquivo do ano corrente so' aparece depois da primeira
                 # publicacao; anos antigos podem faltar sem aviso.
@@ -257,6 +263,9 @@ def cmd_load(args: argparse.Namespace) -> int:
             houve_carga = True
 
     if not houve_carga:
+        if rede is not None:
+            # Ver ADR-022: a causa sobe para ser classificada.
+            raise rede
         log.error("nada carregado — a carga nao substitui as tabelas por vazio")
         return 1
     return 0

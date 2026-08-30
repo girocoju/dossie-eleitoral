@@ -294,6 +294,7 @@ def download(
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     cached = _read_manifest(dest)
+    fallback: Artifact | None = None
     if cached and not force:
         intacto = (cached.size_bytes == dest.stat().st_size
                    and cached.sha256 == sha256_file(dest))
@@ -312,6 +313,18 @@ def download(
                 return cached
             log.info("cache desatualizado %s (%s) — rebaixando",
                      dest.name, "mudou no servidor" if mudou else "sem validador")
+            # A COPIA LOCAL E' A REDE DE SEGURANCA, e nao lixo a descartar.
+            #
+            # Em 30/08/2026 a API da Camara ficou fora do ar. Os manifestos
+            # antigos nao tinham validador guardado, entao a revalidacao devolveu
+            # "nao sei" e mandou rebaixar — e o download falhou, derrubando um
+            # pipeline que ANTES funcionava com o arquivo local intacto.
+            #
+            # A revalidacao existe para nao servir dado velho sem saber; ela nao
+            # deve transformar indisponibilidade da fonte em perda do que ja'
+            # temos. Se o redownload falhar por rede E a copia local estiver
+            # integra, ela volta a valer, com aviso.
+            fallback = cached
 
     if dry_run:
         log.info("[dry-run] baixaria %s -> %s", url, dest)
@@ -368,6 +381,12 @@ def download(
     if not ok:
         if part.exists() and part.stat().st_size == 0:
             part.unlink(missing_ok=True)
+        if fallback is not None:
+            # Ver o comentario em `fallback = cached`, acima.
+            log.warning(
+                "%s nao pode ser rebaixado (%s) — seguindo com a copia local de %s",
+                dest.name, type(last_error).__name__, fallback.extracted_at)
+            return fallback
         raise DownloadError(
             f"nao foi possivel baixar {url} apos {MAX_ATTEMPTS} tentativas: {last_error}"
         ) from last_error

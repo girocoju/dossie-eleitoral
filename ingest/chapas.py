@@ -33,7 +33,7 @@ from typing import Any
 
 from ingest.common.cli import executar
 from ingest.common.config import DATASET_RAW_TSE, get_settings
-from ingest.common.http import utc_now
+from ingest.common.http import DownloadError, utc_now
 from ingest.common.log import get_logger
 from ingest.common.writer import NdjsonWriter
 from ingest.propostas import consultar
@@ -100,9 +100,16 @@ def candidaturas(cliente, ano: int, limite: int | None) -> list[dict[str, Any]]:
 def coletar(candidatos: list[dict[str, Any]], ano: int) -> list[dict[str, Any]]:
     saida: list[dict[str, Any]] = []
     sem_chapa = 0
+    rede: DownloadError | None = None
     for i, c in enumerate(candidatos, 1):
         try:
             detalhe = consultar(ano, c["sg_ue"], str(c["sq_candidato"])) or {}
+        except DownloadError as exc:
+            # Sobe intacta para `executar` classificar pela CAUSA (ADR-022).
+            # Engolir num codigo opaco faz fonte fora do ar virar erro fatal.
+            log.warning("rede: %s", str(exc)[:100])
+            rede = exc
+            continue
         except Exception as exc:  # noqa: BLE001
             # Uma candidatura sem resposta nao para a carga — a chapa dela fica
             # simplesmente ausente, que e' melhor que uma chapa inventada.
@@ -117,6 +124,11 @@ def coletar(candidatos: list[dict[str, Any]], ano: int) -> list[dict[str, Any]]:
         if i % 50 == 0:
             log.info("%d/%d consultadas, %d vinculos", i, len(candidatos), len(saida))
 
+    if not saida and rede is not None:
+        # Nada coletado E houve falha de rede: a causa sobe intacta, para
+        # `executar` classificar (ADR-022). Devolver lista vazia faria `cmd_load`
+        # reportar codigo 1 opaco, e o workflow leria fonte fora do ar como bug.
+        raise rede
     log.info("%d vinculos em %d candidaturas | %d sem vice/suplente na resposta",
              len(saida), len(candidatos), sem_chapa)
     return saida

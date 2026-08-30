@@ -60,7 +60,7 @@ from typing import Any
 
 from ingest.common.cli import executar
 from ingest.common.config import DATASET_RAW_LEGISLATIVO, get_settings
-from ingest.common.http import download, utc_now
+from ingest.common.http import DownloadError, download, utc_now
 from ingest.common.log import get_logger
 from ingest.common.writer import NdjsonWriter
 
@@ -273,10 +273,20 @@ def cmd_load(args: argparse.Namespace) -> int:
     deputados: set[str] = set()
     carregados: list[int] = []
     indisponiveis: list[int] = []
+    ultima_falha_de_rede: DownloadError | None = None
 
     for ano in anos:
         try:
             linhas = coletar_ano(ano, bruto, force=args.force)
+        except DownloadError as exc:
+            # NAO vira `return 1`. Quem decide se isto derruba o pipeline e'
+            # `ingest.common.cli.executar`, olhando a CAUSA (ADR-022). Engolir
+            # aqui apagava a diferenca — e em 30/08/2026 o job anunciou "nao e'
+            # instabilidade de rede" para a API da Camara fora do ar.
+            log.warning("%d indisponivel: %s", ano, str(exc)[:120])
+            indisponiveis.append(ano)
+            ultima_falha_de_rede = exc
+            continue
         except Exception as exc:  # noqa: BLE001
             # O arquivo do ano corrente so' existe depois da primeira publicacao.
             log.warning("%d indisponivel: %s", ano, str(exc)[:120])
@@ -313,6 +323,11 @@ def cmd_load(args: argparse.Namespace) -> int:
         carregados.append(ano)
 
     if not carregados:
+        if ultima_falha_de_rede is not None:
+            # A causa sobe intacta para ser classificada. Sem isto, uma fonte
+            # fora do ar chega ao workflow como codigo 1 opaco, e o pipeline
+            # inteiro cai por instabilidade alheia.
+            raise ultima_falha_de_rede
         log.error("nenhum ano carregado — a carga nao substitui a tabela por vazio")
         return 1
 
