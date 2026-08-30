@@ -111,11 +111,13 @@ letter-spacing:.12em;color:var(--ink-3);margin-bottom:4px;font-weight:400}
 .glossario td:nth-child(3){min-width:24ch;max-width:46ch}
 .glossario td:nth-child(4){min-width:16ch;max-width:26ch}
 
-/* Retrato na listagem de proporcionais. Pequeno de proposito: a lista tem
-   milhares de linhas e a foto e' para RECONHECER, nao para admirar. */
-.retrato{width:44px;padding-right:0}
-.retrato img{width:38px;height:38px;object-fit:cover;object-position:top center;
-             border-radius:4px;display:block;background:var(--surface-2)}
+/* Foto na LISTAGEM de proporcionais — nome proprio, e nao `.retrato`, que ja'
+   e a foto da FICHA (linha 33). Reusar aquele nome esmagou a coluna esquerda de
+   todas as fichas: a regra daqui vem depois no arquivo e sobrescrevia o
+   `width:100%` original, deixando a foto com 38px e o texto quebrando. */
+.foto-lista{width:44px;padding-right:0}
+.foto-lista img{width:38px;height:38px;object-fit:cover;object-position:top center;
+                border-radius:4px;display:block;background:var(--surface-2)}
 /* O numero da urna com a mesma cara da ficha: e' o que a pessoa digita. */
 .urna-lista{font-variant-numeric:tabular-nums;font-weight:700;letter-spacing:.5px;
             white-space:nowrap}

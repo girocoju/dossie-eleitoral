@@ -908,7 +908,7 @@ function desenhar() {{
   $("contagem").textContent = vis.length.toLocaleString("pt-BR") + " de " +
     dados.length.toLocaleString("pt-BR") + " candidaturas neste estado";
   $("linhas").innerHTML = vis.map(d => `<tr>
-    <td class="retrato">${{d.foto
+    <td class="foto-lista">${{d.foto
       ? `<img src="${{d.foto}}" alt="" loading="lazy" decoding="async">` : ""}}</td>
     <td>${{d.nome ?? ""}}</td>
     <td class="urna-lista">${{d.nr ?? "—"}}</td>
