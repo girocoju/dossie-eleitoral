@@ -184,6 +184,8 @@ correcoes de nome de urna (MA, MT, RJ) que teriam sumido sem rastro.
 | F-15 / [ADR-014](adr/ADR-014-ponte-legislativo.md) | Ponte de identidade com Camara e Senado | ✅ **Entregue** — 513 deputados por CPF, 81 senadores por nome+nascimento |
 | F-16 / [ADR-015](adr/ADR-015-atividade-legislativa.md) | Atividade legislativa dos deputados | ✅ **Entregue** — 296.962 proposicoes de 710 deputados, so' `proponente = 1` |
 | F-11 / [ADR-020](adr/ADR-020-financiamento-de-campanha.md) | Financiamento de campanha | ✅ **Entregue** — 43.610 receitas e 54.019 despesas sobre 7.722 candidaturas; CPF de doador hasheado na ingestao. Conferido ao centavo contra o TSE |
+| F-20 / [ADR-025](adr/ADR-025-plenario-e-chapas.md) | Votos e presenca em plenario | ✅ **Entregue** — 2003-2026, 1,9 mi de votacoes e 2,5 mi de presencas, agregados por deputado/ano. Sem taxa de presenca |
+| F-21 / [ADR-025](adr/ADR-025-plenario-e-chapas.md) | Chapa: vice e suplentes | ✅ **Entregue** — 889 vinculos, 887 resolvidos. O vinculo so' existe no DivulgaCandContas |
 | F-18 | Ficha propria para as 20.765 candidaturas proporcionais | ⬜ **Backlog, aprovada em 29/08/2026** — pedido recorrente de quem usou o site. Bloqueada por sincronizacao incremental no envio: 790 arquivos levam 13 min, 21 mil nao cabem numa execucao |
 | Indicadores IPCA e SELIC | Inflacao e juros para a pagina de presidenciaveis | ✅ **Entregue** — IPCA 1980-2025 (46 anos), Selic 1974-2025 (52 anos), so' `BR` |
 

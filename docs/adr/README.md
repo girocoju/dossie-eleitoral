@@ -30,3 +30,4 @@ junto com qualquer arquivo daqui.
 | [ADR-022](ADR-022-fonte-indisponivel.md) | Fonte indisponivel nao derruba a carga diaria | Aceita |
 | [ADR-023](ADR-023-resultado-apurado-dos-votos.md) | Resultado apurado dos votos, onde o TSE nao publica | Aceita |
 | [ADR-024](ADR-024-atividade-de-mandatos-anteriores.md) | Atividade legislativa de mandatos anteriores | Aceita |
+| [ADR-025](ADR-025-plenario-e-chapas.md) | Votos, presenca e a chapa | Aceita |

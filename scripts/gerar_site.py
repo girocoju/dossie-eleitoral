@@ -130,6 +130,11 @@ class Candidato:
     # A tela mostra um e DIZ que ha' outro — esconder sem avisar seria decidir
     # em silencio qual registro do TSE vale.
     registros_no_tse: int = 1
+    # Votos e presenca em plenario, por legislatura (F-20).
+    plenario: list[dict] = field(default_factory=list)
+    # Vice ou suplentes da chapa (F-21). Vazio para cargo proporcional, que nao
+    # tem chapa — deputado concorre sozinho.
+    chapa: list[dict] = field(default_factory=list)
 
     @property
     def partido_completo(self) -> str:
@@ -225,6 +230,8 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     _anexar_atividade(cliente, ids)
     _anexar_planos(cliente, {c.sk: c for c in saida})
     _anexar_financiamento(cliente, {c.sk: c for c in saida})
+    _anexar_plenario(cliente, ids)
+    _anexar_chapa(cliente, {c.sk: c for c in saida})
     return saida
 
 
@@ -504,6 +511,81 @@ def _anexar_financiamento(cliente, por_sk: dict[str, Candidato]) -> None:
     com = sum(1 for c in por_sk.values() if c.financiamento)
     log.info("%d de %d candidaturas com prestacao de contas declarada",
              com, len(por_sk))
+
+
+def _anexar_plenario(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """Quantas vezes votou e em quantos eventos esteve, por legislatura (F-20).
+
+    NAO ha' taxa de presenca, e a ausencia e' deliberada: a fonte diz onde a
+    pessoa esteve, nao a quantos eventos ela DEVIA comparecer. Sem denominador
+    nao existe percentual honesto, e um numero errado ali seria uma acusacao
+    publicada sobre uma pessoa real (ADR-025).
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    lista = "','".join(por_pessoa)
+    sql = f"""
+        select id_pessoa,
+               id_legislatura                       as leg,
+               2003 + 4 * (id_legislatura - 52)     as leg_ini,
+               2006 + 4 * (id_legislatura - 52)     as leg_fim,
+               sum(qt_votacoes)                     as votacoes,
+               sum(qt_sim)                          as sim,
+               sum(qt_nao)                          as nao,
+               sum(qt_abstencao)                    as abstencao,
+               sum(qt_obstrucao)                    as obstrucao,
+               sum(qt_eventos)                      as eventos,
+               sum(qt_eventos_plenario)             as eventos_plenario
+        from `{p}.marts.fct_plenario_deputado`
+        where id_pessoa in ('{lista}') and ligado_ao_tse
+        group by 1, 2, 3, 4
+    """
+    n = 0
+    for r in cliente.query(sql).result():
+        for c in por_pessoa.get(r.id_pessoa, []):
+            c.plenario.append({
+                "leg": r.leg, "leg_ini": r.leg_ini, "leg_fim": r.leg_fim,
+                "votacoes": r.votacoes, "sim": r.sim, "nao": r.nao,
+                "abstencao": r.abstencao, "obstrucao": r.obstrucao,
+                "eventos": r.eventos, "plenario": r.eventos_plenario,
+            })
+            n += 1
+    log.info("%d linhas de plenario anexadas", n)
+
+
+def _anexar_chapa(cliente, por_sk: dict[str, Candidato]) -> None:
+    """Vice ou suplentes de cada chapa majoritaria (F-21).
+
+    O vinculo nao existe no pacote em lote do TSE — so' no DivulgaCandContas.
+    Sem ele, Alckmin esta' na base como candidato a Vice-Presidente pelo PSB e
+    nada diz que ele concorre com Lula.
+    """
+    p = cliente.project
+    try:
+        linhas = list(cliente.query(f"""
+            select sk_titular, ordem, cargo_vice, nome_urna_vice,
+                   nome_completo_vice, sigla_partido_vice, url_foto_vice,
+                   vice_encontrado
+            from `{p}.marts.dim_chapa`
+            order by sk_titular, ordem
+        """).result())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("dim_chapa indisponivel (%s) — o site sai sem a chapa",
+                    str(exc)[:80])
+        return
+    n = 0
+    for r in linhas:
+        c = por_sk.get(r.sk_titular)
+        if not c or not r.vice_encontrado:
+            continue
+        c.chapa.append({
+            "cargo": r.cargo_vice, "nome": r.nome_urna_vice,
+            "completo": r.nome_completo_vice, "partido": r.sigla_partido_vice,
+            "foto": r.url_foto_vice,
+        })
+        n += 1
+    log.info("%d vices/suplentes anexados", n)
 
 
 def _anexar_planos(cliente, por_sk: dict[str, Candidato]) -> None:

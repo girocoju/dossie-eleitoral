@@ -228,6 +228,33 @@ deputado* em vez de rotulá-los como legislatura.
 
 ---
 
+**F-20 — Votos e presença em plenário** · P1 · **Implementada em 30/08/2026**
+
+> Fonte nova (S19). Ver [ADR-025](docs/adr/ADR-025-plenario-e-chapas.md).
+
+**Alcance:** 2003-2026, 2.024 deputados, 1,9 milhão de votações e 2,5 milhões de
+presenças — agregados na ingestão para (deputado, ano), o que mantém a tabela em
+13 mil linhas em vez de dezenas de milhões.
+
+**O que NÃO entra:** taxa de presença. A fonte diz onde o parlamentar esteve, não
+a quantos eventos deveria ter ido, e sem denominador não existe percentual
+honesto. Fica o **volume**, com plenário separado de comissão.
+
+---
+
+**F-21 — Chapa: vice e suplentes** · P1 · **Implementada em 30/08/2026**
+
+> Fonte nova (S14b). Ver [ADR-025](docs/adr/ADR-025-plenario-e-chapas.md).
+
+**Por que entra:** vice e suplente já estavam no lake com candidatura própria —
+13 vice-presidentes, 203 vice-governadores, 661 suplentes. O que não existe no
+pacote em lote do TSE é a **chapa**: nada dizia que Alckmin concorre com Lula.
+
+**Alcance real:** 889 vínculos, 887 resolvidos. Os 2 restantes são suplentes
+registrados depois da última publicação em lote do TSE (L-23).
+
+---
+
 **F-18 — Ficha própria para as candidaturas proporcionais** · P1 · **backlog, aprovada em 29/08/2026**
 
 **Por que entra.** O projeto foi mostrado a pessoas reais e a falta mais citada

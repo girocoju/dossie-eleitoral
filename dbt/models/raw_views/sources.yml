@@ -55,6 +55,17 @@ sources:
         description: >
           S14 — existencia da proposta de governo por candidatura majoritaria,
           consultada no DivulgaCandContas. Guarda link, nunca PDF (ADR-013).
+      - name: chapas
+        description: >
+          S14b — quem concorre com quem: o vinculo entre titular e vice/suplente
+          (F-21). Vice e suplente JA' estao em `candidatos` com candidatura
+          propria; o que nao existe no pacote em lote e' a chapa. So' o
+          DivulgaCandContas tem, no campo `vices` do detalhe.
+        columns:
+          - name: ordem
+            description: >
+              Posicao na lista da fonte. Importa para senador: o 1o suplente
+              assume antes do 2o.
       - name: financiamento_receitas
         description: >
           S18 — receitas declaradas de campanha, um registro por lancamento. O CPF
@@ -153,6 +164,22 @@ sources:
     tables:
       - name: parlamentares
         description: "513 deputados + 81 senadores em exercicio, com o metodo de casamento."
+      - name: votos_deputado
+        description: >
+          S19 — como cada deputado votou, AGREGADO por (deputado, ano) na
+          ingestao. A fonte tem centenas de milhares de votos individuais por
+          ano; 2003-2026 seriam dezenas de milhoes. O dossie usa o volume e a
+          distribuicao, nao o voto avulso (ADR-025).
+      - name: presenca_deputado
+        description: >
+          S19 — em quantos eventos o deputado esteve, por ano, com plenario
+          separado de comissao. NAO ha' taxa: a fonte nao diz a quantos eventos
+          ele DEVIA comparecer, e sem denominador nao existe percentual honesto.
+        columns:
+          - name: qt_eventos_plenario
+            description: >
+              Sessao de plenario e reuniao de comissao sao trabalhos diferentes;
+              somar os dois num numero so' esconderia isso.
       - name: parlamentares_historico
         description: >
           S15b — deputados de legislaturas JA' ENCERRADAS (52a a 56a, 2003-2023),

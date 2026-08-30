@@ -203,6 +203,7 @@ def _atividade(c: Candidato) -> str:
     # Uma tabela por LEGISLATURA. Somar as passagens de alguem que serviu de
     # 2003 a 2010 e voltou em 2019 esconderia justamente o que interessa: o que
     # ele fez em CADA mandato, e que houve um intervalo.
+    plenario = c.plenario
     por_leg: dict[int, list[dict]] = {}
     for a in c.atividade:
         por_leg.setdefault(a.get("leg") or 0, []).append(a)
@@ -227,13 +228,27 @@ def _atividade(c: Candidato) -> str:
             for a in itens
         )
         total = sum(a["total"] for a in itens)
+        # Votos e presenca da MESMA legislatura, logo abaixo das proposicoes.
+        # Separado nao ajudaria ninguem: sao tres medidas do mesmo mandato.
+        pl = next((x for x in plenario if x["leg"] == leg), None)
+        extra = "" if not pl else f"""
+      <dl class="campos" style="margin:10px 0 0">
+        <div><dt>Votações em que votou</dt><dd>{pl['votacoes']:,}</dd></div>
+        <div><dt>Sessões de plenário</dt><dd>{pl['plenario'] or '—'}</dd></div>
+        <div><dt>Eventos no total</dt><dd>{pl['eventos'] or '—'}
+          <span class='ajuda' tabindex='0' title='Plenário e comissões somados.
+          Não é taxa de presença: a fonte não diz a quantos eventos o
+          parlamentar deveria ter comparecido.'>?</span></dd></div>
+        <div><dt>Como votou</dt><dd>{pl['sim']:,} sim · {pl['nao']:,} não
+          · {pl['abstencao']:,} abst. · {pl['obstrucao']:,} obstr.</dd></div>
+      </dl>""".replace(",", ".")
         blocos.append(f"""
       <h3 style="margin:24px 0 8px;font-size:15px">{leg}ª legislatura · {periodo}
         <small style="font-weight:400;color:var(--ink-3)"> — {total:,} proposições</small>
         {marca}</h3>
       <div class="rolagem"><table>
         <thead><tr><th>Tipo de proposição</th><th>Apresentadas</th>
-        <th>Viraram norma</th></tr></thead><tbody>{linhas}</tbody></table></div>""".replace(
+        <th>Viraram norma</th></tr></thead><tbody>{linhas}</tbody></table></div>{extra}""".replace(
             f"{total:,}", f"{total:,}".replace(",", ".")))
 
     return f"""<section class="bloco">
@@ -250,7 +265,10 @@ def _atividade(c: Candidato) -> str:
         apoio não conta. Os tipos aparecem separados porque somá-los não significa
         nada: um projeto de lei e um requerimento de retirada de pauta custam
         coisas muito diferentes. <b>Não há taxa de aprovação</b>: aprovar depende de
-        estar na base do governo, não do mérito do texto.</p>
+        estar na base do governo, não do mérito do texto.
+        <b>Não há taxa de presença</b> pelo mesmo motivo estrutural: a fonte diz
+        onde o parlamentar esteve, não a quantos eventos deveria ter ido — e sem
+        denominador não existe percentual honesto.</p>
     </section>"""
 
 
@@ -504,6 +522,39 @@ def _resultado(t: dict) -> str:
     return ("<span class='marca-dado m-ausente'>resultado não publicado</span>")
 
 
+def _chapa(c: Candidato) -> str:
+    """Com quem a pessoa concorre (F-21).
+
+    O vinculo nao existe no pacote em lote do TSE: vice e suplente tem
+    candidatura propria, e nada nos arquivos diz que uma pertence a' chapa da
+    outra. Sem isto, Geraldo Alckmin aparece na base como candidato a
+    Vice-Presidente pelo PSB e mais nada.
+
+    Cargo proporcional nao tem chapa — deputado concorre sozinho —, entao o bloco
+    simplesmente nao existe nessas fichas, em vez de aparecer vazio.
+    """
+    if not c.chapa:
+        return ""
+    cartoes = "".join(
+        f"""<div class="parceiro">
+        {'<img src="' + e(v['foto']) + '" alt="" loading="lazy">' if v.get('foto') else ''}
+        <div><b>{e(v['nome'] or '—')}</b>
+          <small>{e(v['completo'] or '')}</small>
+          <small>{e(v['cargo'] or '')} · {e(v['partido'] or '—')}</small></div>
+      </div>"""
+        for v in c.chapa
+    )
+    titulo = "Vice" if len(c.chapa) == 1 else "Suplentes"
+    return f"""<section class="bloco">
+      <h2>{titulo} da chapa</h2>
+      <div class="chapa">{cartoes}</div>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:10px 0 0">
+        Quem concorre junto na mesma chapa. O vínculo vem do DivulgaCandContas —
+        os arquivos em lote do TSE trazem cada candidatura isolada, sem dizer a
+        qual chapa pertence.</p>
+    </section>"""
+
+
 def _ficha(c: Candidato, quando: str) -> str:
     partes = [f"""
 <a href="{BASE_URL}/{CARGOS[c.cod_cargo][0]}/" style="font-size:13.5px">← {e(c.cargo_nome)}</a>
@@ -658,6 +709,7 @@ def _ficha(c: Candidato, quando: str) -> str:
       continuou publicado. Esta página mostra um deles; nenhum campo da fonte
       indica qual prevalece.</p>""")
 
+    partes.append(_chapa(c))
     partes.append(_atividade(c))
     partes.append(_financiamento(c))
     partes.append(_indicadores(c))

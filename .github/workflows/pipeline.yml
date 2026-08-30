@@ -306,6 +306,20 @@ jobs:
         if: steps.cred.outputs.temos == 'true'
         run: carga.sh "Atividade legislativa (F-16)" ingest.proposicoes load
 
+      # Votos e presenca do ano corrente. Os anos historicos (2003-2025) sao
+      # carga separada e manual: ano encerrado nao muda, e `load_intervalo`
+      # substitui APENAS a particao do ano, entao o diario nao os apaga.
+      - name: Votos e presenca em plenario (F-20)
+        if: steps.cred.outputs.temos == 'true'
+        run: carga.sh "Plenario (F-20)" ingest.plenario load --ano-inicio 2025 --ano-fim 2026
+
+      # O vinculo titular-vice so' existe no DivulgaCandContas, uma consulta por
+      # chapa: 529 candidaturas, ~11 min. Vale rodar diariamente porque o TSE
+      # aceita substituicao de vice ate' a eleicao.
+      - name: Chapas — vice e suplentes (F-21)
+        if: steps.cred.outputs.temos == 'true'
+        run: carga.sh "Chapas (F-21)" ingest.chapas load --ano 2026
+
       # Um ZIP de 15 MB com 27 CSV por tipo. Ate' 04/10 o TSE republica conforme as
       # campanhas prestam contas, entao a cobertura sobe a cada dia — em 28/08/2026
       # eram 7.722 das 20.765 candidaturas.
