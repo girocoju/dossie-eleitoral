@@ -169,8 +169,25 @@ def _read_manifest(dest: Path) -> Artifact | None:
     if not (mf.exists() and dest.exists()):
         return None
     try:
-        return Artifact(**json.loads(mf.read_text(encoding="utf-8")))
-    except (json.JSONDecodeError, TypeError):
+        dados = json.loads(mf.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    # O `path` GRAVADO NAO VALE — vale `dest`.
+    #
+    # O manifesto guarda o caminho absoluto da maquina que baixou o arquivo. Esse
+    # caminho nao sobrevive a nada: pasta renomeada, outro computador, ou o
+    # workspace do GitHub Actions, que e' /home/runner/work/<repo>/<repo> e muda
+    # quando o repositorio muda de nome. `dest` e' o caminho que o chamador pediu
+    # AGORA, e a linha acima ja' confirmou que o arquivo esta' la'.
+    #
+    # Em 31/08/2026, renomear o projeto (ADR-026) fez o cache do CI restaurar
+    # manifestos escritos sob /work/radar-brasil/, e a carga do RTN morreu com
+    # FileNotFoundError apontando para um caminho que nao existia mais — tendo o
+    # arquivo ao lado, no lugar certo.
+    dados["path"] = str(dest)
+    try:
+        return Artifact(**dados)
+    except TypeError:
         return None
 
 
