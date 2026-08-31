@@ -1,7 +1,7 @@
 # Normaliza fim de linha: o repo guarda LF, o checkout usa o padrao do SO.
 * text=auto
 
-# Artefatos do Power BI (diretorio bi/, ARQUIVADO — ver ADR-018): gravados com
+# Artefatos do Power BI (diretorio bi/, ARQUIVADO â€” ver ADR-018): gravados com
 # CRLF pelo Desktop; preserva para nao gerar diff falso no historico.
 *.tmdl   text eol=crlf
 *.pbism  text eol=crlf
@@ -13,3 +13,5 @@
 # do repo (LF), para que o `--check` do CI de' o mesmo resultado em qualquer SO.
 *.ndjson -text
 *.zip    binary
+
+atualizar.bat text eol=crlf
