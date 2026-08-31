@@ -59,7 +59,7 @@ def artifact(zip_sintetico: Path) -> Artifact:
 
 
 def _linhas(zip_sintetico, artifact, monkeypatch):
-    monkeypatch.setenv("RADAR_CPF_SALT", "salt-de-teste")
+    monkeypatch.setenv("DOSSIE_CPF_SALT", "salt-de-teste")
     ds = load_layout(2026).dataset("candidatos")
     return [linha for linha, _, _ in tse._linhas(zip_sintetico, ds, artifact)]
 

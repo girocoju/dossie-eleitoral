@@ -15,16 +15,20 @@ import pytest
 from scripts.publicar import NUNCA_ENVIAR, _config, _nomes_do_certificado, enviar
 
 AMBIENTE = {
-    "RADAR_FTP_HOST": "ftp.datadubaintel.com",
-    "RADAR_FTP_USER": "usuario",
-    "RADAR_FTP_PASSWORD": "senha",
+    "DOSSIE_FTP_HOST": "ftp.datadubaintel.com",
+    "DOSSIE_FTP_USER": "usuario",
+    "DOSSIE_FTP_PASSWORD": "senha",
 }
 
 
 @pytest.fixture
 def limpo(monkeypatch):
+    # OS DOIS PREFIXOS. `_config` resolve `DOSSIE_FTP_*` e cai em `RADAR_FTP_*`
+    # (ADR-026), entao limpar so' um deixa o ambiente real da maquina vazando
+    # para dentro do teste: foi assim que `test_falta_de_credencial` parou de
+    # ver a falta de senha — a senha de verdade estava ali, com o nome antigo.
     for chave in list(os.environ):
-        if chave.startswith("RADAR_FTP"):
+        if chave.startswith(("DOSSIE_FTP", "RADAR_FTP")):
             monkeypatch.delenv(chave, raising=False)
     for chave, valor in AMBIENTE.items():
         monkeypatch.setenv(chave, valor)
@@ -37,7 +41,7 @@ class TestConfig:
         assert _config()["nome_tls"] == ""
 
     def test_nome_tls_separado_do_host(self, limpo):
-        limpo.setenv("RADAR_FTP_TLS_NOME", "ftp.hstgr.io")
+        limpo.setenv("DOSSIE_FTP_TLS_NOME", "ftp.hstgr.io")
         cfg = _config()
         assert cfg["host"] == "ftp.datadubaintel.com"
         assert cfg["nome_tls"] == "ftp.hstgr.io"
@@ -45,12 +49,12 @@ class TestConfig:
     def test_esquema_no_host_e_removido(self, limpo):
         # A Hostinger entrega o host como `ftp://223.27.112.89` no painel, e
         # `connect()` nao aceita esquema.
-        limpo.setenv("RADAR_FTP_HOST", "ftp://ftp.datadubaintel.com/")
+        limpo.setenv("DOSSIE_FTP_HOST", "ftp://ftp.datadubaintel.com/")
         assert _config()["host"] == "ftp.datadubaintel.com"
 
     def test_falta_de_credencial_falha_dizendo_qual(self, limpo):
-        limpo.delenv("RADAR_FTP_PASSWORD")
-        with pytest.raises(SystemExit, match="RADAR_FTP_PASSWORD"):
+        limpo.delenv("DOSSIE_FTP_PASSWORD")
+        with pytest.raises(SystemExit, match="DOSSIE_FTP_PASSWORD"):
             _config()
 
 

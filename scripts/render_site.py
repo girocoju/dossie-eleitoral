@@ -90,6 +90,14 @@ CSS = (Path(__file__).parent / "dossie.css").read_text(encoding="utf-8")
 
 def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
             canonical: str, ativo: str = "") -> str:
+    # A home passa "Dossie Eleitoral 2026" como titulo, e o sufixo fixo fazia
+    # "Dossie Eleitoral 2026 — Dossie Eleitoral" — que e' o texto que aparece na
+    # aba do navegador, no resultado do Google e no card compartilhado. Nome
+    # repetido na primeira coisa que se le' de um projeto e' o tipo de descuido
+    # que custa credibilidade justamente com quem vai avaliar o trabalho.
+    marca = "Dossiê Eleitoral"
+    titulo_aba = titulo if titulo.startswith(marca) else f"{titulo} — {marca}"
+
     nav = "".join(
         f'<a href="{BASE_URL}/{s}/" class="{"on" if s == ativo else ""}">{n}</a>'
         for s, n, _ in CARGOS.values()
@@ -102,12 +110,12 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(titulo)} — Dossiê Eleitoral</title>
+<title>{e(titulo_aba)}</title>
 <meta name="description" content="{e(descricao)}">
 <link rel="canonical" href="{e(canonical)}">
 <meta name="robots" content="index,follow">
 <meta property="og:type" content="website">
-<meta property="og:title" content="{e(titulo)} — Dossiê Eleitoral">
+<meta property="og:title" content="{e(titulo_aba)}">
 <meta property="og:description" content="{e(descricao)}">
 <meta property="og:url" content="{e(canonical)}">
 <meta property="og:site_name" content="Data Duba Intelligence">
@@ -1266,7 +1274,7 @@ def _metodologia(quando: str, catalogo: list[dict]) -> str:
         automáticas sobre os dados. Elas não pegam tudo — o erro de 2006 descrito
         acima passou por todas elas e foi encontrado por um leitor.</p>
       <p>O código, os testes e o registro de cada decisão estão públicos em
-        <a href="https://github.com/girocoju/radar-brasil">github.com/girocoju/radar-brasil</a>.
+        <a href="https://github.com/girocoju/dossie-eleitoral">github.com/girocoju/dossie-eleitoral</a>.
         Encontrou um número errado? Abra uma issue — a correção e o motivo dela
         ficam registrados lá.</p>
     </section>

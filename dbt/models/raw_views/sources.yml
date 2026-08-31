@@ -7,7 +7,7 @@ sources:
       Carregada por `ingest/tse.py`, particionada por intervalo de inteiros sobre
       `ano_eleicao` (ADR-009). A carga substitui a tabela inteira a partir dos
       NDJSON em `data/staging`, entao reexecutar nunca duplica.
-    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    database: "{{ env_var('DOSSIE_GCP_PROJECT', 'radar-brasil-ddi') }}"
     schema: raw_tse
     config:
       loaded_at_field: _extracted_at
@@ -96,7 +96,7 @@ sources:
           sq_candidato, sem sg_uf nem cd_cargo.
 
   - name: raw_ibge
-    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    database: "{{ env_var('DOSSIE_GCP_PROJECT', 'radar-brasil-ddi') }}"
     schema: raw_ibge
     config:
       loaded_at_field: _extracted_at
@@ -112,7 +112,7 @@ sources:
       S11 — receita e despesa orcamentaria dos governos estaduais, da Declaracao de
       Contas Anuais do SICONFI. E' o indicador com o vinculo mais forte com um
       mandato executivo: e' o orcamento que o governador administra.
-    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    database: "{{ env_var('DOSSIE_GCP_PROJECT', 'radar-brasil-ddi') }}"
     schema: raw_tesouro
     config:
       loaded_at_field: _extracted_at
@@ -132,7 +132,7 @@ sources:
           isso nao mediam resultado fiscal (L-22, ADR-017).
 
   - name: raw_ipea
-    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    database: "{{ env_var('DOSSIE_GCP_PROJECT', 'radar-brasil-ddi') }}"
     schema: raw_ipea
     config:
       loaded_at_field: _extracted_at
@@ -154,7 +154,7 @@ sources:
 
       `proposicoes` e a atividade legislativa da Camara, ja filtrada por
       `proponente = 1` na ingestao — assinatura de apoio nunca entra.
-    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    database: "{{ env_var('DOSSIE_GCP_PROJECT', 'radar-brasil-ddi') }}"
     schema: raw_legislativo
     config:
       loaded_at_field: _extracted_at
@@ -206,7 +206,7 @@ sources:
       S8 — IDEB por UF e Brasil, 2005-2025 (11 edicoes bienais). E' a serie com
       melhor encaixe em janela de mandato do projeto: um mandato de governador
       contem duas ou tres medicoes.
-    database: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+    database: "{{ env_var('DOSSIE_GCP_PROJECT', 'radar-brasil-ddi') }}"
     schema: raw_inep
     config:
       loaded_at_field: _extracted_at

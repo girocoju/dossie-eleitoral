@@ -37,7 +37,7 @@ from ingest.common.writer import NdjsonWriter
 log = get_logger("fotos")
 
 BASE = "https://cdn.tse.jus.br/estatistica/sead/eleicoes"
-BUCKET = "radar-brasil-fotos"
+BUCKET = "dossie-eleitoral-fotos"
 
 # `F` + sigla da UE + sequencial do candidato + `_div.jpg`
 PADRAO_ARQUIVO = re.compile(r"^F(?P<ue>[A-Z]{2})(?P<sq>\d+)_div\.jpg$", re.IGNORECASE)

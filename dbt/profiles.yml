@@ -1,9 +1,9 @@
 # Versionado de proposito: nao ha' segredo aqui, so' env_var().
 # Defina antes de rodar:
-#   RADAR_GCP_PROJECT   (ex.: radar-brasil)
+#   DOSSIE_GCP_PROJECT   (ex.: radar-brasil-ddi)
 #   RADAR_BQ_LOCATION   (US — ver docs/adr/ADR-003)
 #   GOOGLE_APPLICATION_CREDENTIALS  (caminho da service account)
-radar_brasil:
+dossie_eleitoral:
   target: "{{ env_var('RADAR_DBT_TARGET', 'dev') }}"
   outputs:
     # Local: usa as credenciais do `gcloud auth application-default login`.
@@ -12,7 +12,7 @@ radar_brasil:
     dev:
       type: bigquery
       method: oauth
-      project: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+      project: "{{ env_var('DOSSIE_GCP_PROJECT', 'radar-brasil-ddi') }}"
       dataset: "{{ env_var('RADAR_BQ_DATASET_DEV', 'marts') }}"
       location: "{{ env_var('RADAR_BQ_LOCATION', 'US') }}"
       threads: 4
@@ -25,7 +25,7 @@ radar_brasil:
     prod:
       type: bigquery
       method: service-account
-      project: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+      project: "{{ env_var('DOSSIE_GCP_PROJECT', 'radar-brasil-ddi') }}"
       dataset: "{{ env_var('RADAR_BQ_DATASET_PROD', 'radar') }}"
       location: "{{ env_var('RADAR_BQ_LOCATION', 'US') }}"
       keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', '') }}"
@@ -40,7 +40,7 @@ radar_brasil:
     ci:
       type: bigquery
       method: oauth
-      project: "{{ env_var('RADAR_GCP_PROJECT', 'radar-brasil') }}"
+      project: "{{ env_var('DOSSIE_GCP_PROJECT', 'radar-brasil-ddi') }}"
       dataset: "{{ env_var('RADAR_BQ_DATASET_CI', 'marts') }}"
       location: "{{ env_var('RADAR_BQ_LOCATION', 'US') }}"
       threads: 8

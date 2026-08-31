@@ -1,4 +1,4 @@
-# Radar Brasil — Raio-X Eleitoral 2026
+# Dossiê Eleitoral 2026
 # Constituicao §4: `make bootstrap && make run` recria tudo a partir das fontes originais.
 
 SHELL := /bin/bash

@@ -1,7 +1,7 @@
-name: "radar_brasil"
+name: "dossie_eleitoral"
 version: "0.1.0"
 config-version: 2
-profile: "radar_brasil"
+profile: "dossie_eleitoral"
 
 model-paths: ["models"]
 snapshot-paths: ["snapshots"]
@@ -24,7 +24,7 @@ vars:
   cargos_mandato_executivo: [1, 3]
 
 models:
-  radar_brasil:
+  dossie_eleitoral:
     +persist_docs: { relation: true, columns: true }
     staging:
       +materialized: view
@@ -34,7 +34,7 @@ models:
       +schema: marts
 
 seeds:
-  radar_brasil:
+  dossie_eleitoral:
     +schema: marts
     +quote_columns: false
     cargo_tse:

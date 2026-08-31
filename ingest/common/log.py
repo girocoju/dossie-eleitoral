@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
+
+from ingest.common.env import env
 
 _FORMAT = "%(asctime)s | %(levelname)-7s | %(name)-22s | %(message)s"
 _configured = False
@@ -14,10 +15,10 @@ def _configure() -> None:
     global _configured
     if _configured:
         return
-    level = os.environ.get("RADAR_LOG_LEVEL", "INFO").upper()
+    level = (env("DOSSIE_LOG_LEVEL") or "INFO").upper()
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter(_FORMAT, datefmt="%H:%M:%S"))
-    root = logging.getLogger("radar")
+    root = logging.getLogger("dossie")
     root.setLevel(level)
     root.handlers.clear()
     root.addHandler(handler)
@@ -26,6 +27,6 @@ def _configure() -> None:
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Devolve um logger sob o namespace `radar.`."""
+    """Devolve um logger sob o namespace `dossie.`."""
     _configure()
-    return logging.getLogger(f"radar.{name}")
+    return logging.getLogger(f"dossie.{name}")

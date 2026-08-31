@@ -20,7 +20,7 @@ mostrou que a fonte é boa:
 ## Decisão
 
 1. As imagens vão para um bucket **público** do Cloud Storage
-   (`radar-brasil-fotos`, região `US`, *uniform bucket-level access*).
+   (`dossie-eleitoral-fotos`, região `US`, *uniform bucket-level access*).
 2. O BigQuery guarda **apenas a URL**, em `dim_candidato.url_foto`.
 3. Escopo: **somente 2026**.
 
@@ -69,7 +69,7 @@ disso, custam US$ 0,004 por 10 mil — centavos.
 - Mais um recurso de infraestrutura para versionar e recriar: o bucket precisa
   entrar no `make bootstrap` para a Constituição §4 continuar valendo.
 - A URL vira contrato público. Mudar o caminho quebra relatório publicado, então o
-  caminho é determinístico e estável: `gs://radar-brasil-fotos/2026/{SG_UE}/{sq_candidato}.jpg`.
+  caminho é determinístico e estável: `gs://dossie-eleitoral-fotos/2026/{SG_UE}/{sq_candidato}.jpg`.
 - Se o TSE mudar a nomenclatura, o teste de cobertura ≥ 95% falha a carga — o
   mesmo princípio que já protege os layouts (ADR-008).
 
@@ -79,7 +79,7 @@ disso, custam US$ 0,004 por 10 mil — centavos.
 |---|---|
 | Fotos no bucket | **20.765**, das 28 unidades eleitorais |
 | Cobertura em `dim_candidato` | **99,98%** (20.765 de 20.769 candidaturas de 2026) |
-| Caminho | `gs://radar-brasil-fotos/2026/{SG_UE}/{sq_candidato}.jpg` |
+| Caminho | `gs://dossie-eleitoral-fotos/2026/{SG_UE}/{sq_candidato}.jpg` |
 | URL pública | responde `200 image/jpeg`, sem autenticação, `Cache-Control: public, max-age=86400` |
 | `dbt build` | 147 de 147 |
 

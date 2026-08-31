@@ -1,4 +1,4 @@
-# CLAUDE.md — Radar Brasil
+# CLAUDE.md — Dossiê Eleitoral
 
 **Leia [SPEC.md](SPEC.md) antes de qualquer tarefa.**
 

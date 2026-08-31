@@ -1,9 +1,0 @@
-/// Projeto GCP que hospeda os datasets. Trocar aqui muda todas as tabelas.
-expression ProjetoGCP = "radar-brasil" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
-	lineageTag: 7bfa2fe4-c64f-1a92-2324-7e2c5df5740f
-	annotation PBI_NavigationStepName = Navigation
-
-/// Dataset com as tabelas de marts materializadas pelo dbt.
-expression DatasetMarts = "marts" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
-	lineageTag: 4d90fc07-764f-3fc7-3585-be19baf272b6
-	annotation PBI_NavigationStepName = Navigation

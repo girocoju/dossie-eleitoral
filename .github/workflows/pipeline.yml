@@ -32,9 +32,9 @@ on:
         default: false
 
 env:
-  RADAR_GCP_PROJECT: ${{ vars.RADAR_GCP_PROJECT || 'radar-brasil' }}
-  RADAR_BQ_LOCATION: ${{ vars.RADAR_BQ_LOCATION || 'US' }}
-  RADAR_LOG_LEVEL: INFO
+  DOSSIE_GCP_PROJECT: ${{ vars.DOSSIE_GCP_PROJECT || vars.RADAR_GCP_PROJECT || 'radar-brasil-ddi' }}
+  DOSSIE_BQ_LOCATION: ${{ vars.DOSSIE_BQ_LOCATION || vars.RADAR_BQ_LOCATION || 'US' }}
+  DOSSIE_LOG_LEVEL: INFO
 
 jobs:
 
@@ -107,17 +107,17 @@ jobs:
       contents: read
       id-token: write
     env:
-      RADAR_DBT_TARGET: ci
-      RADAR_CPF_SALT: ${{ secrets.RADAR_CPF_SALT }}
+      DOSSIE_DBT_TARGET: ci
+      DOSSIE_CPF_SALT: ${{ secrets.DOSSIE_CPF_SALT || secrets.RADAR_CPF_SALT }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Conferir se ha' credenciais
         id: cred
         run: |
-          if [ -z "${{ vars.RADAR_WIF_PROVIDER }}" ]; then
+          if [ -z "${{ vars.DOSSIE_WIF_PROVIDER || vars.RADAR_WIF_PROVIDER }}" ]; then
             echo "temos=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Variavel RADAR_WIF_PROVIDER ausente — etapa de carga pulada (ver docs/STATUS.md)."
+            echo "::notice::Variavel DOSSIE_WIF_PROVIDER ausente — etapa de carga pulada (ver docs/STATUS.md)."
           else
             echo "temos=true" >> "$GITHUB_OUTPUT"
           fi
@@ -128,8 +128,8 @@ jobs:
         if: steps.cred.outputs.temos == 'true'
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ vars.RADAR_WIF_PROVIDER }}
-          service_account: ${{ vars.RADAR_WIF_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.DOSSIE_WIF_PROVIDER || vars.RADAR_WIF_PROVIDER }}
+          service_account: ${{ vars.DOSSIE_WIF_SERVICE_ACCOUNT || vars.RADAR_WIF_SERVICE_ACCOUNT }}
 
       - uses: actions/setup-python@v5
         if: steps.cred.outputs.temos == 'true'
@@ -401,7 +401,7 @@ jobs:
       - name: Conferir se ha' credenciais
         id: cred
         run: |
-          if [ -z "${{ vars.RADAR_WIF_PROVIDER }}" ] || [ -z "${{ secrets.HOSTINGER_HOST }}" ]; then
+          if [ -z "${{ vars.DOSSIE_WIF_PROVIDER || vars.RADAR_WIF_PROVIDER }}" ] || [ -z "${{ secrets.HOSTINGER_HOST }}" ]; then
             echo "temos=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Credenciais de GCP ou de FTP ausentes — publicacao pulada."
           else
@@ -412,8 +412,8 @@ jobs:
         if: steps.cred.outputs.temos == 'true'
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ vars.RADAR_WIF_PROVIDER }}
-          service_account: ${{ vars.RADAR_WIF_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.DOSSIE_WIF_PROVIDER || vars.RADAR_WIF_PROVIDER }}
+          service_account: ${{ vars.DOSSIE_WIF_SERVICE_ACCOUNT || vars.RADAR_WIF_SERVICE_ACCOUNT }}
 
       - uses: actions/setup-python@v5
         if: steps.cred.outputs.temos == 'true'
@@ -450,15 +450,15 @@ jobs:
       - name: Publicar na Hostinger (FTPS)
         if: steps.cred.outputs.temos == 'true'
         env:
-          RADAR_FTP_HOST: ${{ secrets.HOSTINGER_HOST }}
-          RADAR_FTP_USER: ${{ secrets.HOSTINGER_USER }}
-          RADAR_FTP_PASSWORD: ${{ secrets.HOSTINGER_PASSWORD }}
-          RADAR_FTP_PORT: ${{ secrets.HOSTINGER_PORT }}
-          RADAR_FTP_DIR: "/"
+          DOSSIE_FTP_HOST: ${{ secrets.HOSTINGER_HOST }}
+          DOSSIE_FTP_USER: ${{ secrets.HOSTINGER_USER }}
+          DOSSIE_FTP_PASSWORD: ${{ secrets.HOSTINGER_PASSWORD }}
+          DOSSIE_FTP_PORT: ${{ secrets.HOSTINGER_PORT }}
+          DOSSIE_FTP_DIR: "/"
           # NAO e' segredo: e' o nome no certificado publico da Hostinger.
-          # A conexao vai para RADAR_FTP_HOST; a verificacao TLS confere o
+          # A conexao vai para DOSSIE_FTP_HOST; a verificacao TLS confere o
           # certificado contra ESTE nome, porque e' o que o servidor de
           # fato apresenta (Sectigo, *.hstgr.io). A cadeia e o hostname
           # seguem verificados — ver ADR-021.
-          RADAR_FTP_TLS_NOME: "ftp.hstgr.io"
+          DOSSIE_FTP_TLS_NOME: "ftp.hstgr.io"
         run: python -m scripts.publicar --origem site

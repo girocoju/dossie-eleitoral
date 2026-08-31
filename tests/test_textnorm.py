@@ -85,17 +85,17 @@ class TestCpfHash:
     """
 
     def test_hash_e_deterministico_com_o_mesmo_salt(self, monkeypatch):
-        monkeypatch.setenv("RADAR_CPF_SALT", "salt-de-teste")
+        monkeypatch.setenv("DOSSIE_CPF_SALT", "salt-de-teste")
         assert tn.cpf_hash("12345678900") == tn.cpf_hash("123.456.789-00")
 
     def test_hash_muda_com_o_salt(self, monkeypatch):
-        monkeypatch.setenv("RADAR_CPF_SALT", "salt-a")
+        monkeypatch.setenv("DOSSIE_CPF_SALT", "salt-a")
         a = tn.cpf_hash("12345678900")
-        monkeypatch.setenv("RADAR_CPF_SALT", "salt-b")
+        monkeypatch.setenv("DOSSIE_CPF_SALT", "salt-b")
         assert tn.cpf_hash("12345678900") != a
 
     def test_hash_nao_contem_o_cpf(self, monkeypatch):
-        monkeypatch.setenv("RADAR_CPF_SALT", "salt-de-teste")
+        monkeypatch.setenv("DOSSIE_CPF_SALT", "salt-de-teste")
         digest = tn.cpf_hash("12345678900")
         assert digest is not None
         assert "12345678900" not in digest
@@ -103,19 +103,19 @@ class TestCpfHash:
 
     @pytest.mark.parametrize("invalido", ["", None, "123", "00000000000", "#NULO#", "1234567890a"])
     def test_cpf_invalido_nao_gera_chave(self, invalido, monkeypatch):
-        monkeypatch.setenv("RADAR_CPF_SALT", "salt-de-teste")
+        monkeypatch.setenv("DOSSIE_CPF_SALT", "salt-de-teste")
         assert tn.cpf_hash(invalido) is None
 
 
 def test_pessoa_fallback_precisa_das_duas_pontas(monkeypatch):
-    monkeypatch.setenv("RADAR_CPF_SALT", "salt-de-teste")
+    monkeypatch.setenv("DOSSIE_CPF_SALT", "salt-de-teste")
     assert tn.pessoa_fallback_key("Maria da Silva", "01/02/1970") is not None
     assert tn.pessoa_fallback_key("Maria da Silva", None) is None
     assert tn.pessoa_fallback_key(None, "01/02/1970") is None
 
 
 def test_pessoa_fallback_ignora_acento_e_caixa(monkeypatch):
-    monkeypatch.setenv("RADAR_CPF_SALT", "salt-de-teste")
+    monkeypatch.setenv("DOSSIE_CPF_SALT", "salt-de-teste")
     assert tn.pessoa_fallback_key("JOSÉ ANTÔNIO", "01/02/1970") == tn.pessoa_fallback_key(
         "jose antonio", "01/02/1970"
     )

@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import re
 import unicodedata
 from datetime import date, datetime
 
+from ingest.common.env import env
 from ingest.common.log import get_logger
 
 log = get_logger("textnorm")
@@ -24,7 +24,13 @@ NULL_TOKENS = frozenset(
 )
 
 # Salt publico de fallback: mantem `make run` reproduzivel do zero (Constituicao §4)
-# mas NAO protege o CPF. Em producao defina RADAR_CPF_SALT. Ver docs/adr/ADR-006.
+# mas NAO protege o CPF. Em producao defina DOSSIE_CPF_SALT. Ver docs/adr/ADR-006.
+# O VALOR ABAIXO NAO ACOMPANHA O RENAME, DE PROPOSITO.
+# Ele nao e' um nome, e' uma CHAVE: `id_pessoa` e' HMAC do CPF com ela
+# (ADR-006). Trocar a string para combinar com o nome novo reescreveria
+# todos os `id_pessoa` de quem rodar sem salt proprio, quebrando em
+# silencio a ponte de identidade entre legislaturas. Um rename cosmetico
+# nunca justifica mexer no que gera identificador.
 _DEFAULT_SALT = "radar-brasil-salt-publico-ver-ADR-006"
 _salt_warned = False
 
@@ -78,11 +84,11 @@ def only_digits(value: str | None) -> str | None:
 
 def cpf_salt() -> str:
     global _salt_warned
-    salt = os.environ.get("RADAR_CPF_SALT")
+    salt = env("DOSSIE_CPF_SALT")
     if not salt:
         if not _salt_warned:
             log.warning(
-                "RADAR_CPF_SALT nao definido — usando salt publico de fallback. "
+                "DOSSIE_CPF_SALT nao definido — usando salt publico de fallback. "
                 "Os hashes sao reproduziveis, mas NAO protegem o CPF. Ver ADR-006."
             )
             _salt_warned = True

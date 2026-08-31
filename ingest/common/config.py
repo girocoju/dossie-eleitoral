@@ -2,9 +2,11 @@
 
 Variaveis reconhecidas (todas opcionais para rodar `--dry-run` / `--target local`):
 
-    RADAR_GCP_PROJECT        id do projeto GCP        (default: radar-brasil)
-    RADAR_BQ_LOCATION        localizacao dos datasets (default: US — ver ADR-003)
-    RADAR_DATA_DIR           cache local de download  (default: ./data)
+    DOSSIE_GCP_PROJECT       id do projeto GCP        (default: radar-brasil-ddi)
+    DOSSIE_BQ_LOCATION       localizacao dos datasets (default: US — ver ADR-003)
+    DOSSIE_DATA_DIR          cache local de download  (default: ./data)
+
+O prefixo antigo `RADAR_` continua aceito — ver `ingest/common/env.py`.
     GOOGLE_APPLICATION_CREDENTIALS   caminho da service account
 """
 
@@ -14,6 +16,8 @@ import os
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+
+from ingest.common.env import env
 
 # Datasets do SPEC §4. Nomes fixos: mudar aqui exige ADR.
 DATASET_RAW_TSE = "raw_tse"
@@ -62,10 +66,14 @@ class Settings:
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     root = Path(__file__).resolve().parents[2]
-    data_dir = Path(os.environ.get("RADAR_DATA_DIR", root / "data")).resolve()
+    data_dir = Path(env("DOSSIE_DATA_DIR") or root / "data").resolve()
     return Settings(
-        project=os.environ.get("RADAR_GCP_PROJECT", "radar-brasil"),
-        location=os.environ.get("RADAR_BQ_LOCATION", "US"),
+        # O ID DO PROJETO GCP E' IMUTAVEL e continua `radar-brasil-ddi` (ADR-026):
+        # o Google nao renomeia project id, so' o nome de exibicao. Trocar exigiria
+        # projeto novo e migrar tudo, sem nada em troca — o id nao aparece em
+        # lugar nenhum do site.
+        project=env("DOSSIE_GCP_PROJECT", "radar-brasil-ddi"),
+        location=env("DOSSIE_BQ_LOCATION", "US"),
         data_dir=data_dir,
         credentials_path=os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"),
     )

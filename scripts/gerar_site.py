@@ -51,7 +51,7 @@ log = get_logger("site")
 # Prefixo de todo link interno e de toda URL canonica. Em producao e' o endereco
 # publico; para conferir no navegador local, `--base http://localhost:8000` faz o
 # site inteiro funcionar sem servidor de producao.
-BASE_URL = "https://datadubaintel.com/dossie"
+BASE_URL = "https://datadubaintel.com/dossie-eleitoral"
 
 CARGOS = {
     1: ("presidente", "Presidente", "Brasil"),

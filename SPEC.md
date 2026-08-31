@@ -1,4 +1,4 @@
-# Radar Brasil — Raio-X Eleitoral 2026
+# Dossiê Eleitoral 2026
 ## Spec-Driven Development (SDD) para uso com Claude Code
 
 > **Como usar este arquivo no Claude Code**
@@ -92,7 +92,7 @@
 ```
 
 - **Linguagem:** Python 3.11+, `uv` para dependências.
-- **Warehouse:** BigQuery, projeto `radar-brasil`, datasets `raw_tse`, `raw_ibge`, `raw_ipea`, `stg`, `marts`. Localização `southamerica-east1` ou `US` (decidir — ver ADR-003).
+- **Warehouse:** BigQuery, projeto `radar-brasil-ddi` (o *project id* do GCP é imutável e não acompanhou o rename — ver ADR-026), datasets `raw_tse`, `raw_ibge`, `raw_ipea`, `stg`, `marts`. Localização `southamerica-east1` ou `US` (decidir — ver ADR-003).
 - **Transformação:** dbt-core + dbt-bigquery. Testes de schema obrigatórios em toda tabela de `marts`.
 - **Orquestração:** GitHub Actions (cron semanal até a eleição; manual depois). Sem Airflow no MVP.
 - **Publicação:** site estático gerado por script Python a partir de `marts`, hospedado com CDN. Sem servidor de aplicação: o dado muda uma vez por dia (ADR-018).
@@ -395,7 +395,7 @@ Critérios de aceite:
 
 ### Fase 4.5 — Fotos (F-13) — concluída em 28/08/2026
 
-- T-451 Criar bucket público `radar-brasil-fotos` em `US`, com acesso de leitura
+- T-451 Criar bucket público `dossie-eleitoral-fotos` em `US`, com acesso de leitura
   anônimo e *uniform bucket-level access*.
 - T-452 `ingest/fotos.py`: baixa por UE, valida o padrão do nome, envia ao bucket,
   registra `sq_candidato → url` num NDJSON e carrega em `raw_tse.fotos`.
@@ -432,7 +432,7 @@ Critérios de aceite:
 ## 8. Estrutura do repositório
 
 ```
-radar-brasil/
+dossie-eleitoral/
 ├── CLAUDE.md
 ├── SPEC.md                  ← este arquivo
 ├── README.md
@@ -448,8 +448,6 @@ radar-brasil/
 │   ├── models/{raw_views,staging,marts}/
 │   ├── seeds/
 │   └── tests/
-├── bi/
-│   └── RadarBrasil.pbip   (ARQUIVADO — ver ADR-018)
 ├── docs/
 │   ├── METODOLOGIA.md
 │   └── adr/
@@ -491,6 +489,10 @@ radar-brasil/
 | ADR-021 | O nome que o certificado do FTP precisa cobrir | A Hostinger apresenta certificado de `*.hstgr.io`, nao do dominio do cliente; verificar contra o nome real mantem a validacao completa, e fixar o certificado quebraria na renovacao | Aceita |
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
+
+| ADR-026 | Tudo passa a se chamar Dossiê Eleitoral | Três nomes em circulação às vésperas da divulgação para imprensa, um deles na URL de toda foto do site; o *project id* do GCP e o salt público não acompanham, por serem imutável e chave | Aceita |
+| ADR-025 | Votações, presença em plenário e a chapa titular–vice | Agregar por (deputado, ano) na ingestão troca milhões de linhas por 13 mil; da chapa guarda-se só o PAR, nunca atributo do vice | Aceita |
+| ADR-024 | Atividade de mandatos anteriores | Ponte de identidade por CPF entre legislaturas, cobertura de 48 para 117 majoritários | Aceita |
 | ADR-019 | Texto integral dos planos de governo | O endpoint certo do TSE estava no bundle do próprio app; 201 de 206 planos transcrevem, 19,3 mi de caracteres | Aceita |
 | ADR-018 | Site estático gerado do lake, em vez de ferramenta de BI | *Publish to web* não tem layout mobile, URL por candidato nem indexação; e 20 mil candidatos que mudam 1x/dia são geração estática, não consulta ao vivo | Aceita |
 

@@ -1,4 +1,4 @@
-# Radar Brasil — Raio-X Eleitoral 2026
+# Dossiê Eleitoral 2026
 
 Hub analitico sobre as eleicoes gerais de 2026: **quem** sao os candidatos a
 Presidente, Governador, Senador e Deputado, e **em que contexto socioeconomico**

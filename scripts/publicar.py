@@ -5,13 +5,13 @@
 Le a configuracao do ambiente, nunca de argumento — senha em linha de comando
 aparece no historico do shell e na lista de processos:
 
-    RADAR_FTP_HOST      ftp.datadubaintel.com
-    RADAR_FTP_USER      u........prdgirocoju
-    RADAR_FTP_PASSWORD  (segredo)
-    RADAR_FTP_PORT      21          (opcional)
-    RADAR_FTP_DIR       /           (opcional — a conta ja' esta' enraizada em
+    DOSSIE_FTP_HOST      ftp.datadubaintel.com
+    DOSSIE_FTP_USER      u........prdgirocoju
+    DOSSIE_FTP_PASSWORD  (segredo)
+    DOSSIE_FTP_PORT      21          (opcional)
+    DOSSIE_FTP_DIR       /           (opcional — a conta ja' esta' enraizada em
                                      /public_html/dossie)
-    RADAR_FTP_TLS_NOME  ftp.hstgr.io  (opcional — ver abaixo)
+    DOSSIE_FTP_TLS_NOME  ftp.hstgr.io  (opcional — ver abaixo)
 
 TLS NAO E' OPCIONAL AQUI
 
@@ -30,10 +30,10 @@ infraestrutura dela — e NAO para o apelido do cliente, `ftp.datadubaintel.com`
 Verificar o hostname contra o endereco de conexao falha, e falha com razao: o
 certificado realmente nao cobre aquele nome.
 
-Entao `RADAR_FTP_TLS_NOME` separa as duas coisas, que sempre foram duas:
+Entao `DOSSIE_FTP_TLS_NOME` separa as duas coisas, que sempre foram duas:
 
-    onde conectar          RADAR_FTP_HOST      ftp.datadubaintel.com
-    quem deve estar la'    RADAR_FTP_TLS_NOME  ftp.hstgr.io
+    onde conectar          DOSSIE_FTP_HOST      ftp.datadubaintel.com
+    quem deve estar la'    DOSSIE_FTP_TLS_NOME  ftp.hstgr.io
 
 A verificacao segue completa — cadeia ate' uma CA publica, validade e hostname.
 Muda apenas contra QUAL nome, e o nome passa a ser o verdadeiro. Quem sequestrasse
@@ -56,7 +56,7 @@ primeira renovacao, num sabado, sem ninguem entender o motivo.
 Se o servidor recusar TLS, este script FALHA em vez de cair para FTP simples. A
 degradacao silenciosa e' o pior padrao possivel para credencial: funcionaria, e
 ninguem descobriria que a senha passou a viajar em claro. Existe uma valvula
-explicita — `RADAR_FTP_INSEGURO=1` — que precisa ser ligada por alguem que leu
+explicita — `DOSSIE_FTP_INSEGURO=1` — que precisa ser ligada por alguem que leu
 esta linha.
 
 O QUE ESTE SCRIPT NAO FAZ: APAGAR
@@ -79,11 +79,11 @@ from __future__ import annotations
 
 import argparse
 import ftplib  # noqa: S402 — o canal e' TLS; ver o cabecalho deste modulo
-import os
 import ssl
 import sys
 from pathlib import Path
 
+from ingest.common.env import definida, env
 from ingest.common.log import get_logger
 
 log = get_logger("publicar")
@@ -97,22 +97,25 @@ BLOCO = 1024 * 64
 
 
 def _config() -> dict[str, str | int]:
-    faltando = [n for n in ("RADAR_FTP_HOST", "RADAR_FTP_USER", "RADAR_FTP_PASSWORD")
-                if not os.environ.get(n)]
+    # `definida` e nao `os.environ`: o nome antigo `RADAR_FTP_*` ainda resolve
+    # enquanto o .env e os Secrets nao forem renomeados. Checar so' o nome novo
+    # aqui abortaria a publicacao com "faltam variaveis" tendo todas definidas.
+    faltando = [n for n in ("DOSSIE_FTP_HOST", "DOSSIE_FTP_USER", "DOSSIE_FTP_PASSWORD")
+                if not definida(n)]
     if faltando:
         raise SystemExit(
             "faltam variaveis de ambiente: " + ", ".join(faltando) +
             "\nNo GitHub elas vem de secrets; localmente, do .env.")
     return {
-        "host": os.environ["RADAR_FTP_HOST"].replace("ftp://", "").rstrip("/"),
-        "user": os.environ["RADAR_FTP_USER"],
-        "senha": os.environ["RADAR_FTP_PASSWORD"],
-        "porta": int(os.environ.get("RADAR_FTP_PORT") or 21),
-        "raiz": os.environ.get("RADAR_FTP_DIR") or "/",
+        "host": env("DOSSIE_FTP_HOST").replace("ftp://", "").rstrip("/"),
+        "user": env("DOSSIE_FTP_USER"),
+        "senha": env("DOSSIE_FTP_PASSWORD"),
+        "porta": int(env("DOSSIE_FTP_PORT") or 21),
+        "raiz": env("DOSSIE_FTP_DIR") or "/",
         # Vazio = verificar contra o proprio host de conexao, que e' o
         # comportamento padrao e o correto para servidor com certificado
         # no proprio nome.
-        "nome_tls": (os.environ.get("RADAR_FTP_TLS_NOME") or "").strip(),
+        "nome_tls": (env("DOSSIE_FTP_TLS_NOME") or "").strip(),
     }
 
 
@@ -152,16 +155,16 @@ def conectar(cfg: dict) -> ftplib.FTP:
             "Em hospedagem compartilhada isso costuma ser normal: o servidor tem "
             "certificado do PROVEDOR, nao do dominio do cliente. Veja qual nome "
             "ele cobre com\n\n    python -m scripts.publicar --certificado\n\n"
-            "e informe esse nome em RADAR_FTP_TLS_NOME. A verificacao continua "
+            "e informe esse nome em DOSSIE_FTP_TLS_NOME. A verificacao continua "
             "completa; muda so' contra qual nome.") from exc
 
     except ssl.SSLError as exc:
-        if os.environ.get("RADAR_FTP_INSEGURO") != "1":
+        if env("DOSSIE_FTP_INSEGURO") != "1":
             raise SystemExit(
                 f"o servidor recusou TLS ({exc}). A senha viajaria em texto puro.\n"
-                "Se isso for mesmo o que se quer, ligue RADAR_FTP_INSEGURO=1 — e "
+                "Se isso for mesmo o que se quer, ligue DOSSIE_FTP_INSEGURO=1 — e "
                 "leia antes o cabecalho de scripts/publicar.py.") from exc
-        log.warning("TLS recusado e RADAR_FTP_INSEGURO=1 — a SENHA VAI EM CLARO")
+        log.warning("TLS recusado e DOSSIE_FTP_INSEGURO=1 — a SENHA VAI EM CLARO")
         sessao = ftplib.FTP()  # noqa: S321 — ligado deliberadamente pela valvula
         sessao.connect(cfg["host"], cfg["porta"], timeout=60)
         sessao.login(cfg["user"], cfg["senha"])
@@ -242,7 +245,7 @@ def cmd_certificado(cfg: dict) -> int:
                              if n.startswith("*.")), nomes[0])
             print(f"\n  NAO cobre {cfg['host']}. Para verificar contra a "
                   "identidade real:\n"
-                  f"      RADAR_FTP_TLS_NOME={sugerido}")
+                  f"      DOSSIE_FTP_TLS_NOME={sugerido}")
     else:
         print("  cobre   : nao foi possivel ler os nomes do certificado.\n"
               "            Use `openssl s_client -starttls ftp -connect "

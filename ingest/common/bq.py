@@ -92,7 +92,7 @@ def ensure_datasets(settings: Settings | None = None) -> None:
     for nome in settings.datasets:
         ref = bigquery.Dataset(f"{settings.project}.{nome}")
         ref.location = settings.location
-        ref.description = f"Radar Brasil — camada {nome}"
+        ref.description = f"Dossie Eleitoral — camada {nome}"
         client.create_dataset(ref, exists_ok=True)
         log.info("dataset   %s.%s pronto (%s)", settings.project, nome, settings.location)
 

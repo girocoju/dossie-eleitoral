@@ -1,6 +1,6 @@
 @echo off
 rem ===========================================================================
-rem  Radar Brasil - atualizacao manual do lake, sem depender do GitHub Actions
+rem  Dossie Eleitoral - atualizacao manual do lake, sem depender do GitHub Actions
 rem ===========================================================================
 rem
 rem  Uso:  atualizar.bat            fontes diarias
@@ -52,7 +52,7 @@ echo !SELF!| findstr /C:" " >nul && (
   echo [ERRO] O caminho curto ainda contem espaco:
   echo        !SELF!
   echo        Os nomes 8.3 devem estar desligados neste volume. Mova o projeto
-  echo        para uma pasta sem espacos, por exemplo C:\radar-brasil
+  echo        para uma pasta sem espacos, por exemplo C:\dossie-eleitoral
   goto :fim_externo
 )
 
@@ -60,7 +60,7 @@ rem Log, argumentos e marca de resultado viajam por VARIAVEL DE AMBIENTE: dentro
 rem do PowerShell viram `$env:LOG` e `$env:ARGS`, que nao passam por camada de
 rem aspas nenhuma, e ai' espaco e acento no caminho sao irrelevantes.
 set "ARGS=%*"
-set "MARCA=%TEMP%\radar_codigo_%RANDOM%.txt"
+set "MARCA=%TEMP%\dossie_codigo_%RANDOM%.txt"
 if exist "!MARCA!" del "!MARCA!" >nul 2>&1
 
 rem Tee em UTF-8, escrevendo na tela e no arquivo linha a linha.
@@ -99,8 +99,18 @@ if exist ".env" (
   for /f "usebackq tokens=1,* delims==" %%a in (".env") do (
     set "K=%%a"
     set "V=%%b"
-    if /I "!K!"=="RADAR_CPF_SALT"     call :procurar "!V!" "o salt do CPF"
-    if /I "!K!"=="RADAR_FTP_PASSWORD" call :procurar "!V!" "a senha do FTP"
+    rem Sem isto, um .env salvo como "UTF-8 com BOM" faz a PRIMEIRA chave chegar
+    rem aqui com bytes invisiveis grudados. A comparacao falha, o segredo nao e'
+    rem procurado no log - e o rodape continua dizendo TUDO CERTO. Guarda que
+    rem para de guardar sem avisar e' pior que guarda nenhum.
+    call :sem_bom K
+    if /I "!K!"=="DOSSIE_CPF_SALT"     call :procurar "!V!" "o salt do CPF"
+    if /I "!K!"=="DOSSIE_FTP_PASSWORD" call :procurar "!V!" "a senha do FTP"
+    rem Os nomes antigos seguem aqui ate' o .env ser renomeado. Guarda que so'
+    rem conhece o nome novo deixa passar o segredo com o nome velho - e continua
+    rem dizendo que conferiu.
+    if /I "!K!"=="RADAR_CPF_SALT"      call :procurar "!V!" "o salt do CPF"
+    if /I "!K!"=="RADAR_FTP_PASSWORD"  call :procurar "!V!" "a senha do FTP"
   )
 )
 
@@ -121,8 +131,10 @@ echo ===========================================================================
 :fim_externo
 rem A pausa existe para quem abre com dois cliques: sem ela a janela fecha antes
 rem de dar tempo de ler. Quem chama de dentro de outro script - o Agendador de
-rem Tarefas do Windows, por exemplo - define RADAR_SEM_PAUSA=1 e nao trava.
-if not defined RADAR_SEM_PAUSA (
+rem Tarefas do Windows, por exemplo - define DOSSIE_SEM_PAUSA=1 e nao trava.
+rem (RADAR_SEM_PAUSA, o nome antigo, continua valendo.)
+if defined RADAR_SEM_PAUSA set "DOSSIE_SEM_PAUSA=1"
+if not defined DOSSIE_SEM_PAUSA (
   echo.
   echo Pressione uma tecla para fechar...
   pause >nul
@@ -132,6 +144,20 @@ exit /b %CODIGO%
 
 rem Busca literal do segredo dentro do log. `findstr /C:` nao trata o texto como
 rem expressao regular, o que importa porque o salt tem `-` e `+`.
+:sem_bom
+rem Tira do INICIO do nome recebido (por referencia) o que nao puder comecar uma
+rem chave. Nome de variavel comeca por letra ou _; comentario comeca por #. Tudo
+rem que vier antes disso e' lixo de codificacao. Tres voltas bastam: o BOM do
+rem UTF-8 tem tres bytes.
+setlocal EnableDelayedExpansion
+set "N=!%~1!"
+for /l %%i in (1,1,3) do (
+  set "C=!N:~0,1!"
+  echo(!C!| findstr /r /c:"^[A-Za-z_#]" >nul || set "N=!N:~1!"
+)
+endlocal & set "%~1=%N%"
+exit /b 0
+
 :procurar
 if "%~1"=="" exit /b 0
 findstr /C:"%~1" "%LOG%" >nul 2>&1 && set "VAZOU=%VAZOU% %~2"
@@ -152,7 +178,7 @@ set "AVISOS="
 
 for /f "delims=" %%i in ('powershell -NoProfile -Command "Get-Date -Format \"dd/MM/yyyy HH:mm:ss\""') do set "INICIO=%%i"
 echo ===========================================================================
-echo   RADAR BRASIL - atualizacao do lake
+echo   DOSSIE ELEITORAL - atualizacao do lake
 echo   !INICIO!
 echo ===========================================================================
 echo.
@@ -174,12 +200,16 @@ if not exist ".env" (
 )
 for /f "usebackq tokens=1,* delims==" %%a in (".env") do (
   set "CHAVE=%%a"
-  rem Um .env salvo como "UTF-8 com BOM" traz tres bytes invisiveis grudados no
-  rem nome da PRIMEIRA chave, e a variavel nasceria com nome errado.
-  if "!CHAVE:~0,1!"=="﻿" set "CHAVE=!CHAVE:~1!"
+  rem Um .env salvo como "UTF-8 com BOM" traz bytes invisiveis grudados no nome
+  rem da PRIMEIRA chave, e a variavel nasceria com nome errado. Comparar com o
+  rem caractere U+FEFF literal NAO resolve - depende da pagina de codigo do
+  rem console, e medido em 31/08/2026 nao funcionava: a primeira chave chegava
+  rem vazia. A limpeza agora e' por exclusao (ver :sem_bom).
+  call :sem_bom CHAVE
   if not "!CHAVE!"=="" if not "!CHAVE:~0,1!"=="#" set "!CHAVE!=%%b"
 )
-echo   projeto BigQuery: !RADAR_GCP_PROJECT!
+if not defined DOSSIE_GCP_PROJECT set "DOSSIE_GCP_PROJECT=!RADAR_GCP_PROJECT!"
+echo   projeto BigQuery: !DOSSIE_GCP_PROJECT!
 echo.
 
 rem TOLERANTE, e nao fatal.
@@ -265,14 +295,15 @@ call :passo "Conferir que o historico continua la" fatal || goto :abortar
 set "CMD="%PY%" -m scripts.gerar_site --saida site"
 call :passo "Gerar o site" fatal || goto :abortar
 
-if defined RADAR_FTP_HOST (
+if not defined DOSSIE_FTP_HOST set "DOSSIE_FTP_HOST=!RADAR_FTP_HOST!"
+if defined DOSSIE_FTP_HOST (
   set "CMD="%PY%" -m scripts.publicar --origem site"
   call :passo "Publicar na Hostinger" tolerante
 ) else (
   echo [pulado] Publicacao
   echo          As credenciais de FTP nao estao no .env: o LAKE foi atualizado,
   echo          mas o site nao. Para publicar agora, abra
-  echo            https://github.com/girocoju/radar-brasil/actions
+  echo            https://github.com/girocoju/dossie-eleitoral/actions
   echo          rode "pipeline" e marque a caixa "somente_publicar".
   echo.
 )

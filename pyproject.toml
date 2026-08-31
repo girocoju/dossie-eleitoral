@@ -1,7 +1,7 @@
 [project]
-name = "radar-brasil"
+name = "dossie-eleitoral"
 version = "0.1.0"
-description = "Radar Brasil — Dossie Eleitoral 2026: pipeline TSE/IBGE/IPEA -> BigQuery -> dbt -> site estatico"
+description = "Dossie Eleitoral 2026: pipeline TSE/IBGE/IPEA -> BigQuery -> dbt -> site estatico"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -32,15 +32,15 @@ dev = [
 ]
 
 [project.scripts]
-radar-tse = "ingest.tse:main"
-radar-sidra = "ingest.ibge_sidra:main"
-radar-ipea = "ingest.ipeadata:main"
-radar-fotos = "ingest.fotos:main"
-radar-propostas = "ingest.propostas:main"
-radar-siconfi = "ingest.siconfi:main"
-radar-ideb = "ingest.ideb:main"
-radar-rtn = "ingest.rtn:main"
-radar-planos = "ingest.planos:main"
+dossie-tse = "ingest.tse:main"
+dossie-sidra = "ingest.ibge_sidra:main"
+dossie-ipea = "ingest.ipeadata:main"
+dossie-fotos = "ingest.fotos:main"
+dossie-propostas = "ingest.propostas:main"
+dossie-siconfi = "ingest.siconfi:main"
+dossie-ideb = "ingest.ideb:main"
+dossie-rtn = "ingest.rtn:main"
+dossie-planos = "ingest.planos:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,4 +1,4 @@
-# Metodologia — Radar Brasil
+# Metodologia — Dossiê Eleitoral
 
 > Este documento e' a versao longa do que aparece na pagina **Metodologia** do
 > relatorio (F-09). Se algo aqui e a tela discordarem, a tela esta' errada.

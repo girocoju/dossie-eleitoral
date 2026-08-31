@@ -20,7 +20,7 @@ a service account do pipeline. **Nenhuma chave e' criada em momento algum.**
 
 A confianca e' amarrada a um repositorio especifico por condicao de atributo:
 
-    assertion.repository == 'girocoju/radar-brasil'
+    assertion.repository == 'girocoju/dossie-eleitoral'
 
 Um fork, ou qualquer outro repo, nao consegue assumir a identidade nem com o mesmo
 provider configurado.
