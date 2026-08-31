@@ -59,3 +59,8 @@ Thumbs.db
 
 # dbt package lock gerado por `dbt deps`
 dbt/package-lock.yml
+
+# Logs do `atualizar.bat`. Ficam de fora do repo por dois motivos: eles crescem a
+# cada execucao, e podem conter a saida bruta de qualquer comando — inclusive,
+# num dia ruim, algo que nao devia ser publicado.
+/logs/

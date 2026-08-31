@@ -163,3 +163,31 @@ Ver [ADR-006](docs/adr/ADR-006-hmac-no-cpf.md) e [ADR-007](docs/adr/ADR-007-hash
 
 Codigo sob MIT. Os dados sao publicos e pertencem as suas fontes originais
 (TSE, IBGE, IPEA), citadas em toda visualizacao.
+
+## Atualizar sem depender do GitHub Actions
+
+`make` nao existe no Windows, e o robo das 11h pode atrasar ou falhar. Para
+atualizar na hora, da propria maquina:
+
+```
+atualizar.bat            fontes diarias
+atualizar.bat --tudo     inclui as fontes ANUAIS (IBGE, Ipeadata, SICONFI, INEP, RTN)
+```
+
+A saida aparece na tela **e** vai para `logs/atualizacao_AAAA-MM-DD_HH-MM-SS.log`
+ao mesmo tempo. O caminho e' impresso no fim — e' esse arquivo que se manda quando
+algo falha.
+
+O script distingue os dois tipos de problema, como o pipeline (ADR-022):
+
+| | |
+|---|---|
+| **AVISO** | a fonte nao respondeu agora; o dado anterior continua valendo e a atualizacao segue |
+| **FALHA** | erro de verdade. So' a carga do TSE e o `dbt build` interrompem tudo |
+
+Antes de dizer "manda o log", ele confere se algum segredo do `.env` vazou para
+dentro do arquivo e avisa em vermelho se vazou.
+
+**A publicacao do site** so' acontece se as credenciais de FTP estiverem no
+`.env`. Sem elas, o lake e' atualizado e o site nao — para publicar, rode o
+workflow `pipeline` no GitHub marcando `somente_publicar`.
