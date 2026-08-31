@@ -73,7 +73,7 @@ rem importa.
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
  "$w=New-Object IO.StreamWriter($env:LOG,$false,(New-Object Text.UTF8Encoding($false)));" ^
  "$w.AutoFlush=$true;" ^
- "try{cmd /c \"$env:SELF --interno $env:ARGS\" 2>&1 | ForEach-Object{Write-Host $_;$w.WriteLine($_)}}" ^
+ "try{cmd /c \"$env:SELF --interno $env:ARGS\" 2>&1 | ForEach-Object{$L=if($_ -is [Management.Automation.ErrorRecord]){$_.ToString()}else{$_};Write-Host $L;$w.WriteLine($L)}}" ^
  "finally{$w.Close()}"
 
 rem O RESULTADO VEM DE UM ARQUIVO, e nao de `%ERRORLEVEL%`.
@@ -179,8 +179,17 @@ for /f "usebackq tokens=1,* delims==" %%a in (".env") do (
 echo   projeto BigQuery: !RADAR_GCP_PROJECT!
 echo.
 
-set "CMD=git pull --ff-only"
-call :passo "Atualizar o codigo (git pull)" fatal || goto :abortar
+rem TOLERANTE, e nao fatal.
+rem
+rem A primeira versao era fatal e derrubou a atualizacao inteira porque o
+rem `main` local nao tinha upstream configurado - um detalhe do git, sem
+rem nenhuma relacao com o dado. Isso inverte a prioridade do projeto: o
+rem snapshot do TSE e' o que NAO volta; codigo desatualizado se resolve no
+rem proximo pull.
+rem
+rem `origin main` explicito para nao depender de `--set-upstream-to`.
+set "CMD=git pull --ff-only origin main"
+call :passo "Atualizar o codigo (git pull)" tolerante || goto :abortar
 
 rem O TSE e' FATAL de proposito: ele publica apenas o ESTADO ATUAL, sem
 rem historico. Um dia sem tirar a foto e' um dia que nao volta.
