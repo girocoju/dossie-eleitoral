@@ -125,7 +125,7 @@ de 1998.
 |---|---|---|
 | T-401 Pagina Metodologia + `docs/METODOLOGIA.md` | ✅ | Documento escrito; pagina do relatorio a montar |
 | T-402 Perfil de candidatos completo (F-08) | 🟡 | Medidas de perfil no modelo; filtros a montar no Desktop |
-| T-403 GitHub Actions **diario** (F-10) | ✅ | Rodou ponta a ponta em 28/08/2026: ingestao, `dbt build` (139), snapshot e trava de historico. Autenticacao sem chave via OIDC (ADR-011) |
+| T-403 Atualizacao diaria (F-10) | ✅ | **Migrada para a maquina do usuario em 31/08/2026.**  no Agendador de Tarefas do Windows; as fontes ANUAIS entram sozinhas aos domingos. O workflow perdeu o  e continua como rede de seguranca, por push e disparo manual |
 | T-404 Publish to web, README com prints, post | 🟡 | Publicacao automatizada: job `publicar` envia `site/` para a Hostinger por FTPS a cada carga diaria (ADR-018). Falta o post |
 
 ## Fase 5 — Pos-eleicao

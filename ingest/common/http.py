@@ -72,6 +72,23 @@ GZIP_MAGIC = bytes([0x1F, 0x8B])
 MAX_ATTEMPTS = 6
 BACKOFF_BASE = 4.0  # segundos; 4, 8, 16, 32, 64, 128
 
+# TETO DE TEMPO POR RECURSO, em segundos.
+#
+# So' o numero de tentativas nao limita nada: seis tentativas com timeout de 120s
+# e backoff ate' 64s chegam a QUATORZE MINUTOS num unico arquivo. Em 30/08/2026
+# a API da Camara caiu e o passo das proposicoes gastou 1h20 tentando dois
+# arquivos - o dobro do que a carga inteira leva quando tudo funciona.
+#
+# Um teto e' mais preciso que reduzir tentativas: host que falha rapido gasta as
+# seis em segundos e nao perde nada; host que demora para responder desiste no
+# limite, em vez de multiplicar timeout por tentativa.
+#
+# Cinco minutos porque a decisao ja' esta' tomada mesmo: fonte que nao respondeu
+# em cinco minutos vira aviso e a carga segue (ADR-022). Insistir mais so' adia
+# o mesmo desfecho - e, desde que a atualizacao roda na maquina do usuario, adia
+# com ele olhando a tela parada.
+LIMITE_TOTAL = 300.0
+
 
 class DownloadError(RuntimeError):
     """Falha ao obter um recurso, depois de esgotadas as tentativas.
@@ -341,7 +358,12 @@ def download(
     # Validadores que o servidor devolver: e' com eles que a proxima execucao
     # revalida este arquivo em vez de aceitar o cache no escuro.
     etag = modificado = None
+    limite = time.monotonic() + LIMITE_TOTAL
     for attempt in range(1, MAX_ATTEMPTS + 1):
+        if time.monotonic() > limite:
+            log.warning("%s: %.0fs sem sucesso — desistindo (teto de tempo)",
+                        dest.name, LIMITE_TOTAL)
+            break
         offset = part.stat().st_size if part.exists() else 0
         try:
             with _open(url, offset=offset) as resp:
@@ -424,7 +446,11 @@ def _decode_body(raw: bytes, encoding: str | None) -> bytes:
 def get_texto(url: str, *, timeout: float = 120.0, attempts: int = MAX_ATTEMPTS) -> str:
     """Busca uma pagina como texto, com o mesmo retry de `get_json`."""
     last_error: Exception | None = None
+    limite = time.monotonic() + LIMITE_TOTAL
     for attempt in range(1, attempts + 1):
+        if time.monotonic() > limite:
+            log.warning("%s: teto de %.0fs atingido", url[:70], LIMITE_TOTAL)
+            break
         try:
             with _open(url, timeout=timeout, aceita_gzip=True) as resp:
                 raw = _decode_body(resp.read(), resp.headers.get("Content-Encoding"))
@@ -443,7 +469,11 @@ def get_json(url: str, *, timeout: float = 120.0, attempts: int = MAX_ATTEMPTS):
     chegam a dezenas de MB de JSON e `_decode_body` sabe descomprimir.
     """
     last_error: Exception | None = None
+    limite = time.monotonic() + LIMITE_TOTAL
     for attempt in range(1, attempts + 1):
+        if time.monotonic() > limite:
+            log.warning("%s: teto de %.0fs atingido", url[:70], LIMITE_TOTAL)
+            break
         try:
             with _open(url, timeout=timeout, aceita_gzip=True, json_apenas=True) as resp:
                 raw = _decode_body(resp.read(), resp.headers.get("Content-Encoding"))

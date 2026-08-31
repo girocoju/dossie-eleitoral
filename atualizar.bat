@@ -4,7 +4,10 @@ rem  Radar Brasil - atualizacao manual do lake, sem depender do GitHub Actions
 rem ===========================================================================
 rem
 rem  Uso:  atualizar.bat            fontes diarias
-rem        atualizar.bat --tudo     inclui tambem as fontes ANUAIS
+rem        atualizar.bat --tudo     forca tambem as fontes ANUAIS
+rem
+rem  As fontes anuais (IBGE, Ipeadata, SICONFI, INEP, RTN) entram SOZINHAS aos
+rem  domingos. `--tudo` serve para forcar em qualquer outro dia.
 rem
 rem  A saida aparece na TELA e vai para um ARQUIVO ao mesmo tempo. O caminho do
 rem  log e' impresso no fim - e' esse arquivo que voce manda quando algo falhar.
@@ -188,6 +191,21 @@ rem snapshot do TSE e' o que NAO volta; codigo desatualizado se resolve no
 rem proximo pull.
 rem
 rem `origin main` explicito para nao depender de `--set-upstream-to`.
+rem AS FONTES ANUAIS ENTRAM SOZINHAS AOS DOMINGOS.
+rem
+rem O robo do GitHub rodava as anuais no cron de domingo. Com o agendamento
+rem removido em 31/08/2026, elas passariam a depender de alguem lembrar de
+rem digitar `--tudo` - e series que param de atualizar em silencio sao o modo
+rem de falha que este projeto mais evita.
+rem
+rem Domingo porque e' quando o robo as rodava, e porque IBGE, Ipeadata,
+rem SICONFI, INEP e RTN publicam no maximo algumas vezes por ano: uma vez por
+rem semana ja' e' folgado.
+for /f "delims=" %%i in ('powershell -NoProfile -Command "(Get-Date).DayOfWeek"') do set "DIA=%%i"
+set "ANUAIS="
+if /I "%~2"=="--tudo" set "ANUAIS=1"
+if /I "!DIA!"=="Sunday" set "ANUAIS=1"
+
 set "CMD=git pull --ff-only origin main"
 call :passo "Atualizar o codigo (git pull)" tolerante || goto :abortar
 
@@ -220,7 +238,7 @@ call :passo "Chapas - vice e suplentes" tolerante || goto :abortar
 set "CMD="%PY%" -m ingest.financiamento load --ano 2026"
 call :passo "Financiamento de campanha" tolerante || goto :abortar
 
-if /I "%~2"=="--tudo" (
+if defined ANUAIS (
   set "CMD="%PY%" -m ingest.ibge_sidra load --somente-verificados"
   call :passo "IBGE / SIDRA" tolerante
   set "CMD="%PY%" -m ingest.ipeadata load --somente-verificados"
@@ -233,8 +251,8 @@ if /I "%~2"=="--tudo" (
   call :passo "Tesouro / RTN" tolerante
 ) else (
   echo [pulado] Fontes anuais: IBGE, Ipeadata, SICONFI, INEP, RTN
-  echo          Sao series ANUAIS - rodar todo dia gasta tempo sem mudar nada.
-  echo          Para incluir:  atualizar.bat --tudo
+  echo          Sao series ANUAIS e entram sozinhas aos DOMINGOS. Hoje e' !DIA!.
+  echo          Para incluir agora:  atualizar.bat --tudo
   echo.
 )
 
