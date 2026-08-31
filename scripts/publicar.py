@@ -81,6 +81,8 @@ import argparse
 import ftplib  # noqa: S402 — o canal e' TLS; ver o cabecalho deste modulo
 import ssl
 import sys
+import time
+from collections.abc import Callable
 from pathlib import Path
 
 from ingest.common.env import definida, env
@@ -94,6 +96,24 @@ NUNCA_ENVIAR = {".env", ".git", "__pycache__", ".DS_Store", "Thumbs.db"}
 # Extensoes que sobem em modo texto seriam corrompidas por conversao de fim de
 # linha. Tudo binario e' o comportamento correto: HTML e JSON tambem.
 BLOCO = 1024 * 64
+
+# QUEDA DE CONEXAO NO MEIO DA PUBLICACAO NAO E' ERRO, E' INSTABILIDADE.
+#
+# Sao 738 arquivos por FTP numa sessao unica que fica aberta por volta de treze
+# minutos. Em 31/08/2026 o servidor da Hostinger cortou a conexao no meio e a
+# publicacao inteira morreu com ConnectionResetError — depois de ja' ter subido
+# centenas de arquivos, deixando o site com metade das paginas novas e metade
+# antigas. Sem retomada, o unico caminho e' recomecar do zero e torcer.
+#
+# A distincao e' a mesma do ADR-022: `error_perm` (5xx) e' problema de verdade —
+# caminho errado, permissao negada — e deve falhar alto. Conexao cortada e
+# `error_temp` (4xx) sao instabilidade: reconecta e continua do mesmo arquivo.
+TENTATIVAS_POR_ARQUIVO = 4
+ESPERA_BASE = 2.0          # segundos: 2, 4, 8
+RECONEXOES_MAX = 40        # rede ruim tem limite; alem disso e' outra coisa
+
+# `error_perm` fica DE FORA de proposito: e' a excecao que precisa subir.
+TRANSITORIAS = (OSError, EOFError, ftplib.error_temp)
 
 
 def _config() -> dict[str, str | int]:
@@ -290,7 +310,8 @@ def _liberar_caminho(sessao: ftplib.FTP, destino: str) -> None:
 
 
 def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
-           seco: bool) -> tuple[int, int]:
+           seco: bool, reconectar: Callable[[], ftplib.FTP] | None = None,
+           ) -> tuple[int, int]:
     arquivos = sorted(p for p in origem.rglob("*") if p.is_file())
     arquivos = [p for p in arquivos
                 if not any(parte in NUNCA_ENVIAR for parte in p.parts)]
@@ -310,6 +331,7 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
         for i in range(len(partes)):
             feitas.add("/".join(partes[:i + 1]))
     bytes_enviados = 0
+    reconexoes = 0
 
     for i, caminho in enumerate(arquivos, 1):
         rel = caminho.relative_to(origem).as_posix()
@@ -327,10 +349,30 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
             bytes_enviados += caminho.stat().st_size
             continue
 
-        garantir_pasta(sessao, pasta, feitas)
-        _liberar_caminho(sessao, destino)
-        with caminho.open("rb") as f:
-            sessao.storbinary(f"STOR {destino}", f, blocksize=BLOCO)
+        for tentativa in range(1, TENTATIVAS_POR_ARQUIVO + 1):
+            try:
+                garantir_pasta(sessao, pasta, feitas)
+                _liberar_caminho(sessao, destino)
+                with caminho.open("rb") as f:
+                    sessao.storbinary(f"STOR {destino}", f, blocksize=BLOCO)
+                break
+            except TRANSITORIAS as erro:
+                if reconectar is None or tentativa == TENTATIVAS_POR_ARQUIVO:
+                    raise
+                reconexoes += 1
+                if reconexoes > RECONEXOES_MAX:
+                    raise SystemExit(
+                        f"{reconexoes} reconexoes em uma publicacao — isso deixou "
+                        "de ser instabilidade de rede. Verifique a conexao e o "
+                        "servidor antes de tentar de novo.") from erro
+                espera = ESPERA_BASE * 2 ** (tentativa - 1)
+                log.warning("%s: %s — reconectando em %.0fs (tentativa %d/%d)",
+                            rel, type(erro).__name__, espera, tentativa,
+                            TENTATIVAS_POR_ARQUIVO)
+                time.sleep(espera)
+                # A pasta ja' criada continua criada do outro lado, entao
+                # `feitas` segue valendo depois de reconectar.
+                sessao = reconectar()
         bytes_enviados += caminho.stat().st_size
         if i % 100 == 0:
             log.info("%d/%d enviados (%.1f MB)", i, len(arquivos),
@@ -362,14 +404,26 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     cfg = _config()
-    sessao = conectar(cfg)
+    # A sessao viva fica num dicionario porque `enviar` pode troca-la no meio do
+    # caminho; o `finally` precisa fechar a ATUAL, nao a que morreu.
+    viva: dict[str, ftplib.FTP] = {"sessao": conectar(cfg)}
+
+    def reconectar() -> ftplib.FTP:
+        try:
+            viva["sessao"].close()
+        except Exception:  # noqa: BLE001, S110 — ja' esta' morta; fechar e' cortesia
+            pass
+        viva["sessao"] = conectar(cfg)
+        return viva["sessao"]
+
     try:
-        n, tamanho = enviar(sessao, origem, str(cfg["raiz"]), seco=False)
+        n, tamanho = enviar(viva["sessao"], origem, str(cfg["raiz"]), seco=False,
+                            reconectar=reconectar)
         log.info("publicados %d arquivos, %.1f MB em %s%s",
                  n, tamanho / 1e6, cfg["host"], cfg["raiz"])
     finally:
         try:
-            sessao.quit()
+            viva["sessao"].quit()
         except Exception:  # noqa: BLE001, S110 — desconexao suja nao invalida o envio
             pass
     return 0

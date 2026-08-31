@@ -126,7 +126,7 @@ de 1998.
 | T-401 Pagina Metodologia + `docs/METODOLOGIA.md` | ✅ | Documento escrito; pagina do relatorio a montar |
 | T-402 Perfil de candidatos completo (F-08) | 🟡 | Medidas de perfil no modelo; filtros a montar no Desktop |
 | T-403 Atualizacao diaria (F-10) | OK | Roda na maquina do usuario pelo `atualizar.bat` no Agendador de Tarefas do Windows; as fontes ANUAIS entram sozinhas aos domingos. O workflow perdeu o `schedule` e continua como rede de seguranca, por push e disparo manual |
-| T-404 Rename para Dossie Eleitoral (ADR-026) | PARCIAL | Repo, bucket de fotos, variaveis, dbt e prosa feitos. **Faltam tres passos fora do repo** (ver ADR-026): alargar a condicao do WIF no GCP, renomear o repositorio no GitHub e re-enraizar a conta FTP na Hostinger. O push esta' retido ate' a Hostinger, porque publicar com `BASE_URL` novo na pasta antiga quebraria todos os links do site no ar |
+| T-404 Rename para Dossie Eleitoral (ADR-026) | OK | Repo `girocoju/dossie-eleitoral`, pasta local, site em `datadubaintel.com/dossie-eleitoral`, bucket `dossie-eleitoral-fotos`, variaveis `DOSSIE_*` (o prefixo `RADAR_` ainda resolve, com aviso). Publicado e conferido em 31/08/2026. **Resta um passo opcional:** a condicao do WIF aceita os dois nomes de repo; fechar so' no novo quando quiser |
 | T-404 Publish to web, README com prints, post | 🟡 | Publicacao automatizada: job `publicar` envia `site/` para a Hostinger por FTPS a cada carga diaria (ADR-018). Falta o post |
 
 ## Fase 5 — Pos-eleicao
