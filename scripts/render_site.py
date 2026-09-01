@@ -155,12 +155,14 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
     nav = "".join(
         f'<a href="{BASE_URL}/{s}/" class="{"on" if s == ativo else ""}">{n}</a>'
         for s, n, _ in CARGOS.values()
-    ) + (
-        f'<a href="{BASE_URL}/doadores/" '
-        f'class="{"on" if ativo == "doadores" else ""}">Doadores</a>'
     ) + "".join(
         f'<a href="{BASE_URL}/{s}/" class="{"on" if s == ativo else ""}">{n}</a>'
         for s, n in PROPORCIONAIS.values()
+    ) + (
+        # Por ULTIMO: os cargos vem em ordem de eleicao, e "Doadores" no meio
+        # partia essa sequencia.
+        f'<a href="{BASE_URL}/doadores/" '
+        f'class="{"on" if ativo == "doadores" else ""}">Doadores</a>'
     )
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -1641,7 +1643,7 @@ def _pagina_doadores(linhas: list[list], quando: str) -> str:
 <div class="rolagem" style="max-height:none"><table>
   <thead><tr>
     <th>Financiador</th><th>Tipo</th><th>UF</th>
-    <th title="soma de todas as doações deste financiador a esta candidatura">Valor</th>
+    <th title="soma de todas as doações deste financiador a esta candidatura">Valor (R$)</th>
     <th title="quantas transferências separadas">Nº</th>
     <th>Candidato</th><th>Partido</th><th>Cargo</th><th>UF</th>
   </tr></thead>
@@ -1681,7 +1683,7 @@ function desenhar() {{
     const prop = d[7] ? ' <span class="marca-dado">próprio</span>' : "";
     return `<tr><td>${{d[0]}}${{prop}}${{cnpj ? "<br>" + cnpj : ""}}</td>
       <td>${{d[1] === "J" ? "jurídica" : "física"}}</td><td>${{d[3] || "—"}}</td>
-      <td class="num">R$ ${{num(d[5])}}</td><td class="num">${{d[6] || "—"}}</td>
+      <td class="num">${{num(d[5])}}</td><td class="num">${{d[6] || "—"}}</td>
       <td>${{cand}}</td><td>${{d[9] || "—"}}</td><td>${{d[10]}}</td>
       <td>${{d[11] || "—"}}</td></tr>`;
   }}).join(""));
