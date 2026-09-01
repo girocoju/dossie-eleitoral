@@ -29,6 +29,48 @@ FONTE = "TSE — Divulgação de Candidaturas"
 # "Rendimento medio mensal real do trabalho" e' o nome tecnico correto e quase
 # ninguem sabe o que significa. A tela mostra o nome curto e guarda a definicao
 # num tooltip — sem simplificar o DADO, so' a forma de nomea-lo.
+# Indicadores cujo NOME e explicacao dependem do ente governado. `True` = mandato
+# nacional, `False` = estadual, `None` = fora de uma ficha (catalogo da
+# metodologia, que fala dos dois casos ao mesmo tempo).
+#
+# So' entram aqui os que diziam "estado" no texto. Receita/Despesa/Resultado do
+# estado e da Uniao nao precisam: depois do ADR-029 cada um so' aparece na ficha
+# do cargo que chefiou aquele ente, entao o nome ja' esta' sempre certo.
+_ESCOPO = {
+    "PIB": {
+        True: ("PIB do Brasil",
+               "Soma de tudo que foi produzido no país no ano, a preços correntes — "
+               "a variação inclui a inflação e não é crescimento real."),
+        False: ("PIB do estado",
+                "Soma de tudo que foi produzido no estado no ano, a preços correntes — "
+                "a variação inclui a inflação e não é crescimento real."),
+        None: ("PIB",
+               "Soma de tudo que foi produzido no território no ano, a preços "
+               "correntes — a variação inclui a inflação e não é crescimento real."),
+    },
+    "POPULACAO": {
+        True: ("População", "Estimativa do IBGE de quantas pessoas moram no país."),
+        False: ("População", "Estimativa do IBGE de quantas pessoas moram no estado."),
+        None: ("População", "Estimativa do IBGE de quantas pessoas moram no território."),
+    },
+}
+
+
+def _rotulo_indicador(cod: str, nome_de_origem: str,
+                      nacional: bool | None = None) -> tuple[str, str]:
+    """Nome de tela e explicacao, com o escopo resolvido pelo mandato.
+
+    Uma ficha de PRESIDENTE dizia "PIB do estado" e "quantas pessoas moram no
+    estado" para um numero nacional. Rotulo errado sobre dado certo e' a familia
+    de erro que este projeto mais evita (ADR-023).
+    """
+    variantes = _ESCOPO.get(cod)
+    if variantes is not None:
+        return variantes[nacional]
+    return _GLOSSARIO.get(
+        cod, (nome_de_origem, "Ver metodologia para a definição completa."))
+
+
 _GLOSSARIO = {
     "PIB": ("PIB do estado",
             "Soma de tudo que foi produzido no estado no ano, a preços correntes — "
@@ -326,9 +368,6 @@ def _indicadores(c: Candidato) -> str:
     if not grupos:
         return ""
 
-    def _rotulo(i: dict) -> tuple[str, str]:
-        return _GLOSSARIO.get(
-            i["cod"], (i["indicador"], "Ver metodologia para a definição completa."))
 
     blocos = []
     # Mandato mais recente primeiro: e' a leitura de trajetoria, do que a pessoa
@@ -340,12 +379,26 @@ def _indicadores(c: Candidato) -> str:
         # "Produto Interno Bruto a precos correntes" por "PIB do estado" e "Taxa
         # de desocupacao" por "Desemprego". Ordenar pela origem produziria, na
         # tela, uma ordem que parece aleatoria.
-        for i in sorted(itens, key=lambda x: strip_accents(_rotulo(x)[0]).casefold()):
+        # Mandato nacional: o indicador JA' E' o Brasil, entao a coluna
+        # "Brasil no mesmo periodo" repetiria o mesmo numero. Medido em
+        # 31/08/2026: 76 das 78 linhas de ficha presidencial tinham as duas
+        # variacoes identicas, e as outras 2 nao tinham comparador nenhum.
+        # Comparar o Brasil com o Brasil nao e' comparacao — e' ruido que parece
+        # erro.
+        nacional = cargo == 1
+
+        # `nacional` amarrado por default: a funcao e' redefinida a cada volta
+        # do laco, e fechar sobre a variavel livre e' o tipo de bug que so'
+        # aparece quando alguem torna a chamada preguicosa (ruff B023).
+        def _rot(i: dict, nacional: bool = nacional) -> tuple[str, str]:
+            return _rotulo_indicador(i["cod"], i["indicador"], nacional)
+
+        for i in sorted(itens, key=lambda x: strip_accents(_rot(x)[0]).casefold()):
             pct = f"{i['pct']:+.1f}%" if i["pct"] is not None else "—"
             pct_br = f"{i['pct_br']:+.1f}%" if i["pct_br"] is not None else "—"
             incompleta = (' <span class="marca-dado m-ausente">janela incompleta</span>'
                           if i["incompleta"] else "")
-            nome, ajuda = _rotulo(i)
+            nome, ajuda = _rot(i)
             # Sem esta marca, "+8,6%" no PIB e' lido como crescimento economico.
             nominal = _MARCA_NOMINAL if i["cod"] in _NOMINAIS else ""
             linhas.append(
@@ -353,15 +406,16 @@ def _indicadores(c: Candidato) -> str:
                 f"aria-label='{e(ajuda)}' title='{e(ajuda)}'>?</span>{incompleta}</td>"
                 f"<td class='num'>{i['ref1']}–{i['ref2']}</td>"
                 f"<td class='num'>{pct}{nominal}</td>"
-                f"<td class='num'>{pct_br}</td></tr>")
+                + ("" if nacional else f"<td class='num'>{pct_br}</td>")
+                + "</tr>")
         if not linhas:
             continue
         blocos.append(f"""
       <h3 style="margin:24px 0 8px;font-size:15px">{e(_CARGO_CURTO.get(cargo, "—"))}
         · {e(ue)} · {a1}–{a2}</h3>
       <div class="rolagem"><table>
-        <thead><tr><th>Indicador</th><th>Janela</th>
-        <th>Variação</th><th>Brasil no mesmo período</th></tr></thead>
+        <thead><tr><th>Indicador</th><th>Janela</th><th>Variação</th>
+        {"" if nacional else "<th>Brasil no mesmo período</th>"}</tr></thead>
         <tbody>{"".join(linhas)}</tbody></table></div>""")
     if not blocos:
         return ""
@@ -1128,7 +1182,7 @@ _NOTAS_INDICADOR: dict[str, tuple[str, str, str]] = {
 def _linha_catalogo(ind: dict) -> str:
     """Uma linha da tabela de indicadores, com a cobertura vinda do lake."""
     cod = ind["cod_indicador"]
-    nome, _ = _GLOSSARIO.get(cod, (ind["nome"], ""))
+    nome, _ = _rotulo_indicador(cod, ind["nome"])
     mede, agrega, ressalva = _NOTAS_INDICADOR.get(
         cod, (ind["nome"], "—", "Ver a documentação técnica do projeto."))
 

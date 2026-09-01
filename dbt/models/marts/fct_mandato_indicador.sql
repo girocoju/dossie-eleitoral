@@ -175,20 +175,44 @@ calculado as (
 )
 
 select
-    *,
+    c.*,
+    i.ente_medido,
     -- diferenca entre a variacao da UF e a do Brasil no MESMO periodo.
     -- E' um contraste descritivo, nao um placar.
     case
-        when variacao_pct is null or variacao_brasil_pct is null then null
-        else variacao_pct - variacao_brasil_pct
+        when c.variacao_pct is null or c.variacao_brasil_pct is null then null
+        else c.variacao_pct - c.variacao_brasil_pct
     end                                                 as delta_vs_brasil,
     case
-        when variacao_pct is null or variacao_regiao_pct is null then null
-        else variacao_pct - variacao_regiao_pct
+        when c.variacao_pct is null or c.variacao_regiao_pct is null then null
+        else c.variacao_pct - c.variacao_regiao_pct
     end                                                 as delta_vs_regiao,
     -- texto que acompanha o registro para qualquer lugar que ele for exibido
     'Indicadores refletem o periodo; nao medem o efeito do mandato.' as aviso_metodologico
-from calculado
-where valor_inicio is not null
-  and valor_fim is not null
-  and ano_referencia_inicio < ano_referencia_fim
+from calculado as c
+inner join {{ ref('dim_indicador') }} as i using (cod_indicador)
+where c.valor_inicio is not null
+  and c.valor_fim is not null
+  and c.ano_referencia_inicio < c.ano_referencia_fim
+  /*
+    O INDICADOR PRECISA MEDIR O ENTE QUE A PESSOA CHEFIOU.
+
+    Sem esta clausula, a linha `sg_uf = 'BR'` do orcamento ESTADUAL — que e' a
+    soma dos 27 estados, criada em `fct_indicador_uf_ano` para servir de
+    COMPARADOR a um governador — entrava na ficha de um PRESIDENTE como se fosse
+    o orcamento dele. Medido em 31/08/2026: 9 linhas em 4 fichas presidenciais,
+    rotuladas "Despesa do estado" e "Receita do estado".
+
+    O numero estava certo e o rotulo mentia, que e' a familia de erro que este
+    projeto mais evita (ADR-023, L-22). Ver ADR-029.
+
+    `territorio` (PIB, populacao, homicidios, IDEB...) vale para os dois cargos:
+    descreve o lugar governado, e quem muda e' o rotulo, na tela.
+  */
+  and (
+      i.ente_medido = 'territorio'
+      or (i.ente_medido in ('governo_federal', 'economia_nacional')
+          and c.cod_cargo = 1)          -- Presidente
+      or (i.ente_medido = 'governo_estadual'
+          and c.cod_cargo = 3)          -- Governador
+  )

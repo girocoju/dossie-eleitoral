@@ -11,6 +11,20 @@
 # `direcao_desejavel` existe SO' para escolher a cor neutra de tendencia no Power BI
 # (Constituicao 0.1). Nao e' juizo sobre gestao, e a tela nunca atribui a variacao
 # a um mandato (Constituicao 0.2).
+# `ente_medido` diz O QUE o numero mede, e por isso decide em qual ficha ele pode
+# aparecer e com que nome:
+#
+#   territorio        o territorio governado. Vale para estado e para o pais; o
+#                     rotulo muda conforme o mandato ("PIB do estado" / "do Brasil").
+#   governo_estadual  o orcamento do governo do estado. So' na ficha de governador.
+#   governo_federal   o orcamento do governo federal. So' na ficha de presidente.
+#   economia_nacional condicoes nacionais que nao sao territorio nem orcamento de
+#                     um ente. So' na ficha de quem teve mandato nacional.
+#
+# Sem esta declaracao, a soma do orcamento dos 27 estados aparecia na ficha de um
+# PRESIDENTE rotulada "Despesa do estado" — numero que nao e' dele, com nome que
+# nao e' o dele. Ver ADR-029.
+
 versao: 1
 
 indicadores:
@@ -18,6 +32,7 @@ indicadores:
   # ── IBGE / SIDRA (S6) ────────────────────────────────────────────────
   PIB:
     nome: "Produto Interno Bruto a precos correntes"
+    ente_medido: territorio
     fonte: "IBGE — Contas Regionais (SIDRA t/5938)"
     unidade: "R$ mil correntes"
     periodicidade: anual
@@ -34,6 +49,7 @@ indicadores:
 
   POPULACAO:
     nome: "Populacao residente estimada"
+    ente_medido: territorio
     fonte: "IBGE — Estimativas de Populacao (SIDRA t/6579)"
     unidade: "pessoas"
     periodicidade: anual
@@ -50,6 +66,7 @@ indicadores:
 
   POPULACAO_CENSO:
     nome: "Populacao residente (Censo)"
+    ente_medido: territorio
     fonte: "IBGE — Censo Demografico 2022 (SIDRA t/4709)"
     unidade: "pessoas"
     periodicidade: decenal
@@ -76,6 +93,7 @@ indicadores:
 
   DESOCUPACAO:
     nome: "Taxa de desocupacao (14 anos ou mais)"
+    ente_medido: territorio
     fonte: "IBGE — PNAD Continua trimestral (SIDRA t/4099)"
     unidade: "%"
     periodicidade: anual
@@ -97,6 +115,7 @@ indicadores:
 
   RENDIMENTO_MEDIO:
     nome: "Rendimento medio mensal real do trabalho"
+    ente_medido: territorio
     fonte: "IBGE — PNAD Continua (SIDRA t/4566)"
     unidade: "R$ constantes"
     periodicidade: anual
@@ -125,6 +144,7 @@ indicadores:
 
   IPCA:
     nome: "Inflacao acumulada no ano (IPCA)"
+    ente_medido: economia_nacional
     fonte: "IBGE — IPCA serie historica (SIDRA t/1737)"
     unidade: "% no ano"
     periodicidade: anual
@@ -159,6 +179,7 @@ indicadores:
   # `verificado: false`, o indicador NAO entra na carga automatica (--somente-verificados).
   HOMICIDIOS:
     nome: "Taxa de homicidios por 100 mil habitantes"
+    ente_medido: territorio
     fonte: "IPEA — Atlas da Violencia (Ipeadata)"
     unidade: "por 100 mil hab."
     periodicidade: anual
@@ -175,6 +196,7 @@ indicadores:
 
   SELIC:
     nome: "Taxa de juros nominal — Over/Selic"
+    ente_medido: economia_nacional
     fonte: "IPEA — Ipeadata macroeconomico (serie PAN_TJOVER)"
     unidade: "% a.a."
     periodicidade: anual
@@ -206,6 +228,7 @@ indicadores:
 
   MORTALIDADE_INFANTIL:
     nome: "Taxa de mortalidade infantil"
+    ente_medido: territorio
     fonte: "IBGE — Indicadores de Desenvolvimento Sustentavel (SIDRA t/3834)"
     unidade: "por mil nascidos vivos"
     periodicidade: anual
@@ -240,6 +263,7 @@ indicadores:
   # comparador, sem atribuir merito. Muda que aqui a proximidade e' defensavel.
   RECEITA_ESTADUAL:
     nome: "Receita orcamentaria liquida do estado"
+    ente_medido: governo_estadual
     fonte: "Tesouro Nacional — SICONFI/DCA (Anexo I-C)"
     unidade: "R$ correntes"
     periodicidade: anual
@@ -258,6 +282,7 @@ indicadores:
 
   DESPESA_ESTADUAL:
     nome: "Despesa orcamentaria empenhada do estado"
+    ente_medido: governo_estadual
     fonte: "Tesouro Nacional — SICONFI/DCA (Anexo I-D)"
     unidade: "R$ correntes"
     periodicidade: anual
@@ -276,6 +301,7 @@ indicadores:
 
   PIB_PER_CAPITA:
     nome: "PIB per capita a precos correntes"
+    ente_medido: territorio
     fonte: "Calculado: IBGE t/5938 (PIB) / IBGE t/6579 (populacao)"
     unidade: "R$ correntes por habitante"
     periodicidade: anual
@@ -293,6 +319,7 @@ indicadores:
   # ── Fontes de arquivo (S8, S10) — fase 3, ver docs/LACUNAS.md ────────
   RESULTADO_ORCAMENTARIO:
     nome: "Resultado orcamentario do estado"
+    ente_medido: governo_estadual
     fonte: "Calculado: SICONFI receita liquida menos despesa empenhada"
     unidade: "R$ correntes"
     periodicidade: anual
@@ -317,6 +344,7 @@ indicadores:
 
   IDHM:
     nome: "Indice de Desenvolvimento Humano Municipal (agregado por UF)"
+    ente_medido: territorio
     fonte: "IPEA — Atlas do Desenvolvimento Humano (Ipeadata, serie ADH_IDHM)"
     unidade: "indice 0-1"
     periodicidade: decenal
@@ -344,6 +372,7 @@ indicadores:
 
   IDEB:
     nome: "IDEB — anos finais do ensino fundamental (rede publica)"
+    ente_medido: territorio
     fonte: "INEP — IDEB (planilha de divulgacao por UF)"
     unidade: "indice 0-10"
     periodicidade: bienal
@@ -389,6 +418,7 @@ indicadores:
 
   RECEITA_LIQUIDA_UNIAO:
     nome: "Receita liquida do Governo Central"
+    ente_medido: governo_federal
     fonte: "Tesouro Nacional — RTN, tabela 2.1"
     unidade: "R$ correntes"
     periodicidade: anual
@@ -409,6 +439,7 @@ indicadores:
 
   DESPESA_PRIMARIA_UNIAO:
     nome: "Despesa primaria total do Governo Central"
+    ente_medido: governo_federal
     fonte: "Tesouro Nacional — RTN, tabela 2.1"
     unidade: "R$ correntes"
     periodicidade: anual
@@ -425,6 +456,7 @@ indicadores:
 
   RESULTADO_PRIMARIO_UNIAO:
     nome: "Resultado primario do Governo Central"
+    ente_medido: governo_federal
     fonte: "Tesouro Nacional — RTN, tabela 2.1 (acima da linha)"
     unidade: "R$ correntes"
     periodicidade: anual

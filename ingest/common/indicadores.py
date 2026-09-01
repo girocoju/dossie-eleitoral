@@ -26,6 +26,11 @@ log = get_logger("indicadores")
 CATALOGO_PATH = Path(__file__).resolve().parents[1] / "layouts" / "indicadores.yml"
 
 DIRECOES = frozenset({"cima", "baixo", "neutro"})
+
+# O QUE o indicador mede — decide em qual ficha ele pode aparecer e com que nome.
+# Ver o cabecalho de `ingest/layouts/indicadores.yml` e ADR-029.
+ENTES = frozenset({"territorio", "governo_estadual", "governo_federal",
+                   "economia_nacional"})
 PROVEDORES = frozenset({"sidra", "ipeadata", "siconfi", "inep", "rtn", "arquivo", "derivado"})
 
 
@@ -41,6 +46,7 @@ class Indicador:
     unidade: str
     periodicidade: str
     direcao_desejavel: str
+    ente_medido: str
     provedor: str
     verificado: bool
     notas: str = ""
@@ -101,13 +107,19 @@ def carregar_catalogo(path: str | None = None) -> dict[str, Indicador]:
 
     catalogo: dict[str, Indicador] = {}
     for cod, spec in itens.items():
-        faltando = [c for c in ("nome", "fonte", "unidade", "provedor") if c not in spec]
+        faltando = [c for c in ("nome", "fonte", "unidade", "provedor",
+                                "ente_medido") if c not in spec]
         if faltando:
             raise CatalogoError(f"indicador {cod}: faltam os campos {faltando}")
         if spec["provedor"] not in PROVEDORES:
             raise CatalogoError(
                 f"indicador {cod}: provedor '{spec['provedor']}' desconhecido "
                 f"(use um de {sorted(PROVEDORES)})"
+            )
+        if spec["ente_medido"] not in ENTES:
+            raise CatalogoError(
+                f"indicador {cod}: ente_medido '{spec['ente_medido']}' desconhecido "
+                f"(use um de {sorted(ENTES)})"
             )
         direcao = spec.get("direcao_desejavel", "neutro")
         if direcao not in DIRECOES:
@@ -122,6 +134,7 @@ def carregar_catalogo(path: str | None = None) -> dict[str, Indicador]:
             unidade=spec["unidade"],
             periodicidade=spec.get("periodicidade", "anual"),
             direcao_desejavel=direcao,
+            ente_medido=spec["ente_medido"],
             provedor=spec["provedor"],
             verificado=bool(spec.get("verificado", False)),
             notas=str(spec.get("notas", "")).strip(),

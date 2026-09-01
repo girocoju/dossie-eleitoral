@@ -490,6 +490,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-029 | O indicador tem de medir o ente que a pessoa chefiou | A soma do orçamento dos 27 estados aparecia na ficha de um presidente rotulada "Despesa do estado"; catálogo passa a declarar `ente_medido`, o dbt filtra por cargo e o rótulo segue o ente governado | Aceita |
 | ADR-028 | "Durante mandatos anteriores" separa por mandato | O título nomeava o mandato da primeira linha para uma tabela que juntava todos — falso para 57 dos 129 candidatos com o bloco; ordem alfabética passa a ser a do nome exibido, não a do banco | Aceita |
 | ADR-027 | Queda de conexão não derruba a publicação inteira | 793 arquivos numa sessão FTP; o servidor corta a conexão a cada ~100. Reconecta e continua do mesmo arquivo, mas `error_perm` (5xx) segue falhando alto | Aceita |
 | ADR-026 | Tudo passa a se chamar Dossiê Eleitoral | Três nomes em circulação às vésperas da divulgação para imprensa, um deles na URL de toda foto do site; o *project id* do GCP e o salt público não acompanham, por serem imutável e chave | Aceita |

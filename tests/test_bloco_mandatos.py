@@ -70,18 +70,47 @@ def test_ordem_alfabetica_e_a_do_nome_EXIBIDO():
         _linha("DESOCUPACAO", "Taxa de desocupacao", 2019, 2022, 2018, 2022),
     ])
     exibidos = _indicadores_por_bloco(_indicadores(c))[0]
-    assert exibidos == ["Desemprego", "PIB do estado", "População"], (
+    assert exibidos == ["Desemprego", "PIB do Brasil", "População"], (
         f"ordem na tela saiu {exibidos} — se estiver na ordem do banco, o "
         "leitor ve' uma lista que parece aleatoria")
 
 
 def test_a_coluna_no_cargo_de_saiu_porque_o_titulo_ja_diz():
-    c = SimpleNamespace(indicadores=[_linha("PIB", "PIB", 2019, 2022, 2018, 2022)])
+    c = SimpleNamespace(indicadores=[
+        _linha("PIB", "PIB", 2019, 2022, 2018, 2022, ue="GOIÁS", cargo=3)])
     html = _indicadores(c)
     assert "<th>No cargo de</th>" not in html
-    assert "Governador" in html or "Presidente" in html
+    assert "Governador" in html
     cabecalhos = re.findall(r"<th>(.*?)</th>", html)
     assert cabecalhos == ["Indicador", "Janela", "Variação", "Brasil no mesmo período"]
+
+
+def test_mandato_nacional_nao_compara_o_brasil_com_o_brasil():
+    """Numa ficha de presidente o indicador JA' E' o Brasil.
+
+    Medido em 31/08/2026: 76 das 78 linhas presidenciais tinham `variacao_pct`
+    identica a `variacao_brasil_pct`, e as outras 2 nao tinham comparador. A
+    coluna repetia o mesmo numero — ruido que parece erro.
+    """
+    c = SimpleNamespace(indicadores=[
+        _linha("PIB", "PIB", 2023, 2026, 2022, 2025, ue="BRASIL", cargo=1)])
+    cabecalhos = re.findall(r"<th>(.*?)</th>", _indicadores(c))
+    assert cabecalhos == ["Indicador", "Janela", "Variação"]
+    assert "Brasil no mesmo período" not in _indicadores(c)
+
+
+def test_o_rotulo_do_pib_segue_o_ente_governado():
+    """"PIB do estado" numa ficha de presidente e' rotulo falso sobre dado certo."""
+    nacional = SimpleNamespace(indicadores=[
+        _linha("PIB", "Produto Interno Bruto", 2023, 2026, 2022, 2025, ue="BRASIL", cargo=1)])
+    estadual = SimpleNamespace(indicadores=[
+        _linha("PIB", "Produto Interno Bruto", 2019, 2022, 2018, 2022, ue="GOIÁS", cargo=3)])
+    assert _indicadores_por_bloco(_indicadores(nacional))[0] == ["PIB do Brasil"]
+    assert _indicadores_por_bloco(_indicadores(estadual))[0] == ["PIB do estado"]
+    assert "moram no país" in _indicadores(SimpleNamespace(indicadores=[
+        _linha("POPULACAO", "Populacao", 2023, 2026, 2022, 2025, cargo=1)]))
+    assert "moram no estado" in _indicadores(SimpleNamespace(indicadores=[
+        _linha("POPULACAO", "Populacao", 2019, 2022, 2018, 2022, ue="GOIÁS", cargo=3)]))
 
 
 def test_mandato_sem_valor_nenhum_nao_vira_bloco_vazio():

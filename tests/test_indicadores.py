@@ -54,7 +54,8 @@ def test_derivado_e_arquivo_sem_url_nao_sao_ingeriveis():
 
     orfao = Indicador(
         cod_indicador="X", nome="x", fonte="x", unidade="x", periodicidade="anual",
-        direcao_desejavel="neutro", provedor="arquivo", verificado=False,
+        direcao_desejavel="neutro", ente_medido="territorio",
+        provedor="arquivo", verificado=False,
     )
     assert orfao.ingerivel is False
 

@@ -61,6 +61,20 @@ seeds:
           - accepted_values:
               arguments:
                 values: [cima, baixo, neutro]
+      - name: ente_medido
+        description: >
+          O QUE o numero mede — e por isso em qual ficha ele pode aparecer e com
+          que nome. `territorio` vale para estado e para o pais, e o rotulo muda
+          conforme o mandato; `governo_estadual` so' aparece em ficha de
+          governador; `governo_federal` so' em ficha de presidente;
+          `economia_nacional` (IPCA, Selic) so' em mandato nacional, e nao e'
+          chamado de federal porque a Selic e' do Copom, nao do governo.
+          Ver ADR-029.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [territorio, governo_estadual, governo_federal, economia_nacional]
       - name: provedor
         tests:
           - accepted_values:
