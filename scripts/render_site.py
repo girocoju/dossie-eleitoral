@@ -82,9 +82,12 @@ _GLOSSARIO = {
     "POPULACAO_CENSO": ("População (Censo)",
             "Contagem do Censo, feita de porta em porta — mais precisa que a estimativa."),
     "DESOCUPACAO": ("Desemprego",
-            "Percentual de quem tem 14 anos ou mais, procura trabalho e não encontra."),
+            "Percentual de quem tem 14 anos ou mais, procura trabalho e não encontra. "
+            "É a taxa anual que o IBGE publica, não uma média calculada aqui."),
     "RENDIMENTO_MEDIO": ("Rendimento do trabalho",
-            "Quanto ganha por mês, em média, quem está ocupado — já descontada a inflação."),
+            "O que quem está ocupado EFETIVAMENTE recebeu no mês, em média, já "
+            "descontada a inflação. Não é o rendimento habitual, que é a outra "
+            "série do IBGE e costuma ser o número das manchetes."),
     "HOMICIDIOS": ("Homicídios",
             "Mortes por agressão a cada 100 mil habitantes."),
     "MORTALIDADE_INFANTIL": ("Mortalidade infantil",
@@ -1107,15 +1110,23 @@ _NOTAS_INDICADOR: dict[str, tuple[str, str, str]] = {
         "Mais precisa que a estimativa, e disponível só no ano censitário."),
     "DESOCUPACAO": (
         "Percentual de quem tem 14 anos ou mais, procura trabalho e não encontra.",
-        "<b>Média dos quatro trimestres</b> da PNAD Contínua. Um ano com menos de "
-        "quatro trimestres publicados não vira ano.",
-        "Pode diferir da <i>taxa anual</i> que o IBGE divulga, que é calculada por "
-        "outro caminho. Diferenças de duas a três décimas são esperadas."),
+        "<b>Nenhuma</b>: a tabela 4562 do SIDRA já é anual. O valor é o que o IBGE "
+        "publica como taxa anual de desocupação.",
+        "Até 01/09/2026 esta série vinha da tabela <i>trimestral</i> e o ano era a "
+        "média dos quatro trimestres. Isso dava 6,85% contra os 6,6% que o IBGE "
+        "publicou para 2024 — um número que não existia em publicação nenhuma. "
+        "Hoje vem da série anual oficial e confere ano a ano."),
     "RENDIMENTO_MEDIO": (
-        "Quanto ganha por mês, em média, quem está ocupado.",
-        "Média dos trimestres da PNAD Contínua.",
-        "<b>É a única série monetária já em valores reais</b> aqui: o IBGE publica "
-        "com a inflação descontada. Todas as outras estão a preços correntes."),
+        "Quanto quem está ocupado efetivamente recebeu por mês, em média.",
+        "<b>Nenhuma</b>: a tabela 4566 do SIDRA já é anual.",
+        "Duas ressalvas. É o rendimento <b>efetivamente recebido</b> — o que entrou "
+        "no mês, incluindo 13º, falta e atraso —, e não o <b>habitualmente "
+        "recebido</b>, que é a outra série do IBGE e costuma ser o número "
+        "divulgado: R$ 3.492 contra R$ 3.225 em 2024, as duas oficiais. E é "
+        "<b>a única série monetária já em valores reais</b> aqui, a preços do "
+        "período mais recente da pesquisa — por isso o valor de um ano passado "
+        "muda a cada nova divulgação. A variação entre dois anos continua válida; "
+        "o valor absoluto só faz sentido com a data de extração ao lado."),
     "IPCA": (
         "Índice oficial de inflação ao consumidor.",
         "<b>Acumulado no ano</b> — o valor de dezembro, não a média dos meses.",
@@ -1332,6 +1343,51 @@ def _metodologia(quando: str, catalogo: list[dict]) -> str:
         Nenhum valor é estendido, estimado ou projetado para cobrir o intervalo
         que a fonte não publica. Onde a série termina, a ficha fica sem o
         indicador — e diz isso.</p>
+    </section>
+
+    <section class="bloco">
+      <h2>Conferência com a fonte oficial</h2>
+      <p>Em 01/09/2026 cada um dos 18 indicadores foi conferido contra o número
+        <b>publicado pela instituição que o produz</b> — não contra notícia sobre o
+        dado. Sempre que possível, contra o arquivo que o próprio pipeline baixa
+        (planilha do INEP, planilha do Tesouro) ou contra a API da instituição
+        (Banco Central, SIDRA, Ipeadata).</p>
+      <p><b>14 dos 18 conferem</b>, vários exatos até o último dígito: a Selic bate
+        com a série do Banco Central até a quarta casa decimal (13,0282% em 2023);
+        a série do IDEB é idêntica à planilha do INEP; o resultado primário de 2023
+        bate real a real (&minus;R$ 228.499.381.293).</p>
+      <p><b>Uma série foi trocada por causa desta conferência.</b> A taxa de
+        desocupação vinha da tabela trimestral, e o valor do ano era a média dos
+        quatro trimestres — o que dava 6,85% contra os 6,6% que o IBGE publicou
+        para 2024, um número que não existia em publicação nenhuma. Passou a vir da
+        série anual oficial.</p>
+      <h3 style="margin:24px 0 8px;font-size:15px">Três casos em que dois números
+        oficiais discordam entre si</h3>
+      <ul>
+        <li><b>Homicídios.</b> O Atlas da Violência publica 21,2 para 2023; a série
+          do Ipeadata que usamos traz 21,7. Não é ano trocado: o Ipeadata calcula a
+          taxa com população da PNAD Contínua no denominador, e o Atlas usa outra
+          base. A diferença é constante.</li>
+        <li><b>Resultado primário de 2023.</b> O Tesouro anunciou R$ 230,535 bilhões
+          em janeiro de 2024 e depois revisou para R$ 228,499 bilhões. Usamos a
+          série revisada, que é a atual.</li>
+        <li><b>Rendimento do trabalho.</b> O número das manchetes é o
+          &ldquo;habitualmente recebido&rdquo;; o nosso é o &ldquo;efetivamente
+          recebido&rdquo;. As duas séries são do IBGE e medem coisas diferentes.</li>
+      </ul>
+      <h3 style="margin:24px 0 8px;font-size:15px">E um que parece erro e não é</h3>
+      <p>O IDEB dos anos finais sobe de 4,6 em 2019 para 4,9 em 2021 e <b>cai</b>
+        para 4,7 em 2023. Os três valores estão na planilha do INEP. A pandemia
+        inflou o indicador de fluxo escolar em 2021 — foi por isso que o próprio
+        INEP comparou 2023 com 2019, e não com 2021. Uma janela de mandato que
+        termine em 2021 mostra uma alta que o ano seguinte desfaz.</p>
+      <h3 style="margin:24px 0 8px;font-size:15px">O que não foi conferido</h3>
+      <p>Receita, despesa e resultado <b>do estado</b> no nível Brasil são a soma
+        dos 27 estados feita por este projeto: o SICONFI não publica um consolidado
+        estadual, então não existe número publicado contra o qual comparar o
+        agregado. Conferir exigiria ir estado a estado, contra o Balanço Geral de
+        cada um. <b>Isso não foi feito</b>, e fica dito aqui em vez de ficar
+        implícito.</p>
     </section>
 
     <section class="bloco">

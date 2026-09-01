@@ -490,6 +490,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-030 | Desocupação vem da série anual oficial; rendimento fica no "efetivamente recebido" | A média dos quatro trimestres dava 6,85% contra os 6,6% publicados — número que não existia em publicação nenhuma. Avisar que diverge não é o mesmo que publicar o certo | Aceita |
 | ADR-029 | O indicador tem de medir o ente que a pessoa chefiou | A soma do orçamento dos 27 estados aparecia na ficha de um presidente rotulada "Despesa do estado"; catálogo passa a declarar `ente_medido`, o dbt filtra por cargo e o rótulo segue o ente governado | Aceita |
 | ADR-028 | "Durante mandatos anteriores" separa por mandato | O título nomeava o mandato da primeira linha para uma tabela que juntava todos — falso para 57 dos 129 candidatos com o bloco; ordem alfabética passa a ser a do nome exibido, não a do banco | Aceita |
 | ADR-027 | Queda de conexão não derruba a publicação inteira | 793 arquivos numa sessão FTP; o servidor corta a conexão a cada ~100. Reconecta e continua do mesmo arquivo, mas `error_perm` (5xx) segue falhando alto | Aceita |
@@ -503,13 +504,12 @@ dossie-eleitoral/
 
 ## 11. Perguntas em aberto
 
-- **A taxa de desocupação do site não é a que o IBGE publica.** O valor anual é a média
-  simples dos quatro trimestres; o IBGE calcula pela amostra anual agrupada. Dá 6,85%
-  contra 6,6% em 2024, e 7,98% contra 7,8% em 2023 — um número que não existe em
-  publicação nenhuma. Trocar pela série anual oficial? Ver [VALIDACAO.md](docs/VALIDACAO.md).
-- **`RENDIMENTO_MEDIO` usa a série "efetivamente recebido"**, e o número que sai na
-  imprensa é o "habitualmente recebido" (R$ 3.492 contra R$ 3.225 em 2024). Ambas são
-  oficiais. Rotular a diferença ou trocar de série?
+- ~~A taxa de desocupação do site não é a que o IBGE publica.~~
+  **Respondida em 01/09/2026 (ADR-030):** trocada para a série anual oficial (SIDRA
+  t/4562). Confere ano a ano — 6,6% em 2024.
+- ~~`RENDIMENTO_MEDIO` usa a série "efetivamente recebido"...~~
+  **Respondida em 01/09/2026 (ADR-030):** mantém-se o efetivamente recebido, e a tela
+  passa a nomear a série. A base de deflação, que anda a cada divulgação, também está dita.
 - **O trio do SICONFI nunca foi conferido contra publicação externa.** No nível Brasil
   ele é a soma dos 27 estados feita aqui, e não existe consolidado publicado para
   comparar. Conferir estado a estado contra o Balanço Geral de cada um?

@@ -120,8 +120,28 @@ def test_parse_sidra_ignora_marcador_de_ausencia(sem_valor):
     assert obs == []
 
 
+def _indicador_trimestral():
+    """Indicador SINTETICO para exercitar a agregacao trimestral.
+
+    Antes estes testes usavam `carregar_catalogo()["DESOCUPACAO"]`, que era o
+    unico com `agregacao: media_anual`. Em 01/09/2026 a desocupacao passou a vir
+    da serie ANUAL do IBGE (ADR-030) e os testes quebraram — sem que a maquina de
+    agregacao tivesse mudado nada. Teste de maquinaria nao deve depender de qual
+    indicador do catalogo por acaso a usa hoje.
+    """
+    from ingest.common.indicadores import Indicador
+
+    return Indicador(
+        cod_indicador="TESTE_TRIMESTRAL", nome="teste", fonte="teste",
+        unidade="%", periodicidade="anual", direcao_desejavel="neutro",
+        ente_medido="territorio", provedor="sidra", verificado=False,
+        parametros={"tabela": 1, "variavel": 1, "niveis": ["n1"],
+                    "agregacao": "media_anual", "min_periodos": 4},
+    )
+
+
 def test_parse_sidra_agrega_trimestre_em_ano():
-    ind = carregar_catalogo()["DESOCUPACAO"]
+    ind = _indicador_trimestral()
     cabecalho = dict(CABECALHO_SIDRA, D3C="Trimestre (Codigo)", D3N="Trimestre")
     payload = [cabecalho] + [
         _linha("11", f"2024{t:02d}", v) for t, v in ((1, "4.0"), (2, "3.0"), (3, "3.0"), (4, "2.0"))
@@ -135,7 +155,7 @@ def test_parse_sidra_agrega_trimestre_em_ano():
 
 def test_parse_sidra_descarta_ano_incompleto():
     """Meio ano de PNAD nao vira 'o ano' — o 2026 real tinha so' 2 trimestres."""
-    ind = carregar_catalogo()["DESOCUPACAO"]
+    ind = _indicador_trimestral()
     cabecalho = dict(CABECALHO_SIDRA, D3C="Trimestre (Codigo)", D3N="Trimestre")
     payload = [cabecalho, _linha("11", "202601", "5.0"), _linha("11", "202602", "5.0")]
     assert ibge_sidra.parse_resposta(payload, ind, "http://exemplo") == []

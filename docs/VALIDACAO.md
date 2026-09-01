@@ -12,8 +12,15 @@ cada indicador conferido contra um número **publicado fora do pipeline**.
 | | |
 |---|---|
 | Confere com a fonte oficial | **14** de 18 |
-| Diverge do número mais divulgado, por motivo identificado | **2** |
+| Série oficial diferente da mais divulgada, agora nomeada na tela | **1** (rendimento) |
 | Não validado contra publicação externa | **3** (trio SICONFI) |
+
+> A primeira versão deste documento somou 14 quando a tabela tinha 13 linhas — a
+> desocupação ainda divergia. Hoje são 14 de verdade, com ela corrigida. A
+> contagem é conferida contra o catálogo, não digitada à mão.
+
+**Uma série foi trocada por causa desta conferência** (ADR-030): a desocupação
+passou da tabela trimestral para a série anual oficial e hoje confere ano a ano.
 
 ## Confere
 
@@ -36,6 +43,7 @@ cada indicador conferido contra um número **publicado fora do pipeline**.
 | RESULTADO_PRIMARIO_UNIAO | 2023 | −R$ 228.499.381.293 | −R$ 228,499 bi | Tesouro Nacional |
 | RESULTADO_PRIMARIO_UNIAO | 2024 | −R$ 42.923.691.541 | −R$ 43 bi | Tesouro Nacional |
 | HOMICIDIOS | 2019–2024 | 22,0 … 20,1 | idêntico | **API do Ipeadata**, série `AVIOL12_THOMIC` |
+| DESOCUPACAO | 2022–2025 | 9,6 / 7,7 / 6,6 / 5,6 | idêntico | IBGE — SIDRA t/4562 (anual), desde ADR-030 |
 
 ### Três armadilhas que a conferência atravessou
 
@@ -57,24 +65,23 @@ nossa, traz 22,1 e 21,7. Não é ano trocado — é **denominador**: o comentár
 série diz que ela usa população da PNAD Contínua (tabelas 6407 e 6706), e o Atlas
 usa outra base. A defasagem é constante (~0,4–0,5 pontos), não um deslocamento.
 
-## Diverge do número mais divulgado
+## Série oficial diferente da mais divulgada
 
-### DESOCUPACAO — o site mostra número diferente do que o IBGE publica
+### DESOCUPACAO — ~~diverge~~ **resolvido em 01/09/2026 (ADR-030)**
 
-| Ano | No lake | IBGE publica |
-|---|---|---|
-| 2023 | 7,98% | **7,8%** |
-| 2024 | 6,85% | **6,6%** |
+Vinha da tabela **trimestral** 4099, com o ano formado pela média simples dos
+quatro trimestres. Isso produzia um número que **não existia em publicação
+nenhuma do IBGE**:
 
-O valor anual é a **média simples dos quatro trimestres** (declarado em
-`agregacao: media_anual`). O IBGE calcula a taxa anual a partir da amostra anual
-agrupada, não pela média dos trimestres — e os dois não coincidem.
+| Ano | Antes (média dos trimestres) | IBGE publica | Agora |
+|---|---|---|---|
+| 2022 | — | 9,6% | **9,6%** |
+| 2023 | 7,98% | 7,7% | **7,7%** |
+| 2024 | 6,85% | **6,6%** | **6,6%** |
+| 2025 | — | 5,6% | **5,6%** |
 
-Não é erro de extração: é escolha de agregação que produz um número que **não
-existe em publicação nenhuma do IBGE**. Quem conferir vai achar 6,6% e ler 6,85%
-no site.
-
-**Pendente de decisão:** trocar pela série anual oficial do IBGE.
+Passou a vir da **tabela 4562**, anual na origem (2012–2025), com Brasil e as 27
+UFs. Não há mais agregação a fazer.
 
 ### RENDIMENTO_MEDIO — série oficial diferente da mais citada
 
@@ -90,8 +97,15 @@ O valor é fiel à fonte, mas o rótulo do site ("Rendimento do trabalho — qua
 ganha por mês, em média, quem está ocupado, já descontada a inflação") não
 distingue as duas coisas.
 
-**Pendente de decisão:** dizer "efetivamente recebido" no rótulo e a base de
-deflação, ou trocar para a série habitual.
+**Decidido em 01/09/2026 (ADR-030):** mantém-se o **efetivamente recebido**, e a
+tela passa a nomear a série. A ficha e a metodologia agora dizem qual das duas é.
+
+Documentado junto, porque a unidade "R$ constantes" escondia: **a base de
+deflação anda**. A série real é expressa a preços do período mais recente da
+pesquisa, então o valor de um ano passado muda a cada nova divulgação — 2024 vale
+R$ 3.492 na série que termina em 2025 e valia outro número antes. Não é revisão
+do dado, é troca de base. A variação entre dois anos continua válida; o valor
+absoluto não deve ser citado sem a data de extração ao lado.
 
 ## Não validado contra publicação externa
 

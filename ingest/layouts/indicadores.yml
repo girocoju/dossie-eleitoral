@@ -94,24 +94,29 @@ indicadores:
   DESOCUPACAO:
     nome: "Taxa de desocupacao (14 anos ou mais)"
     ente_medido: territorio
-    fonte: "IBGE — PNAD Continua trimestral (SIDRA t/4099)"
+    fonte: "IBGE — PNAD Continua anual (SIDRA t/4562)"
     unidade: "%"
     periodicidade: anual
     direcao_desejavel: baixo
     provedor: sidra
     verificado: true
-    conferido_em: "2026-08-27"
+    conferido_em: "2026-09-01"
     notas: >
-      A fonte e' trimestral desde 2012T1; o valor anual e' a MEDIA SIMPLES dos
-      trimestres disponiveis no ano, e o ano so' entra se tiver os 4 trimestres
-      (`min_periodos: 4`) — meio ano de dado nao vira "o ano".
+      SERIE ANUAL OFICIAL. Ate' 01/09/2026 este indicador vinha da tabela
+      trimestral 4099 e o valor do ano era a MEDIA SIMPLES dos quatro trimestres.
+      A validacao contra a fonte mostrou que isso nao e' o que o IBGE publica: ele
+      calcula a taxa anual pela amostra anual agrupada, e os dois nao coincidem.
+      Dava 6,85% contra 6,6% publicados em 2024 — um numero que nao existia em
+      publicacao nenhuma do IBGE.
+
+      A t/4562 e' anual na origem (2012-2025), tem Brasil e UF, e devolve
+      exatamente o numero divulgado: 6,6% em 2024. Nao ha' mais agregacao a fazer
+      aqui. Ver docs/VALIDACAO.md e ADR-030.
     parametros:
-      tabela: 4099
+      tabela: 4562
       variavel: 4099
       niveis: [n1, n3]
       periodos: all
-      agregacao: media_anual
-      min_periodos: 4
 
   RENDIMENTO_MEDIO:
     nome: "Rendimento medio mensal real do trabalho"
@@ -126,6 +131,21 @@ indicadores:
     notas: >
       Rendimento medio de quem tem 14 anos ou mais e esta' ocupado, por UF,
       2012-2025.
+
+      E' o rendimento EFETIVAMENTE RECEBIDO (t/4566, variavel 5935), e NAO o
+      "habitualmente recebido" que sai nas manchetes. As duas series sao oficiais
+      e medem coisas diferentes: o habitual e' o que a pessoa costuma ganhar, o
+      efetivo e' o que entrou no mes de referencia — inclui 13o, falta, atraso.
+      Em 2024 o efetivo real da' R$ 3.492 e o habitual divulgado deu R$ 3.225.
+      Decisao de 01/09/2026: mantem-se o efetivo, e a tela passa a dizer qual e'
+      (ADR-030).
+
+      A BASE DE DEFLACAO ANDA. A serie real e' expressa a precos do periodo mais
+      recente da pesquisa, entao o valor de um ano PASSADO muda a cada
+      divulgacao: 2024 vale R$ 3.492 na serie que termina em 2025, e valia outro
+      numero antes. Nao e' revisao do dado, e' troca de base — e por isso a
+      variacao percentual entre dois anos continua valendo, mas o valor absoluto
+      nao deve ser citado sem a data de extracao.
 
       E' a serie REAL, ja' deflacionada — e por isso a unica do projeto em R$
       CONSTANTES. PIB, receita, despesa e bens declarados sao todos nominais. Nao
