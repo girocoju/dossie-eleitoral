@@ -363,7 +363,10 @@ def _anexar_indicadores(cliente, por_pessoa: dict[str, list[Candidato]]) -> None
         from `{p}.marts.fct_mandato_indicador` m
         join `{p}.marts.dim_indicador` i using (cod_indicador)
         where m.id_pessoa in ('{lista}')
-        order by m.ano_inicio desc, i.nome
+        -- A ordem final e' decidida no render (o glossario troca o nome
+        -- exibido, entao ordenar por `i.nome` aqui daria outra coisa na
+        -- tela). Isto aqui e' so' para a saida ser deterministica.
+        order by m.ano_inicio desc, m.nm_ue, i.nome
     """
     n = 0
     for r in cliente.query(sql).result():

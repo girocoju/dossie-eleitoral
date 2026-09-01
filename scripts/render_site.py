@@ -19,6 +19,7 @@ import json
 import re
 from pathlib import Path
 
+from ingest.common.textnorm import strip_accents
 from scripts.gerar_site import BASE_URL, CARGOS, PROPORCIONAIS, Candidato, brl, e
 
 FONTE = "TSE — Divulgação de Candidaturas"
@@ -300,39 +301,78 @@ _MARCA_NOMINAL = ("<span class='ajuda' tabindex='0' aria-label='Valor a preços 
 
 
 def _indicadores(c: Candidato) -> str:
-    """Bloco socioeconomico — so' para quem ja' teve mandato executivo."""
+    """Bloco socioeconomico — so' para quem ja' teve mandato executivo.
+
+    SEPARADO POR MANDATO, do mais recente para o mais antigo.
+
+    A versao anterior jogava todos os mandatos numa tabela unica sob um `h2` que
+    nomeava apenas o mandato da PRIMEIRA linha. Para 57 dos 129 candidatos com
+    este bloco isso era uma afirmacao falsa: a ficha do Lula trazia 35 linhas de
+    tres mandatos presidenciais sob "BRASIL, 2023-2026", com "Produto Interno
+    Bruto" aparecendo tres vezes e so' a coluna Janela dizendo qual era qual.
+
+    Separado, a trajetoria se le' sem inferir nada — e o titulo de cada bloco ja'
+    diz o cargo, a unidade e o periodo, o que dispensa a coluna "No cargo de" e
+    devolve uma coluna de largura ao celular.
+    """
     if not c.indicadores:
         return ""
-    linhas = []
+
+    grupos: dict[tuple[int, int, str, int], list[dict]] = {}
     for i in c.indicadores:
         if i["v1"] is None or i["v2"] is None:
             continue
-        pct = f"{i['pct']:+.1f}%" if i["pct"] is not None else "—"
-        pct_br = f"{i['pct_br']:+.1f}%" if i["pct_br"] is not None else "—"
-        janela = f"{i['ref1']}–{i['ref2']}"
-        incompleta = (' <span class="marca-dado m-ausente">janela incompleta</span>'
-                      if i["incompleta"] else "")
-        nome, ajuda = _GLOSSARIO.get(
-            i["cod"], (i["indicador"], "Ver metodologia para a definição completa."))
-        cargo = _CARGO_CURTO.get(i["cargo"], "—")
-        # Sem esta marca, "+8,6%" no PIB e' lido como crescimento economico.
-        nominal = _MARCA_NOMINAL if i["cod"] in _NOMINAIS else ""
-        linhas.append(
-            f"<tr><td>{e(nome)}<span class='ajuda' tabindex='0' "
-            f"aria-label='{e(ajuda)}' title='{e(ajuda)}'>?</span>{incompleta}</td>"
-            f"<td>{e(cargo)}</td>"
-            f"<td class='num'>{janela}</td>"
-            f"<td class='num'>{pct}{nominal}</td>"
-            f"<td class='num'>{pct_br}</td></tr>")
-    if not linhas:
+        grupos.setdefault((i["a1"], i["a2"], i["ue"], i["cargo"]), []).append(i)
+    if not grupos:
         return ""
-    primeiro = c.indicadores[0]
-    return f"""<section class="bloco">
-      <h2>Durante mandatos anteriores — {e(primeiro['ue'])}, {primeiro['a1']}–{primeiro['a2']}</h2>
+
+    def _rotulo(i: dict) -> tuple[str, str]:
+        return _GLOSSARIO.get(
+            i["cod"], (i["indicador"], "Ver metodologia para a definição completa."))
+
+    blocos = []
+    # Mandato mais recente primeiro: e' a leitura de trajetoria, do que a pessoa
+    # fez por ultimo para tras.
+    for (a1, a2, ue, cargo), itens in sorted(grupos.items(),
+                                             key=lambda kv: (-kv[0][0], kv[0][2])):
+        linhas = []
+        # Alfabetica pelo nome EXIBIDO, nao pelo nome do banco: o glossario troca
+        # "Produto Interno Bruto a precos correntes" por "PIB do estado" e "Taxa
+        # de desocupacao" por "Desemprego". Ordenar pela origem produziria, na
+        # tela, uma ordem que parece aleatoria.
+        for i in sorted(itens, key=lambda x: strip_accents(_rotulo(x)[0]).casefold()):
+            pct = f"{i['pct']:+.1f}%" if i["pct"] is not None else "—"
+            pct_br = f"{i['pct_br']:+.1f}%" if i["pct_br"] is not None else "—"
+            incompleta = (' <span class="marca-dado m-ausente">janela incompleta</span>'
+                          if i["incompleta"] else "")
+            nome, ajuda = _rotulo(i)
+            # Sem esta marca, "+8,6%" no PIB e' lido como crescimento economico.
+            nominal = _MARCA_NOMINAL if i["cod"] in _NOMINAIS else ""
+            linhas.append(
+                f"<tr><td>{e(nome)}<span class='ajuda' tabindex='0' "
+                f"aria-label='{e(ajuda)}' title='{e(ajuda)}'>?</span>{incompleta}</td>"
+                f"<td class='num'>{i['ref1']}–{i['ref2']}</td>"
+                f"<td class='num'>{pct}{nominal}</td>"
+                f"<td class='num'>{pct_br}</td></tr>")
+        if not linhas:
+            continue
+        blocos.append(f"""
+      <h3 style="margin:24px 0 8px;font-size:15px">{e(_CARGO_CURTO.get(cargo, "—"))}
+        · {e(ue)} · {a1}–{a2}</h3>
       <div class="rolagem"><table>
-        <thead><tr><th>Indicador</th><th>No cargo de</th><th>Janela</th>
+        <thead><tr><th>Indicador</th><th>Janela</th>
         <th>Variação</th><th>Brasil no mesmo período</th></tr></thead>
-        <tbody>{''.join(linhas)}</tbody></table></div>
+        <tbody>{"".join(linhas)}</tbody></table></div>""")
+    if not blocos:
+        return ""
+
+    return f"""<section class="bloco">
+      <h2>Durante mandatos anteriores</h2>
+      <p style="font-size:13px;color:var(--ink-3);margin:0 0 4px">
+        Separado por mandato, do mais recente para o mais antigo. A
+        <b>janela</b> de cada indicador pode não coincidir com o mandato: ela é o
+        intervalo em que a fonte publicou dado, e aparece em cada linha.</p>
+      {"".join(blocos)}
       <p class="aviso" style="margin:10px 0 0">
         <b>Estes números descrevem o período, não o efeito do mandato.</b>
         Valores marcados <b>nominal</b> estão a preços correntes: a variação
