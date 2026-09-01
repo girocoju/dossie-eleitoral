@@ -205,7 +205,7 @@ indicadores:
     verificado: true
     conferido_em: "2026-08-28"
     notas: >
-      Taxa basica de juros, media do ano, 1974-2025. Serie MACROECONOMICA: nao tem
+      Taxa basica de juros ACUMULADA NO ANO, 1974-2025. Conferido em 01/09/2026 contra a serie SGS 4390 do Banco Central: 2023=13,0282% e 2024=10,8881%, exatos ate' a quarta decimal. NAO e' a media do ano nem a meta de fim de ano (11,75% em 2023) — a nota anterior dizia 'media' e estava errada. Serie MACROECONOMICA: nao tem
       nivel territorial na resposta da API (`NIVNOME` vem vazio), e por isso o
       catalogo declara `macroeconomica: true` para o loader trata-la como nacional.
       So' existe `BR`, nunca UF.

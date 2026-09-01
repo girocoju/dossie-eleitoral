@@ -503,6 +503,16 @@ dossie-eleitoral/
 
 ## 11. Perguntas em aberto
 
+- **A taxa de desocupação do site não é a que o IBGE publica.** O valor anual é a média
+  simples dos quatro trimestres; o IBGE calcula pela amostra anual agrupada. Dá 6,85%
+  contra 6,6% em 2024, e 7,98% contra 7,8% em 2023 — um número que não existe em
+  publicação nenhuma. Trocar pela série anual oficial? Ver [VALIDACAO.md](docs/VALIDACAO.md).
+- **`RENDIMENTO_MEDIO` usa a série "efetivamente recebido"**, e o número que sai na
+  imprensa é o "habitualmente recebido" (R$ 3.492 contra R$ 3.225 em 2024). Ambas são
+  oficiais. Rotular a diferença ou trocar de série?
+- **O trio do SICONFI nunca foi conferido contra publicação externa.** No nível Brasil
+  ele é a soma dos 27 estados feita aqui, e não existe consolidado publicado para
+  comparar. Conferir estado a estado contra o Balanço Geral de cada um?
 - O TSE 2026 já traz `cod_cargo` e layout iguais a 2022? (Verificar no leiame antes da T-101.)
 - Quais séries do Ipeadata têm granularidade UF anual completa desde 1999?
 - ~~IDHM 2021 (atualização do Atlas) está disponível por UF em formato aberto?~~
