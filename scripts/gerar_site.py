@@ -179,6 +179,74 @@ def _cliente():
     return bigquery.Client(project=s.project, location=s.location)
 
 
+# Abreviacao do cargo para a tabela de doadores: a coluna e' estreita e o nome
+# por extenso empurraria o resto para fora da tela no celular.
+# 7.390 das 8.082 linhas de pessoa juridica trazem este mesmo ramo, e ele
+# responde por 99,6% do dinheiro PJ — doacao de EMPRESA a candidato e'
+# inconstitucional desde 2015 (ADI 4650), entao o dinheiro juridico passa por
+# diretorio partidario. Repetir a string 7 mil vezes no JSON custa ~300 KB e nao
+# informa nada que o nome "PARTIDO LIBERAL (PL)" ja' nao diga. Os OUTROS ramos
+# sao justamente os casos que valem a tela, e esses vao inteiros.
+RAMO_OBVIO = "Atividades de organizações políticas"
+
+CARGO_CURTO_DOADOR = {
+    1: "Presidente", 2: "Vice-pres.", 3: "Governador", 4: "Vice-gov.",
+    5: "Senador", 6: "Dep. federal", 7: "Dep. estadual", 8: "Dep. distrital",
+    9: "1º Supl.", 10: "2º Supl.",
+}
+
+
+def carregar_doadores(cliente) -> list[list]:
+    """Quem financiou quem — uma linha por doador x candidatura (ADR-033).
+
+    Sai como ARRAY DE ARRAYS, nao de objetos: sao 23,5 mil linhas, e repetir
+    catorze nomes de chave em cada uma triplicaria o download sem acrescentar
+    nada. O cabecalho vai no JS da pagina.
+
+    CPF de pessoa fisica nunca foi ingerido (ADR-020). CNPJ de empresa entra,
+    porque identifica quem financia e e' de pessoa juridica.
+    """
+    p = cliente.project
+    sql = f"""
+        select nome_doador, doador_tipo, doador_cnpj, doador_uf, doador_ramo,
+               vl_doado, qt_doacoes, e_o_proprio_candidato,
+               sq_candidato, nome_candidato, partido_candidato, cod_cargo,
+               sg_uf_candidato, candidaturas_do_doador
+        from `{p}.marts.fct_ranking_doador`
+        order by vl_doado desc
+    """
+    linhas: list[list] = []
+    try:
+        resultado = cliente.query(sql).result()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("fct_ranking_doador indisponivel (%s) — site sai sem a pagina",
+                    str(exc)[:90])
+        return []
+    for r in resultado:
+        # Ficha so' existe para os cargos de CARGOS; para deputado o link
+        # apontaria para pagina que nao existe.
+        ficha = (f"candidato/{slug(r.nome_candidato or '')}-{r.sq_candidato}"
+                 if r.cod_cargo in CARGOS and r.nome_candidato else "")
+        linhas.append([
+            r.nome_doador or "",
+            "J" if r.doador_tipo == "juridica" else "F",
+            r.doador_cnpj or "",
+            r.doador_uf or "",
+            "" if (r.doador_ramo or "") == RAMO_OBVIO else (r.doador_ramo or ""),
+            round(float(r.vl_doado or 0), 2),
+            int(r.qt_doacoes or 0),
+            1 if r.e_o_proprio_candidato else 0,
+            r.nome_candidato or "",
+            r.partido_candidato or "",
+            CARGO_CURTO_DOADOR.get(r.cod_cargo, "—"),
+            r.sg_uf_candidato or "",
+            int(r.candidaturas_do_doador or 1),
+            ficha,
+        ])
+    log.info("%d linhas de doador x candidatura", len(linhas))
+    return linhas
+
+
 def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     lim = f"limit {limite}" if limite else ""
     p = cliente.project
@@ -758,10 +826,12 @@ def main(argv: list[str] | None = None) -> int:
     quando = extraido_em(cliente)
     majoritarios = carregar_majoritarios(cliente, args.limite)
     proporcionais = carregar_proporcionais(cliente)
+    doadores = carregar_doadores(cliente)
     catalogo = catalogo_indicadores(cliente)
 
     destino = Path(args.saida)
-    escrever_site(destino, majoritarios, proporcionais, quando, catalogo)
+    escrever_site(destino, majoritarios, proporcionais, quando, catalogo,
+                  doadores)
     n = sum(1 for _ in destino.rglob("*.html"))
     log.info("site em %s — %d paginas HTML", destino.resolve(), n)
     return 0

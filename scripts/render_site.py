@@ -155,6 +155,9 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
     nav = "".join(
         f'<a href="{BASE_URL}/{s}/" class="{"on" if s == ativo else ""}">{n}</a>'
         for s, n, _ in CARGOS.values()
+    ) + (
+        f'<a href="{BASE_URL}/doadores/" '
+        f'class="{"on" if ativo == "doadores" else ""}">Doadores</a>'
     ) + "".join(
         f'<a href="{BASE_URL}/{s}/" class="{"on" if s == ativo else ""}">{n}</a>'
         for s, n in PROPORCIONAIS.values()
@@ -1541,6 +1544,14 @@ def _metodologia(quando: str, catalogo: list[dict]) -> str:
 
     <section class="bloco">
       <h2>Prestação de contas de campanha</h2>
+      <p>Além do bloco em cada ficha, há a página
+        <a href="{BASE_URL}/doadores/">Quem financia as campanhas</a>, com
+        <b>todos</b> os repasses declarados numa linha por financiador &times;
+        candidatura — quem financia mais de um candidato aparece uma vez para
+        cada, com o valor de cada.</p>
+      <p><b>99,6% do dinheiro de pessoa jurídica vem de diretório partidário ou do
+        fundo eleitoral</b>, não de empresa: doação de empresa a candidato é
+        inconstitucional desde 2015 (ADI 4650).</p>
       <p>O prazo legal de prestação vai até <b>depois de 04/10/2026</b>, então a
         cobertura cresce a cada dia. Uma candidatura que não aparece
         <b>não declarou zero</b> — não declarou nada, e a ficha diz exatamente
@@ -1569,7 +1580,8 @@ def _metodologia(quando: str, catalogo: list[dict]) -> str:
 
 
 def _sitemap(majoritarios: list[Candidato], quando: str) -> str:
-    urls = [f"{BASE_URL}/", f"{BASE_URL}/metodologia/"]
+    urls = [f"{BASE_URL}/", f"{BASE_URL}/metodologia/",
+            f"{BASE_URL}/doadores/"]
     urls += [f"{BASE_URL}/{s}/" for s, _, _ in CARGOS.values()]
     urls += [f"{BASE_URL}/{s}/" for s, _ in PROPORCIONAIS.values()]
     urls += [c.url for c in majoritarios]
@@ -1580,8 +1592,122 @@ def _sitemap(majoritarios: list[Candidato], quando: str) -> str:
             f"{corpo}</urlset>\n")
 
 
+def _pagina_doadores(linhas: list[list], quando: str) -> str:
+    """Quem financiou quem — uma linha por doador x candidatura (ADR-033).
+
+    Nao e' ranking de politico, que a Constituicao 0.1 proibe: e' a tabela de
+    quem paga, ordenada por valor. Nenhuma coluna emite juizo sobre candidato.
+
+    Quem financia mais de um candidato aparece uma vez por candidatura, com o
+    valor de cada. Somar apagaria justamente a distribuicao do apoio, que e' o
+    que a tabela existe para mostrar.
+
+    A pagina desenha 200 linhas por vez. Jogar 23 mil <tr> no DOM de uma vez
+    trava o celular, que e' a maior parte do acesso (ADR-018).
+    """
+    total = sum(r[5] for r in linhas)
+    pj = sum(r[5] for r in linhas if r[1] == "J")
+    n_doadores = len({(r[0], r[1]) for r in linhas})
+    ufs = sorted({r[3] for r in linhas if r[3]})
+    op_uf = "".join(f'<option value="{e(u)}">{e(u)}</option>' for u in ufs)
+
+    corpo = f"""
+<h1>Quem financia as campanhas de 2026</h1>
+<p class="sub">{len(linhas):,} repasses declarados · {n_doadores:,} financiadores ·
+  {brl(total)} no total, dos quais {brl(pj)} ({pj / total:.0%}) vêm de pessoa
+  jurídica — quase toda ela de <b>diretórios partidários e fundo eleitoral</b>,
+  porque doação de empresa a candidato é inconstitucional desde 2015.</p>
+<p style="font-size:13px;color:var(--ink-3);margin:0 0 10px">
+  Uma linha por <b>financiador × candidatura</b>. Quem financia mais de um
+  candidato aparece uma vez para cada, com o valor de cada — somar apagaria
+  justamente a distribuição do apoio. <b>CPF de pessoa física nunca é publicado
+  nem armazenado</b> por este projeto; o CNPJ de empresa aparece porque
+  identifica quem financia.</p>
+<div class="filtros">
+  <select id="tipo">
+    <option value="">Pessoa física e jurídica</option>
+    <option value="J">Só pessoa jurídica</option>
+    <option value="F">Só pessoa física</option>
+  </select>
+  <select id="uf"><option value="">UF do financiador</option>{op_uf}</select>
+  <select id="multi">
+    <option value="">Financiando um ou vários</option>
+    <option value="1">Só quem financia mais de um</option>
+  </select>
+  <input id="busca" type="search" autocomplete="off"
+         placeholder="Buscar financiador ou candidato">
+</div>
+<p class="contagem" id="contagem">carregando…</p>
+<div class="rolagem" style="max-height:none"><table>
+  <thead><tr>
+    <th>Financiador</th><th>Tipo</th><th>UF</th>
+    <th title="soma de todas as doações deste financiador a esta candidatura">Valor</th>
+    <th title="quantas transferências separadas">Nº</th>
+    <th>Candidato</th><th>Partido</th><th>Cargo</th><th>UF</th>
+  </tr></thead>
+  <tbody id="linhas"></tbody></table></div>
+<p id="mais-caixa" style="margin:14px 0 0"><button id="mais" class="cta">
+  Mostrar mais 200</button></p>
+<p style="font-size:12.5px;color:var(--ink-3);margin:14px 0 0">
+  Fonte: prestação de contas publicada pelo TSE, extraída em {e(quando)}. A
+  cobertura cresce a cada carga — o prazo final de prestação é posterior a
+  04/10/2026, então <b>ausência aqui não significa campanha sem arrecadação</b>.
+  Doações repetidas do mesmo financiador para a mesma candidatura aparecem
+  <b>somadas</b>: quem transferiu cinquenta vezes é um financiador, não cinquenta.
+  Linhas marcadas <b>próprio</b> são o candidato financiando a si mesmo — dinheiro
+  próprio, não apoio externo.</p>
+<script>
+const PASSO = 200;
+let dados = [], vis = [], mostrando = 0;
+const $ = (id) => document.getElementById(id);
+const num = (v) => v.toLocaleString("pt-BR", {{minimumFractionDigits: 2,
+                                              maximumFractionDigits: 2}});
+function filtrar() {{
+  const t = $("tipo").value, uf = $("uf").value, m = $("multi").value;
+  const q = $("busca").value.trim().toLowerCase();
+  vis = dados.filter(d =>
+    (!t || d[1] === t) && (!uf || d[3] === uf) && (!m || d[12] > 1) &&
+    (!q || d[0].toLowerCase().includes(q) || d[8].toLowerCase().includes(q)));
+  mostrando = 0;
+  $("linhas").innerHTML = "";
+  desenhar();
+}}
+function desenhar() {{
+  const lote = vis.slice(mostrando, mostrando + PASSO);
+  $("linhas").insertAdjacentHTML("beforeend", lote.map(d => {{
+    const cand = d[13] ? `<a href="{BASE_URL}/${{d[13]}}/">${{d[8]}}</a>` : d[8];
+    const det = [d[2], d[4]].filter(Boolean).join(" · ");
+    const cnpj = det ? `<small style="color:var(--ink-3)">${{det}}</small>` : "";
+    const prop = d[7] ? ' <span class="marca-dado">próprio</span>' : "";
+    return `<tr><td>${{d[0]}}${{prop}}${{cnpj ? "<br>" + cnpj : ""}}</td>
+      <td>${{d[1] === "J" ? "jurídica" : "física"}}</td><td>${{d[3] || "—"}}</td>
+      <td class="num">R$ ${{num(d[5])}}</td><td class="num">${{d[6] || "—"}}</td>
+      <td>${{cand}}</td><td>${{d[9] || "—"}}</td><td>${{d[10]}}</td>
+      <td>${{d[11] || "—"}}</td></tr>`;
+  }}).join(""));
+  mostrando += lote.length;
+  const soma = vis.reduce((a, d) => a + d[5], 0);
+  $("contagem").textContent =
+    `mostrando ${{mostrando.toLocaleString("pt-BR")}} de ` +
+    `${{vis.length.toLocaleString("pt-BR")}} repasses · R$ ${{num(soma)}}`;
+  $("mais-caixa").style.display = mostrando < vis.length ? "" : "none";
+}}
+$("mais").addEventListener("click", desenhar);
+["tipo", "uf", "multi"].forEach(i => $(i).addEventListener("change", filtrar));
+$("busca").addEventListener("input", filtrar);
+fetch("{BASE_URL}/dados/doadores.json").then(r => r.json()).then(d => {{
+  dados = d; filtrar();
+}}).catch(() => {{ $("contagem").textContent = "não foi possível carregar a tabela"; }});
+</script>"""
+    return _pagina("Quem financia as campanhas",
+                   "Todos os repasses declarados ao TSE na eleição de 2026, por "
+                   "financiador e por candidato. Sem CPF.",
+                   corpo, quando, f"{BASE_URL}/doadores/", "doadores")
+
+
 def escrever_site(destino: Path, majoritarios: list[Candidato],
-                  proporcionais: dict[str, list[dict]], quando: str, catalogo: list[dict]) -> None:
+                  proporcionais: dict[str, list[dict]], quando: str,
+                  catalogo: list[dict], doadores: list[list] | None = None) -> None:
     def grava(caminho: str, conteudo: str) -> None:
         alvo = destino / caminho
         alvo.parent.mkdir(parents=True, exist_ok=True)
@@ -1611,6 +1737,11 @@ def escrever_site(destino: Path, majoritarios: list[Candidato],
             bruto = json.dumps(linhas, ensure_ascii=False, separators=(",", ":"))
             grava(f"dados/{chave}/{uf}.json", bruto)
         grava(f"{chave}/index.html", _listagem_proporcional(chave, nome, por_uf, quando))
+
+    if doadores:
+        grava("dados/doadores.json",
+              json.dumps(doadores, ensure_ascii=False, separators=(",", ":")))
+        grava("doadores/index.html", _pagina_doadores(doadores, quando))
 
     grava("metodologia/index.html", _metodologia(quando, catalogo))
     grava("sitemap.xml", _sitemap(majoritarios, quando))
