@@ -58,7 +58,10 @@ def test_nenhum_cpf_no_payload_nem_na_pagina():
 
 
 def test_a_pagina_diz_que_cpf_nunca_e_publicado():
-    assert "CPF de pessoa física nunca é publicado" in _html()
+    # Sem `split`, o teste quebra quando o paragrafo muda de quebra de linha —
+    # e' o texto que importa, nao onde a linha termina no fonte.
+    texto = " ".join(_html().split())
+    assert "CPF de pessoa física nunca é publicado nem armazenado" in texto
 
 
 def test_a_pagina_nao_desenha_tudo_de_uma_vez():
@@ -101,3 +104,40 @@ def test_os_filtros_que_a_tabela_precisa_existem():
     html = _html()
     for campo in ('id="tipo"', 'id="uf"', 'id="multi"', 'id="busca"'):
         assert campo in html
+
+
+def _cabecalhos(html):
+    return [re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", x)).strip()
+            for x in re.findall(r"<th[^>]*>(.*?)</th>", html, re.S)]
+
+
+def test_nenhuma_coluna_depende_de_tooltip_para_ser_entendida():
+    """A coluna "Nº" existia com a explicacao so' no `title`.
+
+    Tooltip nao aparece no celular e leitor de tela nao anuncia de forma
+    confiavel — num projeto de consulta publica, cabecalho que so' se entende
+    passando o mouse e' cabecalho que nao se entende.
+    """
+    cab = _cabecalhos(_html())
+    assert "Nº" not in cab
+    for c in cab:
+        assert len(c) >= 3, f"cabecalho {c!r} e' curto demais para se explicar"
+
+
+def test_nao_ha_dois_cabecalhos_iguais():
+    """Havia duas colunas "UF" — a do financiador e a do candidato."""
+    cab = _cabecalhos(_html())
+    assert len(cab) == len(set(cab)), f"cabecalho repetido em {cab}"
+
+
+def test_a_contagem_de_doacoes_virou_frase_e_so_aparece_quando_ha_mais_de_uma():
+    html = _html()
+    assert "doações somadas" in html
+    assert "${d[6] > 1" in html, (
+        "uma linha com uma unica doacao nao deve dizer '1 doações somadas'")
+
+
+def test_a_uf_do_financiador_ficou_junto_do_financiador():
+    html = _html()
+    assert "UF do candidato" in html
+    assert "UF do financiador" in html, "o filtro precisa dizer de quem e' a UF"

@@ -1622,8 +1622,10 @@ def _pagina_doadores(linhas: list[list], quando: str) -> str:
 <p style="font-size:13px;color:var(--ink-3);margin:0 0 10px">
   Uma linha por <b>financiador × candidatura</b>. Quem financia mais de um
   candidato aparece uma vez para cada, com o valor de cada — somar apagaria
-  justamente a distribuição do apoio. <b>CPF de pessoa física nunca é publicado
-  nem armazenado</b> por este projeto; o CNPJ de empresa aparece porque
+  justamente a distribuição do apoio. Quando o mesmo financiador transferiu mais
+  de uma vez para a mesma candidatura, o valor aparece <b>somado</b>, com a
+  quantidade de doações escrita embaixo. <b>CPF de pessoa física nunca é
+  publicado nem armazenado</b> por este projeto; o CNPJ de empresa aparece porque
   identifica quem financia.</p>
 <div class="filtros">
   <select id="tipo">
@@ -1642,10 +1644,9 @@ def _pagina_doadores(linhas: list[list], quando: str) -> str:
 <p class="contagem" id="contagem">carregando…</p>
 <div class="rolagem" style="max-height:none"><table>
   <thead><tr>
-    <th>Financiador</th><th>Tipo</th><th>UF</th>
-    <th title="soma de todas as doações deste financiador a esta candidatura">Valor (R$)</th>
-    <th title="quantas transferências separadas">Nº</th>
-    <th>Candidato</th><th>Partido</th><th>Cargo</th><th>UF</th>
+    <th>Financiador</th><th>Tipo</th>
+    <th>Valor (R$)</th>
+    <th>Candidato</th><th>Partido</th><th>Cargo</th><th>UF do candidato</th>
   </tr></thead>
   <tbody id="linhas"></tbody></table></div>
 <p id="mais-caixa" style="margin:14px 0 0"><button id="mais" class="cta">
@@ -1678,12 +1679,14 @@ function desenhar() {{
   const lote = vis.slice(mostrando, mostrando + PASSO);
   $("linhas").insertAdjacentHTML("beforeend", lote.map(d => {{
     const cand = d[13] ? `<a href="{BASE_URL}/${{d[13]}}/">${{d[8]}}</a>` : d[8];
-    const det = [d[2], d[4]].filter(Boolean).join(" · ");
+    const det = [d[2], d[3], d[4]].filter(Boolean).join(" · ");
     const cnpj = det ? `<small style="color:var(--ink-3)">${{det}}</small>` : "";
     const prop = d[7] ? ' <span class="marca-dado">próprio</span>' : "";
     return `<tr><td>${{d[0]}}${{prop}}${{cnpj ? "<br>" + cnpj : ""}}</td>
-      <td>${{d[1] === "J" ? "jurídica" : "física"}}</td><td>${{d[3] || "—"}}</td>
-      <td class="num">${{num(d[5])}}</td><td class="num">${{d[6] || "—"}}</td>
+      <td>${{d[1] === "J" ? "jurídica" : "física"}}</td>
+      <td class="num">${{num(d[5])}}${{d[6] > 1
+        ? `<br><small style="color:var(--ink-3);font-weight:400">${{d[6]}} doações somadas</small>`
+        : ""}}</td>
       <td>${{cand}}</td><td>${{d[9] || "—"}}</td><td>${{d[10]}}</td>
       <td>${{d[11] || "—"}}</td></tr>`;
   }}).join(""));
