@@ -490,6 +490,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-032 | Ficha própria para o vice de presidente e de governador | 216 candidaturas que só existiam como cartão na ficha do titular; Alckmin tem três mandatos de governador que não tinham onde aparecer. Suplente de senador fica de fora | Aceita |
 | ADR-031 | A ausência de um indicador é dita na ficha, não só respeitada | Omitir a linha sem dizer que omitiu é indistinguível de esconder; o rodapé de cada mandato passa a listar o que falta e por quê, derivado do alcance real da série | Aceita |
 | ADR-030 | Desocupação vem da série anual oficial; rendimento fica no "efetivamente recebido" | A média dos quatro trimestres dava 6,85% contra os 6,6% publicados — número que não existia em publicação nenhuma. Avisar que diverge não é o mesmo que publicar o certo | Aceita |
 | ADR-029 | O indicador tem de medir o ente que a pessoa chefiou | A soma do orçamento dos 27 estados aparecia na ficha de um presidente rotulada "Despesa do estado"; catálogo passa a declarar `ente_medido`, o dbt filtra por cargo e o rótulo segue o ente governado | Aceita |

@@ -19,13 +19,15 @@ from scripts.render_site import _indicadores, _nota_ausencias
 
 
 def _linha(cod, a1, a2, ue="BRASIL", cargo=1):
-    return {"cod": cod, "indicador": cod, "unidade": "%", "ue": ue, "cargo": cargo,
+    return {"cod": cod, "indicador": cod, "unidade": "%", "ue": ue,
+            "uf": "BR" if ue == "BRASIL" else "GO", "cargo": cargo,
             "a1": a1, "a2": a2, "ref1": a1 - 1, "ref2": a2, "v1": 1.0, "v2": 2.0,
             "pct": 10.0, "pct_br": 5.0, "delta": 5.0, "incompleta": False}
 
 
 def _ausente(cod, motivo, s1, s2, a1, a2, ue="BRASIL", cargo=1):
-    return {"a1": a1, "a2": a2, "ue": ue, "cargo": cargo, "cod": cod,
+    return {"a1": a1, "a2": a2, "ue": ue,
+            "uf": "BR" if ue == "BRASIL" else "GO", "cargo": cargo, "cod": cod,
             "motivo": motivo, "s1": s1, "s2": s2}
 
 

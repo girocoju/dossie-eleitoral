@@ -53,11 +53,19 @@ log = get_logger("site")
 # site inteiro funcionar sem servidor de producao.
 BASE_URL = "https://datadubaintel.com/dossie-eleitoral"
 
+# Vice tem candidatura propria, foto propria e trajetoria propria — e quem
+# assume quando o titular sai. Ate' 01/09/2026 ele so' aparecia como cartao na
+# ficha do titular, sem pagina onde a propria trajetoria coubesse (ADR-032).
 CARGOS = {
     1: ("presidente", "Presidente", "Brasil"),
+    2: ("vice-presidente", "Vice-Presidente", "Brasil"),
     3: ("governador", "Governador", "estadual"),
+    4: ("vice-governador", "Vice-Governador", "estadual"),
     5: ("senador", "Senador", "estadual"),
 }
+# Cargos que concorrem EM CHAPA como segundo nome. A ficha deles mostra o
+# titular; a do titular mostra eles.
+VICES = frozenset({2, 4})
 PROPORCIONAIS = {
     6: ("deputado-federal", "Deputado Federal"),
     7: ("deputado-estadual", "Deputado Estadual"),
@@ -136,6 +144,7 @@ class Candidato:
     # Vice ou suplentes da chapa (F-21). Vazio para cargo proporcional, que nao
     # tem chapa — deputado concorre sozinho.
     chapa: list[dict] = field(default_factory=list)
+    chapa_titular: dict | None = None
 
     @property
     def partido_completo(self) -> str:
@@ -197,7 +206,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
         -- aconteceu com GUTO SCHIAVETTO na pagina de senadores. As duas linhas
         -- continuam no mart; a tela mostra uma. Ver a CTE `repetidos` em
         -- `fct_candidatura`.
-        where d.ano_eleicao = 2026 and d.cod_cargo in (1, 3, 5)
+        where d.ano_eleicao = 2026 and d.cod_cargo in (1, 2, 3, 4, 5)
           and f.e_registro_exibido
         order by d.cod_cargo, d.sg_uf, d.nome_urna
         {lim}
@@ -358,7 +367,7 @@ def _anexar_indicadores(cliente, por_pessoa: dict[str, list[Candidato]]) -> None
     lista = "','".join(por_pessoa)
     sql = f"""
         select m.id_pessoa, m.cod_indicador, i.nome as indicador, m.unidade,
-               m.nm_ue, m.ano_inicio, m.ano_fim, m.cod_cargo,
+               m.nm_ue, m.sg_uf, m.ano_inicio, m.ano_fim, m.cod_cargo,
                m.ano_referencia_inicio, m.ano_referencia_fim,
                m.valor_inicio, m.valor_fim, m.variacao_pct,
                m.variacao_brasil_pct, m.delta_vs_brasil, m.janela_incompleta
@@ -375,7 +384,7 @@ def _anexar_indicadores(cliente, por_pessoa: dict[str, list[Candidato]]) -> None
         for c in por_pessoa.get(r.id_pessoa, []):
             c.indicadores.append({
                 "cod": r.cod_indicador, "indicador": r.indicador,
-                "unidade": r.unidade, "ue": r.nm_ue,
+                "unidade": r.unidade, "ue": r.nm_ue, "uf": r.sg_uf,
                 "cargo": r.cod_cargo, "a1": r.ano_inicio, "a2": r.ano_fim,
                 "ref1": r.ano_referencia_inicio, "ref2": r.ano_referencia_fim,
                 "v1": r.valor_inicio, "v2": r.valor_fim,
@@ -399,7 +408,7 @@ def _anexar_indicadores_ausentes(cliente, por_pessoa: dict[str, list[Candidato]]
     p = cliente.project
     lista = "','".join(por_pessoa)
     sql = f"""
-        select id_pessoa, ano_inicio, ano_fim, nm_ue, cod_cargo,
+        select id_pessoa, ano_inicio, ano_fim, nm_ue, sg_uf, cod_cargo,
                cod_indicador, motivo, serie_inicio, serie_fim
         from `{p}.marts.fct_mandato_indicador_ausente`
         where id_pessoa in ('{lista}')
@@ -409,7 +418,7 @@ def _anexar_indicadores_ausentes(cliente, por_pessoa: dict[str, list[Candidato]]
     for r in cliente.query(sql).result():
         for c in por_pessoa.get(r.id_pessoa, []):
             c.indicadores_ausentes.append({
-                "a1": r.ano_inicio, "a2": r.ano_fim, "ue": r.nm_ue,
+                "a1": r.ano_inicio, "a2": r.ano_fim, "ue": r.nm_ue, "uf": r.sg_uf,
                 "cargo": r.cod_cargo, "cod": r.cod_indicador,
                 "motivo": r.motivo, "s1": r.serie_inicio, "s2": r.serie_fim,
             })
@@ -600,9 +609,10 @@ def _anexar_chapa(cliente, por_sk: dict[str, Candidato]) -> None:
     p = cliente.project
     try:
         linhas = list(cliente.query(f"""
-            select sk_titular, ordem, cargo_vice, nome_urna_vice,
+            select sk_titular, nome_urna_titular, cod_cargo_titular,
+                   sk_vice, sq_vice, ordem, cargo_vice, nome_urna_vice,
                    nome_completo_vice, sigla_partido_vice, url_foto_vice,
-                   vice_encontrado
+                   id_pessoa_vice, vice_encontrado
             from `{p}.marts.dim_chapa`
             order by sk_titular, ordem
         """).result())
@@ -610,18 +620,39 @@ def _anexar_chapa(cliente, por_sk: dict[str, Candidato]) -> None:
         log.warning("dim_chapa indisponivel (%s) — o site sai sem a chapa",
                     str(exc)[:80])
         return
-    n = 0
+    n, m = 0, 0
     for r in linhas:
-        c = por_sk.get(r.sk_titular)
-        if not c or not r.vice_encontrado:
+        if not r.vice_encontrado:
             continue
-        c.chapa.append({
-            "cargo": r.cargo_vice, "nome": r.nome_urna_vice,
-            "completo": r.nome_completo_vice, "partido": r.sigla_partido_vice,
-            "foto": r.url_foto_vice,
-        })
-        n += 1
-    log.info("%d vices/suplentes anexados", n)
+        vice = por_sk.get(r.sk_vice)
+        titular = por_sk.get(r.sk_titular)
+
+        # A ficha do TITULAR mostra o vice — e agora LINKA para ele, quando o
+        # vice tem ficha (presidente e governador tem; suplente de senador nao).
+        if titular is not None:
+            titular.chapa.append({
+                "cargo": r.cargo_vice, "nome": r.nome_urna_vice,
+                "completo": r.nome_completo_vice, "partido": r.sigla_partido_vice,
+                "foto": r.url_foto_vice,
+                "url": vice.url if vice is not None else None,
+            })
+            n += 1
+
+        # E a ficha do VICE mostra com quem ele concorre. Sem isto a ficha do
+        # vice seria a de alguem que aparece do nada: e' a chapa que explica por
+        # que aquela pessoa esta' na eleicao.
+        if vice is not None and titular is not None:
+            vice.chapa_titular = {
+                "nome": r.nome_urna_titular,
+                "cargo": CARGOS.get(r.cod_cargo_titular, ("", "—", ""))[1],
+                "partido": titular.sigla_partido,
+                "completo": titular.nome_completo,
+                "foto": titular.url_foto,
+                "url": titular.url,
+            }
+            m += 1
+    log.info("%d vices/suplentes anexados ao titular; %d titulares anexados ao vice",
+             n, m)
 
 
 def _anexar_planos(cliente, por_sk: dict[str, Candidato]) -> None:

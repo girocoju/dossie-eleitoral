@@ -19,6 +19,7 @@ from scripts.render_site import _indicadores
 
 def _linha(cod, indicador, a1, a2, ref1, ref2, ue="BRASIL", cargo=1):
     return {"cod": cod, "indicador": indicador, "unidade": "%", "ue": ue,
+            "uf": "BR" if ue == "BRASIL" else "GO",
             "cargo": cargo, "a1": a1, "a2": a2, "ref1": ref1, "ref2": ref2,
             "v1": 1.0, "v2": 2.0, "pct": 10.0, "pct_br": 5.0, "delta": 5.0,
             "incompleta": False}

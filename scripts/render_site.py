@@ -20,7 +20,15 @@ import re
 from pathlib import Path
 
 from ingest.common.textnorm import strip_accents
-from scripts.gerar_site import BASE_URL, CARGOS, PROPORCIONAIS, Candidato, brl, e
+from scripts.gerar_site import (
+    BASE_URL,
+    CARGOS,
+    PROPORCIONAIS,
+    VICES,
+    Candidato,
+    brl,
+    e,
+)
 
 FONTE = "TSE — Divulgação de Candidaturas"
 
@@ -413,15 +421,21 @@ def _indicadores(c: Candidato) -> str:
     if not c.indicadores:
         return ""
 
+    # A chave usa a SIGLA, nao o nome. O TSE grafa a mesma UF de dois jeitos em
+    # anos diferentes — "SAO PAULO" nos mandatos antigos do Alckmin e "SÃO PAULO"
+    # nos recentes, e o mesmo em outras 10 UFs. Agrupar pelo nome partiria o
+    # mesmo estado em dois, e a tela mostraria dois estados onde ha' um.
     ausentes: dict[tuple[int, int, str, int], list[dict]] = {}
     for x in getattr(c, "indicadores_ausentes", []):
-        ausentes.setdefault((x["a1"], x["a2"], x["ue"], x["cargo"]), []).append(x)
+        ausentes.setdefault((x["a1"], x["a2"], x.get("uf") or x["ue"], x["cargo"]),
+                            []).append(x)
 
     grupos: dict[tuple[int, int, str, int], list[dict]] = {}
     for i in c.indicadores:
         if i["v1"] is None or i["v2"] is None:
             continue
-        grupos.setdefault((i["a1"], i["a2"], i["ue"], i["cargo"]), []).append(i)
+        grupos.setdefault((i["a1"], i["a2"], i.get("uf") or i["ue"], i["cargo"]),
+                          []).append(i)
     if not grupos:
         return ""
 
@@ -429,8 +443,11 @@ def _indicadores(c: Candidato) -> str:
     blocos = []
     # Mandato mais recente primeiro: e' a leitura de trajetoria, do que a pessoa
     # fez por ultimo para tras.
-    for (a1, a2, ue, cargo), itens in sorted(grupos.items(),
+    for (a1, a2, uf, cargo), itens in sorted(grupos.items(),
                                              key=lambda kv: (-kv[0][0], kv[0][2])):
+        # Nome canonico a partir da sigla: o `nm_ue` do TSE vem sem acento nos
+        # anos antigos.
+        ue = "BRASIL" if uf == "BR" else _UF_NOME.get(uf, itens[0]["ue"]).upper()
         linhas = []
         # Alfabetica pelo nome EXIBIDO, nao pelo nome do banco: o glossario troca
         # "Produto Interno Bruto a precos correntes" por "PIB do estado" e "Taxa
@@ -474,7 +491,7 @@ def _indicadores(c: Candidato) -> str:
         <thead><tr><th>Indicador</th><th>Janela</th><th>Variação</th>
         {"" if nacional else "<th>Brasil no mesmo período</th>"}</tr></thead>
         <tbody>{"".join(linhas)}</tbody></table></div>"""
-                      + _nota_ausencias(ausentes.get((a1, a2, ue, cargo), []), nacional))
+                      + _nota_ausencias(ausentes.get((a1, a2, uf, cargo), []), nacional))
     if not blocos:
         return ""
 
@@ -537,6 +554,23 @@ def _financiamento(c: Candidato) -> str:
     R$ 40 milhoes vindos de tres mil pessoas sao fatos politicos opostos, e o
     total sozinho nao distingue.
     """
+    if not c.financiamento and c.cod_cargo in VICES:
+        # NAO e' "ainda nao entregue": e' estrutural. Medido em 01/09/2026, os
+        # titulares tinham 55% a 85% de cobertura na prestacao e os 216 vices
+        # tinham ZERO — a conta da chapa e' apresentada pelo titular. Dizer
+        # "ainda nao consta" aqui prometeria um dado que nunca vai chegar.
+        alvo = c.chapa_titular
+        link = (f' Ver <a href="{e(alvo["url"])}">a ficha de '
+                f'{e(alvo["nome"] or "quem encabeça a chapa")}</a>.' if alvo else "")
+        return f"""<section class="bloco">
+      <h2>Financiamento de campanha</h2>
+      <p><span class="marca-dado m-ausente">a prestação é da chapa</span></p>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        A arrecadação e os gastos da chapa são prestados pelo <b>titular</b>, e é
+        na ficha dele que aparecem. Nenhum candidato a vice de 2026 tem prestação
+        própria publicada pelo TSE.{link}</p>
+    </section>"""
+
     if not c.financiamento:
         return """<section class="bloco">
       <h2>Financiamento de campanha</h2>
@@ -695,16 +729,29 @@ def _chapa(c: Candidato) -> str:
     """
     if not c.chapa:
         return ""
-    cartoes = "".join(
-        f"""<div class="parceiro">
-        {'<img src="' + e(v['foto']) + '" alt="" loading="lazy">' if v.get('foto') else ''}
-        <div><b>{e(v['nome'] or '—')}</b>
+    def cartao(v: dict) -> str:
+        foto = ('<img src="' + e(v['foto']) + '" alt="" loading="lazy">'
+                if v.get('foto') else '')
+        # Vice de presidente e de governador tem ficha propria desde o ADR-032;
+        # suplente de senador, nao. Sem `url`, o cartao segue sendo so' texto —
+        # link quebrado seria pior que ausencia de link.
+        nome = (f'<a href="{e(v["url"])}">{e(v["nome"] or "—")}</a>'
+                if v.get("url") else e(v["nome"] or "—"))
+        return f"""<div class="parceiro">
+        {foto}
+        <div><b>{nome}</b>
           <small>{e(v['completo'] or '')}</small>
           <small>{e(v['cargo'] or '')} · {e(v['partido'] or '—')}</small></div>
       </div>"""
-        for v in c.chapa
-    )
-    titulo = "Vice" if len(c.chapa) == 1 else "Suplentes"
+
+    cartoes = "".join(cartao(v) for v in c.chapa)
+    # DO CARGO, nao da contagem. Presidente e governador concorrem com vice;
+    # senador, com suplentes. MARA ROCHA (Senadora, AC) tinha um unico suplente
+    # encontrado e a ficha o chamava de "Vice da chapa".
+    if c.cod_cargo in (1, 3):
+        titulo = "Vice"
+    else:
+        titulo = "Suplente" if len(c.chapa) == 1 else "Suplentes"
     return f"""<section class="bloco">
       <h2>{titulo} da chapa</h2>
       <div class="chapa">{cartoes}</div>
@@ -712,6 +759,34 @@ def _chapa(c: Candidato) -> str:
         Quem concorre junto na mesma chapa. O vínculo vem do DivulgaCandContas —
         os arquivos em lote do TSE trazem cada candidatura isolada, sem dizer a
         qual chapa pertence.</p>
+    </section>"""
+
+
+def _chapa_titular(c: Candidato) -> str:
+    """Na ficha do VICE, com quem ele concorre (ADR-032).
+
+    Sem isto a ficha do vice seria a de alguem que aparece do nada. E' a chapa
+    que explica por que aquela pessoa esta' na eleicao — e um vice se elege pelo
+    voto dado ao titular, nunca por voto proprio.
+    """
+    t = c.chapa_titular
+    if not t:
+        return ""
+    foto = ('<img src="' + e(t["foto"]) + '" alt="" loading="lazy">'
+            if t.get("foto") else "")
+    return f"""<section class="bloco">
+      <h2>Concorre na chapa de</h2>
+      <div class="chapa"><div class="parceiro">
+        {foto}
+        <div><b><a href="{e(t['url'])}">{e(t['nome'] or '—')}</a></b>
+          <small>{e(t['completo'] or '')}</small>
+          <small>{e(t['cargo'] or '')} · {e(t['partido'] or '—')}</small></div>
+      </div></div>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:10px 0 0">
+        <b>Vice não recebe voto próprio.</b> A chapa é votada como um par: o voto
+        vai para o titular, e o vice se elege junto. O vínculo vem do
+        DivulgaCandContas — os arquivos em lote do TSE trazem cada candidatura
+        isolada, sem dizer a qual chapa pertence.</p>
     </section>"""
 
 
@@ -870,6 +945,7 @@ def _ficha(c: Candidato, quando: str) -> str:
       indica qual prevalece.</p>""")
 
     partes.append(_chapa(c))
+    partes.append(_chapa_titular(c))
     partes.append(_atividade(c))
     partes.append(_financiamento(c))
     partes.append(_indicadores(c))
