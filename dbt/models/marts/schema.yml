@@ -232,6 +232,47 @@ models:
           Mesmo indicador e ano, agregado nacional. Existe para que nenhum numero
           de UF possa ser exibido sem comparador (Constituicao 0.2).
 
+  - name: fct_mandato_indicador_ausente
+    description: >
+      Por que um indicador NAO aparece na ficha de um mandato. A Regra 5 proibe
+      preencher buraco de dado, e `fct_mandato_indicador` cumpre: o par
+      simplesmente nao existe. Este modelo existe para a tela poder DIZER que nao
+      existe, e por que — ausencia silenciosa e' lida como omissao. Ver ADR-031.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [sk_mandato, cod_indicador]
+    columns:
+      - name: sk_mandato
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_mandato')
+                field: sk_mandato
+      - name: cod_indicador
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_indicador')
+                field: cod_indicador
+      - name: motivo
+        description: >
+          `serie_comeca_depois` (o caso do desemprego em mandato anterior a 2012),
+          `serie_termina_antes`, `serie_nao_cobre_a_janela` (menos de dois anos
+          com dado dentro da janela — serie decenal cai muito aqui) e
+          `sem_serie_para_a_unidade`.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [serie_comeca_depois, serie_termina_antes,
+                         serie_nao_cobre_a_janela, sem_serie_para_a_unidade]
+      - name: ente_medido
+        description: "Herdado de `dim_indicador`; a aplicabilidade por cargo segue o ADR-029."
+        tests: [not_null]
+
   - name: fct_mandato_indicador
     description: >
       F-06 — o que aconteceu com o indicador durante a janela do mandato, com os

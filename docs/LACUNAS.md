@@ -143,6 +143,13 @@ descricao (Constituicao 0.1). O parser le' `VL_OBSERVADO` e ignora `VL_PROJECAO`
 tem esse indicador em `fct_mandato_indicador`. O par mandato x indicador
 simplesmente nao existe — nao aparece zerado.
 
+**Desde 01/09/2026 a ficha DIZ isso** (ADR-031). Antes ela apenas omitia a linha,
+e a pergunta "por que o Lula nao tem desemprego nos dois primeiros mandatos?" nao
+tinha resposta na tela. Agora o rodape do bloco daquele mandato traz "Sem dado
+para esta janela: Desemprego e Rendimento do trabalho (a serie comeca em 2012)".
+A lacuna continua exatamente a mesma; o que mudou e' que ela deixou de ser
+silenciosa.
+
 **Como fechar:** nao fecha sem trocar de fonte (a PNAD antiga tem metodologia
 diferente e nao e' comparavel; emendar as duas series criaria uma quebra que
 seria lida como fato).

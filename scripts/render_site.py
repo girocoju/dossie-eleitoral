@@ -345,6 +345,56 @@ _MARCA_NOMINAL = ("<span class='ajuda' tabindex='0' aria-label='Valor a preços 
                   "inclui a inflação do período, não é crescimento real.'>nominal</span>")
 
 
+def _nota_ausencias(faltando: list[dict], nacional: bool) -> str:
+    """Diz o que NAO esta' na tabela do mandato, e por que (ADR-031).
+
+    A Regra 5 proibe preencher buraco de dado, e o bloco cumpre: a linha nao
+    existe. Mas omitir sem dizer que omitiu deixa o leitor sem distinguir "nao ha'
+    dado" de "esconderam" ou de "o site esta' pela metade". Quem le' nao tem como
+    saber que a PNAD Continua comeca em 2012 — e foi exatamente essa a pergunta
+    que a ficha do Lula provocou em 01/09/2026.
+    """
+    if not faltando:
+        return ""
+
+    def frase(x: dict) -> str:
+        motivo, s1, s2 = x["motivo"], x["s1"], x["s2"]
+        if motivo == "sem_serie_para_a_unidade":
+            return "a fonte não publica para esta unidade"
+        if motivo == "serie_comeca_depois":
+            return f"série começa em {s1}"
+        if motivo == "serie_termina_antes":
+            return f"série vai até {s2}"
+        return f"série {s1}–{s2}, sem dois anos nesta janela"
+
+    # Agrupado pelo MOTIVO, nao um parenteses por indicador: "Desemprego e
+    # Rendimento do trabalho (a serie comeca em 2012)" se le'; a mesma frase
+    # repetida duas vezes, nao.
+    # A ordem e' a do MOTIVO, nao alfabetica: "a serie comeca em 2012" explica o
+    # caso mais comum e mais surpreendente, e vem primeiro. Ordem alfabetica
+    # jogaria "a serie 1991-2010 nao alcanca..." na frente, que e' o caso de
+    # canto.
+    ordem = {"serie_comeca_depois": 0, "serie_termina_antes": 1,
+             "serie_nao_cobre_a_janela": 2, "sem_serie_para_a_unidade": 3}
+    por_frase: dict[str, tuple[int, list[str]]] = {}
+    for x in faltando:
+        nome, _ = _rotulo_indicador(x["cod"], x["cod"], nacional)
+        chave = frase(x)
+        por_frase.setdefault(chave, (ordem.get(x["motivo"], 9), []))[1].append(nome)
+
+    partes = []
+    for f, (_, nomes) in sorted(por_frase.items(), key=lambda kv: (kv[1][0], kv[0])):
+        nomes = sorted(set(nomes), key=lambda n: strip_accents(n).casefold())
+        rotulos = [f"<b>{e(n)}</b>" for n in nomes]
+        junto = (rotulos[0] if len(rotulos) == 1
+                 else " e ".join([", ".join(rotulos[:-1]), rotulos[-1]]))
+        partes.append(f"{junto} — {e(f)}")
+
+    return ('<p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">'
+            "<b>Sem dado para esta janela:</b> " + " · ".join(partes) + ". "
+            "Nada foi estimado para cobrir o intervalo.</p>")
+
+
 def _indicadores(c: Candidato) -> str:
     """Bloco socioeconomico — so' para quem ja' teve mandato executivo.
 
@@ -362,6 +412,10 @@ def _indicadores(c: Candidato) -> str:
     """
     if not c.indicadores:
         return ""
+
+    ausentes: dict[tuple[int, int, str, int], list[dict]] = {}
+    for x in getattr(c, "indicadores_ausentes", []):
+        ausentes.setdefault((x["a1"], x["a2"], x["ue"], x["cargo"]), []).append(x)
 
     grupos: dict[tuple[int, int, str, int], list[dict]] = {}
     for i in c.indicadores:
@@ -419,7 +473,8 @@ def _indicadores(c: Candidato) -> str:
       <div class="rolagem"><table>
         <thead><tr><th>Indicador</th><th>Janela</th><th>Variação</th>
         {"" if nacional else "<th>Brasil no mesmo período</th>"}</tr></thead>
-        <tbody>{"".join(linhas)}</tbody></table></div>""")
+        <tbody>{"".join(linhas)}</tbody></table></div>"""
+                      + _nota_ausencias(ausentes.get((a1, a2, ue, cargo), []), nacional))
     if not blocos:
         return ""
 
@@ -1341,8 +1396,10 @@ def _metodologia(quando: str, catalogo: list[dict]) -> str:
         <tbody>{linhas_catalogo}</tbody></table></div>
       <p style="font-size:12.5px;color:var(--ink-3);margin:10px 0 0">
         Nenhum valor é estendido, estimado ou projetado para cobrir o intervalo
-        que a fonte não publica. Onde a série termina, a ficha fica sem o
-        indicador — e diz isso.</p>
+        que a fonte não publica. Onde a série não alcança a janela do mandato, a
+        ficha fica sem o indicador — e <b>diz quais faltam e por quê</b>, ao pé da
+        tabela daquele mandato. Até 01/09/2026 ela apenas omitia a linha, o que é
+        indistinguível de esconder.</p>
     </section>
 
     <section class="bloco">

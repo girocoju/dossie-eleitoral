@@ -119,6 +119,7 @@ class Candidato:
     trajetoria: list[dict] = field(default_factory=list)
     mudancas: list[dict] = field(default_factory=list)
     indicadores: list[dict] = field(default_factory=list)
+    indicadores_ausentes: list[dict] = field(default_factory=list)
     atividade: list[dict] = field(default_factory=list)
     # Financiamento (F-11 / ADR-020). `None` e `[]` NAO sao a mesma coisa aqui:
     # lista vazia = a candidatura nao consta na prestacao de contas, e a tela
@@ -227,6 +228,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     _anexar_trajetoria(cliente, ids)
     _anexar_mudancas(cliente, {c.sk: c for c in saida})
     _anexar_indicadores(cliente, ids)
+    _anexar_indicadores_ausentes(cliente, ids)
     _anexar_atividade(cliente, ids)
     _anexar_planos(cliente, {c.sk: c for c in saida})
     _anexar_financiamento(cliente, {c.sk: c for c in saida})
@@ -382,6 +384,37 @@ def _anexar_indicadores(cliente, por_pessoa: dict[str, list[Candidato]]) -> None
             })
             n += 1
     log.info("%d linhas de indicador de mandato anexadas", n)
+
+
+def _anexar_indicadores_ausentes(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """O que NAO aparece no bloco de mandato, e por que (ADR-031).
+
+    A Regra 5 proibe preencher buraco de dado, e o bloco cumpre: a linha nao
+    existe. Mas omitir sem dizer que omitiu deixa o leitor sem distinguir "nao ha'
+    dado" de "esconderam". Quem le' nao tem como saber que a PNAD Continua comeca
+    em 2012 — e por isso um mandato de 2003 nao tem desemprego.
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    lista = "','".join(por_pessoa)
+    sql = f"""
+        select id_pessoa, ano_inicio, ano_fim, nm_ue, cod_cargo,
+               cod_indicador, motivo, serie_inicio, serie_fim
+        from `{p}.marts.fct_mandato_indicador_ausente`
+        where id_pessoa in ('{lista}')
+        order by ano_inicio desc, cod_indicador
+    """
+    n = 0
+    for r in cliente.query(sql).result():
+        for c in por_pessoa.get(r.id_pessoa, []):
+            c.indicadores_ausentes.append({
+                "a1": r.ano_inicio, "a2": r.ano_fim, "ue": r.nm_ue,
+                "cargo": r.cod_cargo, "cod": r.cod_indicador,
+                "motivo": r.motivo, "s1": r.serie_inicio, "s2": r.serie_fim,
+            })
+            n += 1
+    log.info("%d ausencias de indicador anexadas", n)
 
 
 def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
