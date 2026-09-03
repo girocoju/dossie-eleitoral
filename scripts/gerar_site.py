@@ -147,6 +147,8 @@ class Candidato:
     # tem chapa — deputado concorre sozinho.
     chapa: list[dict] = field(default_factory=list)
     chapa_titular: dict | None = None
+    # Quando os dados DESTA candidatura mudaram pela ultima vez (ADR-038).
+    dado_de: str | None = None
 
     @property
     def partido_completo(self) -> str:
@@ -342,6 +344,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     _anexar_indicadores_ausentes(cliente, ids)
     _anexar_atividade(cliente, ids)
     _anexar_atividade_senado(cliente, ids)
+    _anexar_data_do_dado(cliente, {c.sk: c for c in saida})
     _anexar_planos(cliente, {c.sk: c for c in saida})
     _anexar_financiamento(cliente, {c.sk: c for c in saida})
     _anexar_plenario(cliente, ids)
@@ -594,6 +597,47 @@ def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
             })
             n += 1
     log.info("%d linhas de atividade legislativa anexadas", n)
+
+
+def _anexar_data_do_dado(cliente, por_sk: dict[str, Candidato]) -> None:
+    """Quando os dados de cada candidatura mudaram pela ultima vez (ADR-038).
+
+    O rodape mostrava `max(_extracted_at)` da tabela inteira — quando o SITE
+    rodou, nao quando AQUELE dado mudou. `dim_candidato` tem um unico carimbo,
+    reescrito a cada ingestao, entao a data mudava todo dia em toda ficha mesmo
+    quando nada na candidatura tinha mudado.
+
+    Duas consequencias, e as duas ruins:
+
+      - o leitor era informado da hora da maquina, nao da idade do dado;
+      - toda pagina mudava todo dia, e por isso envio incremental nao economizava
+        nada. Com 20.765 fichas (F-18) a publicacao diaria passaria de 2,5 horas.
+
+    O snapshot ja' guarda a resposta certa: `dbt_valid_from` da versao vigente e'
+    a data em que aquela candidatura mudou pela ultima vez. Medido em 03/09/2026:
+    12.729 das 20.856 candidaturas nao mudam desde 27/08.
+    """
+    if not por_sk:
+        return
+    p = cliente.project
+    try:
+        linhas = list(cliente.query(f"""
+            select sk_candidatura,
+                   format_timestamp('%d/%m/%Y', dbt_valid_from, 'UTC') as quando
+            from `{p}.marts.snap_candidatura_2026`
+            where dbt_valid_to is null
+        """).result())
+    except Exception as exc:  # noqa: BLE001 — sem snapshot a ficha cai na data global
+        log.warning("snapshot indisponivel (%s) — fichas usam a data do site",
+                    str(exc)[:90])
+        return
+    n = 0
+    for r in linhas:
+        c = por_sk.get(r.sk_candidatura)
+        if c is not None:
+            c.dado_de = r.quando
+            n += 1
+    log.info("%d fichas com data propria do dado", n)
 
 
 def _anexar_atividade_senado(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:

@@ -144,12 +144,15 @@ CSS = (Path(__file__).parent / "dossie.css").read_text(encoding="utf-8")
 
 
 def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
-            canonical: str, ativo: str = "") -> str:
+            canonical: str, ativo: str = "", fonte_data: str | None = None) -> str:
     # A home passa "Dossie Eleitoral 2026" como titulo, e o sufixo fixo fazia
     # "Dossie Eleitoral 2026 — Dossie Eleitoral" — que e' o texto que aparece na
     # aba do navegador, no resultado do Google e no card compartilhado. Nome
     # repetido na primeira coisa que se le' de um projeto e' o tipo de descuido
     # que custa credibilidade justamente com quem vai avaliar o trabalho.
+    # `fonte_data` deixa a FICHA dizer quando AQUELE dado mudou, em vez de quando
+    # o site rodou (ADR-038). Quem nao passa nada continua com a data do site,
+    # que e' a resposta certa para home, listagem e metodologia.
     marca = "Dossiê Eleitoral"
     titulo_aba = titulo if titulo.startswith(marca) else f"{titulo} — {marca}"
 
@@ -189,7 +192,7 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
 <main class="wrap">
 {corpo}
 <footer class="rodape">
-  <span>Fonte: {FONTE} · extraído em {e(quando)} UTC</span>
+  <span>Fonte: {FONTE} · {fonte_data or f"extraído em {e(quando)} UTC"}</span>
   <span>Dados declarados pelo candidato ao TSE. Este site registra o que foi
     declarado — não avalia, não classifica e não ordena candidatos.</span>
   <span><a href="https://datadubaintel.com/">Data Duba Intelligence</a>
@@ -1045,8 +1048,11 @@ def _ficha(c: Candidato, quando: str) -> str:
     partes.append("</div></div>")
     desc = (f"{c.nome_urna}, candidatura a {c.cargo_nome} por {c.sg_uf} em 2026. "
             f"Perfil declarado ao TSE, trajetória eleitoral e plano de governo.")
+    fonte_data = (f"dados desta candidatura como o TSE publicava em "
+                  f"{e(c.dado_de)}" if c.dado_de else None)
     return _pagina(f"{c.nome_urna} — {c.cargo_nome} {c.sg_uf}", desc,
-                   "".join(partes), quando, c.url, CARGOS[c.cod_cargo][0])
+                   "".join(partes), quando, c.url, CARGOS[c.cod_cargo][0],
+                   fonte_data=fonte_data)
 
 
 _LIMITE_PARAGRAFO = 900
@@ -1130,8 +1136,11 @@ saíram do arquivo. {original}</p>
 <article class="plano">{paragrafos}</article>"""
     desc = (f"Plano de governo de {c.nome_urna}, candidatura a {c.cargo_nome} por "
             f"{c.sg_uf} em 2026. Texto integral entregue ao TSE.")
+    fonte_data = (f"dados desta candidatura como o TSE publicava em "
+                  f"{e(c.dado_de)}" if c.dado_de else None)
     return _pagina(f"Plano de governo de {c.nome_urna}", desc, corpo, quando,
-                   f"{c.url}plano/", CARGOS[c.cod_cargo][0])
+                   f"{c.url}plano/", CARGOS[c.cod_cargo][0],
+                   fonte_data=fonte_data)
 
 
 def _cartao(c: Candidato) -> str:
