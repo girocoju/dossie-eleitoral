@@ -490,6 +490,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-037 | O site remove do servidor o que não gera mais | O gerador não limpa a saída, e seis fichas com nome de urna antigo estavam vivas no ar; manifesto no servidor identifica as órfãs, com teto, piso e recusa de inventário parcial | Aceita |
 | ADR-036 | Publicar não sobrescreve conteúdo mais novo | Uma execução do CI de um commit anterior republicou por cima de uma correção manual já no ar; o critério de linhagem do commit pega o caso que o de horário deixava passar | Aceita |
 | ADR-035 | A receita estadual passa a ser a Receita Corrente Líquida | A conferência achou que faltava descontar as transferências constitucionais (R$ 23,8 bi em MG 2023) e que a declaração das deduções muda entre estados e anos; a RCL é padronizada por lei. O resultado orçamentário saiu | Aceita |
 | ADR-034 | Atividade legislativa do Senado, com o mesmo rigor da Câmara | `ordem = 1` como equivalente do `proponente`, validado em 48 comparações contra a flag oficial do endpoint descontinuado; classes mapeadas pela lista oficial de siglas, não pelo formato | Aceita |

@@ -312,6 +312,22 @@ def _liberar_caminho(sessao: ftplib.FTP, destino: str) -> None:
 
 
 CARIMBO = ".publicacao.json"
+MANIFESTO = ".arquivos.json"
+
+# Teto de seguranca para a remocao de orfas. Uma geracao que falhe pela metade
+# produz poucos arquivos, e sem teto a limpeza apagaria o site inteiro achando
+# que tudo virou orfao. Acima disso o publicador PARA e pede `--forcar`.
+#
+# 25% e' folgado para o caso real (nome de urna que muda, registro indeferido,
+# candidatura retirada) e apertado para o caso de falha: uma geracao truncada
+# perde muito mais que um quarto do site.
+LIMITE_REMOCAO = 0.25
+
+# O percentual sozinho e' agressivo demais em numero pequeno: uma orfa num site
+# de duas paginas ja' e' 50%. O piso existe para que a churn normal — punhado de
+# fichas que mudaram de URL — nunca precise de `--forcar`. Abaixo dele o
+# percentual nem e' consultado.
+PISO_REMOCAO = 20
 
 
 def _carimbo_remoto(sessao: ftplib.FTP, raiz: str) -> dict | None:
@@ -389,6 +405,168 @@ def conferir_regressao(sessao: ftplib.FTP, origem: Path, raiz: str,
         log.warning("%s — seguindo por --forcar", aviso[:80])
         return
     raise SystemExit(aviso)
+
+
+def listar_arquivos(origem: Path) -> list[str]:
+    """Caminhos relativos, em POSIX — o mesmo formato do manifesto e do servidor."""
+    return sorted(
+        p.relative_to(origem).as_posix()
+        for p in origem.rglob("*")
+        if p.is_file() and not any(parte in NUNCA_ENVIAR for parte in p.parts)
+    )
+
+
+def _manifesto_remoto(sessao: ftplib.FTP, raiz: str) -> list[str] | None:
+    """A lista do que a publicacao anterior deixou no servidor."""
+    pedacos: list[bytes] = []
+    base = raiz.rstrip("/")
+    caminho = f"{base}/{MANIFESTO}" if base else MANIFESTO
+    try:
+        sessao.retrbinary(f"RETR {caminho}", pedacos.append)
+    except ftplib.all_errors:
+        return None
+    try:
+        dados = json.loads(b"".join(pedacos).decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return dados if isinstance(dados, list) else None
+
+
+def _varrer_remoto(sessao: ftplib.FTP, base: str, prefixo: str = "",
+                   profundidade: int = 0,
+                   estado: dict | None = None) -> tuple[list[str], bool]:
+    """Lista recursivamente o que existe no servidor. Usado UMA vez.
+
+    Custa uma requisicao por diretorio, e cada candidato tem o seu — cerca de mil
+    hoje, vinte e uma mil quando a F-18 entrar. E' por isso que o caminho normal
+    e' o manifesto: esta varredura so' roda quando nao ha' manifesto anterior,
+    que acontece na primeira publicacao com a limpeza ligada ou se alguem apagar
+    o arquivo.
+    """
+    estado = estado if estado is not None else {"completa": True}
+    if profundidade > 6:      # o site tem 3 niveis; 6 e' folga contra ciclo
+        estado["completa"] = False
+        return [], False
+    caminho = f"{base}/{prefixo}".rstrip("/") or "/"
+    achados: list[str] = []
+    try:
+        entradas = list(sessao.mlsd(caminho))
+    # `ftplib.all_errors` JA' E' uma tupla — aninhar tupla dentro de tupla no
+    # `except` e' TypeError em tempo de execucao, nao erro de sintaxe: so'
+    # aparece quando a excecao acontece. `ssl.SSLError` e' subclasse de OSError.
+    except (*ftplib.all_errors, OSError) as exc:
+        # A conexao cai no meio da varredura, como cai no meio do envio
+        # (ADR-027) — visto como `SSL: BAD_LENGTH` em 03/09/2026. A diferenca e'
+        # que aqui a falha e' silenciosa: uma listagem que morre devolve MENOS
+        # arquivos, e um inventario menor parece um inventario limpo.
+        #
+        # Marcar a varredura como INCOMPLETA e' o que impede que ela dirija
+        # remocao. Inventario parcial tratado como completo apagaria o que
+        # simplesmente nao foi visto.
+        log.warning("listagem de %s falhou (%s) — varredura incompleta",
+                    caminho, str(exc)[:60])
+        estado["completa"] = False
+        return achados, False
+    for nome, fatos in entradas:
+        if nome in (".", ".."):
+            continue
+        rel = f"{prefixo}{nome}"
+        tipo = fatos.get("type")
+        if tipo == "dir":
+            filhos, _ = _varrer_remoto(sessao, base, rel + "/", profundidade + 1, estado)
+            achados.extend(filhos)
+        elif tipo == "file":
+            achados.append(rel)
+    return achados, estado["completa"]
+
+
+def remover_orfas(sessao: ftplib.FTP, raiz: str, atuais: list[str],
+                  anterior: list[str] | None, *, forcar: bool = False) -> int:
+    """Apaga do servidor o que o site nao gera mais (ADR-037).
+
+    O GERADOR NAO LIMPA O DIRETORIO, e por isso pagina de geracao antiga ficava
+    publicada para sempre. Medido em 03/09/2026: seis fichas vivas no ar, entre
+    elas `/candidato/helio-bolsonaro-.../`, mostrando um nome de urna que o TSE
+    nao registra mais — a ficha atual da mesma pessoa esta' em outra URL, e a
+    velha congelou no dia em que o nome mudou.
+
+    Duas das seis eram candidaturas com `e_registro_exibido = false`: registro
+    duplicado que o projeto decidiu NAO mostrar, e que continuava no ar.
+
+    ── Por que manifesto e nao varredura ──
+
+    Descobrir orfas varrendo a arvore remota custa uma listagem por diretorio, e
+    cada candidato tem a sua: mil listagens hoje, vinte e uma mil quando a F-18
+    entrar. O manifesto e' UM arquivo: a publicacao anterior grava o que deixou,
+    e a seguinte compara.
+
+    ── O que esta funcao NAO faz ──
+
+    Nao apaga nada fora da lista da publicacao anterior. Um arquivo que alguem
+    colocou no servidor a mao nunca esteve no manifesto e nao e' tocado.
+    """
+    if anterior is None:
+        # Sem manifesto, a unica forma de saber o que sobra e' perguntar ao
+        # servidor. Caro, e por isso excepcional — mas deixar as orfas para
+        # sempre seria pior: elas nunca entrariam em manifesto nenhum, e a
+        # limpeza jamais as veria.
+        log.info("sem manifesto anterior — varrendo o servidor uma vez")
+        anterior, completa = _varrer_remoto(sessao, raiz.rstrip("/"))
+        if not completa:
+            log.warning(
+                "varredura INCOMPLETA (%d arquivos vistos) — nada sera' removido. "
+                "O manifesto desta publicacao ja' sobe, e a proxima limpeza usa "
+                "ele em vez de varrer.", len(anterior))
+            return 0
+        if not anterior:
+            log.warning("varredura nao devolveu nada — nada sera' removido")
+            return 0
+        log.info("%d arquivos no servidor", len(anterior))
+
+    orfas = sorted(set(anterior) - set(atuais) - {MANIFESTO, CARIMBO})
+    if not orfas:
+        return 0
+
+    fatia = len(orfas) / max(len(anterior), 1)
+    if len(orfas) > PISO_REMOCAO and fatia > LIMITE_REMOCAO and not forcar:
+        raise SystemExit(
+            f"RECUSADO: a limpeza removeria {len(orfas)} de {len(anterior)} "
+            f"arquivos ({fatia:.0%}), acima do teto de {LIMITE_REMOCAO:.0%}. "
+            "Isso e' mais parecido com geracao truncada do que com paginas que "
+            "sairam do ar. Confira o site gerado; se for mesmo o caso, --forcar."
+        )
+
+    base = raiz.rstrip("/")
+    removidas = 0
+    for rel in orfas:
+        alvo = f"{base}/{rel}" if base else rel
+        try:
+            sessao.delete(alvo)
+            removidas += 1
+            log.info("removida orfa %s", rel)
+        except ftplib.all_errors as exc:
+            # Ja' nao existe, ou e' diretorio: nao e' motivo para abortar uma
+            # publicacao que ja' subiu inteira.
+            log.warning("nao removi %s (%s)", rel, str(exc)[:60])
+
+    # O DIRETORIO VAZIO TAMBEM PRECISA SAIR. Apagar so' o `index.html` deixa a
+    # pasta, e o servidor responde 403 em vez de 404 — pior para quem chega por
+    # link antigo, porque "proibido" sugere que existe algo ali.
+    #
+    # `RMD` recusa diretorio nao-vazio, entao isto nunca leva conteudo junto: no
+    # pior caso a chamada falha e o diretorio fica como estava.
+    pastas = sorted({rel.rsplit("/", 1)[0] for rel in orfas if "/" in rel},
+                    key=len, reverse=True)          # mais fundo primeiro
+    for pasta in pastas:
+        if any(a.startswith(pasta + "/") for a in atuais):
+            continue                                # ainda ha' arquivo vivo ali
+        alvo = f"{base}/{pasta}" if base else pasta
+        try:
+            sessao.rmd(alvo)
+            log.info("removida pasta vazia %s", pasta)
+        except ftplib.all_errors:
+            pass                                    # nao estava vazia, ou ja' saiu
+    return removidas
 
 
 def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
@@ -502,12 +680,30 @@ def main(argv: list[str] | None = None) -> int:
         return viva["sessao"]
 
     try:
-        conferir_regressao(viva["sessao"], origem, str(cfg["raiz"]),
-                           forcar=args.forcar)
-        n, tamanho = enviar(viva["sessao"], origem, str(cfg["raiz"]), seco=False,
+        raiz = str(cfg["raiz"])
+        conferir_regressao(viva["sessao"], origem, raiz, forcar=args.forcar)
+
+        # ANTES do envio: subir o manifesto novo sobrescreve o antigo, e sem o
+        # antigo nao ha' como saber o que virou orfao.
+        anterior = _manifesto_remoto(viva["sessao"], raiz)
+
+        atuais = listar_arquivos(origem)
+        (origem / MANIFESTO).write_text(
+            json.dumps(atuais, ensure_ascii=False), encoding="utf-8")
+        atuais = listar_arquivos(origem)          # agora inclui o proprio manifesto
+
+        n, tamanho = enviar(viva["sessao"], origem, raiz, seco=False,
                             reconectar=reconectar)
         log.info("publicados %d arquivos, %.1f MB em %s%s",
                  n, tamanho / 1e6, cfg["host"], cfg["raiz"])
+
+        # DEPOIS do envio: se a limpeza viesse antes e o envio falhasse, o site
+        # ficaria sem as paginas novas E sem as antigas.
+        removidas = remover_orfas(viva["sessao"], raiz, atuais, anterior,
+                                  forcar=args.forcar)
+        if removidas:
+            log.info("%d pagina(s) que o site nao gera mais foram removidas",
+                     removidas)
     finally:
         try:
             viva["sessao"].quit()
