@@ -618,3 +618,30 @@ fonte de verdade. Nao foi tentado.
 
 **O que NAO fazer:** preencher com o numero de relatorias da Camara, ou somar as
 duas casas. Sao coisas diferentes e a tela ja' avisa que nao se comparam.
+
+---
+
+## L-26 · Estado sem indicador de resultado fiscal
+
+**Situacao:** ABERTA · registrada em 03/09/2026
+
+Ate' 03/09/2026 havia `RESULTADO_ORCAMENTARIO`, calculado como receita menos
+despesa. Ele foi RETIRADO (ADR-035): a receita passou a ser a Receita Corrente
+Liquida, que e' receita CORRENTE, e a despesa e' empenhada TOTAL, com capital.
+Subtrair as duas produziria um deficit estrutural que nao existe.
+
+**O substituto obvio nao serve por cobertura.** O RREO Anexo 6 publica
+`RESULTADO PRIMARIO (COM RPPS)`, padronizado e oficial — seria o espelho exato do
+`RESULTADO_PRIMARIO_UNIAO` que ja' mostramos para o governo federal. Medido em
+03/09/2026: a conta so' aparece **a partir de 2023**. Nos anos anteriores o
+rotulo do anexo era outro.
+
+Tres anos nao cobrem uma janela de mandato de quatro. Um indicador que existe
+so' no fim da janela produziria variacao sobre um ponto — ou nenhuma.
+
+**Como fechar:** mapear os rotulos do Anexo 6 nas versoes antigas do RREO
+(2015-2022) e conferir que a conta e' a mesma. E' sondagem propria, do mesmo
+tamanho da que fechou a L-20.
+
+**O que NAO fazer:** voltar a subtrair receita de despesa. Foi assim que MG 2023
+apareceu com superavit de R$ 24 bilhoes.

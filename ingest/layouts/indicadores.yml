@@ -282,22 +282,37 @@ indicadores:
   # muda a Constituicao 0.2 — a tela continua descrevendo o periodo, com
   # comparador, sem atribuir merito. Muda que aqui a proximidade e' defensavel.
   RECEITA_ESTADUAL:
-    nome: "Receita orcamentaria liquida do estado"
+    nome: "Receita Corrente Liquida do estado"
     ente_medido: governo_estadual
-    fonte: "Tesouro Nacional — SICONFI/DCA (Anexo I-C)"
+    fonte: "Tesouro Nacional — SICONFI/RREO (Anexo 3)"
     unidade: "R$ correntes"
     periodicidade: anual
     direcao_desejavel: neutro
     provedor: siconfi
     verificado: true
-    conferido_em: "2026-08-28"
+    conferido_em: "2026-09-03"
     notas: >
-      Receita bruta realizada menos as deducoes (FUNDEB e outras). A bruta
-      superestima o que o estado dispoe: a parcela do FUNDEB e' vinculada por
-      constituicao e sai antes. Cobertura 2015-2025; antes disso o anexo vem vazio.
+      RECEITA CORRENTE LIQUIDA, definida pela Lei de Responsabilidade Fiscal e
+      usada oficialmente para os limites de pessoal e de divida. Padronizada por
+      construcao: todo ente e' obrigado a publica-la no mesmo formato.
+
+      TROCADA EM 03/09/2026 (ADR-035). Vinha da DCA — receita bruta menos as
+      deducoes declaradas — e a validacao mostrou que aquela conta NAO era
+      comparavel. Faltava descontar as transferencias constitucionais (R$ 23,8 bi
+      em MG 2023, que viravam superavit de R$ 24 bi num estado em Regime de
+      Recuperacao Fiscal), e pior: a DECLARACAO das deducoes muda entre estados e
+      entre anos. Sao Paulo nao declarava deducao nenhuma em 2015 e 2019, e
+      declarava FUNDEB em 2023 — a variacao publicada na ficha tinha um salto
+      artificial de R$ 34 bi.
+
+      E' receita CORRENTE: nao inclui receita de capital. Por isso nao subtrai
+      contra a despesa empenhada total, e o indicador de resultado foi retirado.
+      Cobertura 2015-2025, os 27 entes.
     parametros:
-      anexo: "DCA-Anexo I-C"
-      conta: TotalReceitas
+      anexo: "RREO-Anexo 03"
+      conta: "RECEITA CORRENTE LIQUIDA"
+      coluna: "TOTAL (ULTIMOS 12 MESES)"
+      periodo: 6
       ano_inicio: 2015
 
   DESPESA_ESTADUAL:
@@ -337,30 +352,17 @@ indicadores:
       depende_de: [PIB, POPULACAO]
 
   # ── Fontes de arquivo (S8, S10) — fase 3, ver docs/LACUNAS.md ────────
-  RESULTADO_ORCAMENTARIO:
-    nome: "Resultado orcamentario do estado"
-    ente_medido: governo_estadual
-    fonte: "Calculado: SICONFI receita liquida menos despesa empenhada"
-    unidade: "R$ correntes"
-    periodicidade: anual
-    direcao_desejavel: cima
-    provedor: derivado
-    verificado: true
-    conferido_em: "2026-08-28"
-    notas: >
-      Positivo = superavit, negativo = deficit. So' existe nos anos em que receita
-      e despesa coexistem. NAO e' nota de gestao: um deficit pode vir de decisao
-      deliberada de investimento, e um superavit de contingenciamento. A tela
-      mostra o numero com o comparador, nunca um juizo.
-
-      ATENCAO AO VISUAL: este e' o unico indicador do projeto que muda de SINAL.
-      Variacao percentual sobre base negativa e' indefinida, e o modelo devolve
-      NULL nesses casos de proposito — um estado que sai de -800 milhoes para
-      +400 milhoes nao "cresceu X%". Use `variacao_abs` para este indicador; a
-      percentual so' faz sentido quando as duas pontas sao positivas.
-    parametros:
-      formula: "RECEITA_ESTADUAL - DESPESA_ESTADUAL"
-      depende_de: [RECEITA_ESTADUAL, DESPESA_ESTADUAL]
+  # RESULTADO_ORCAMENTARIO foi RETIRADO em 03/09/2026 (ADR-035).
+  #
+  # Ele era `RECEITA_ESTADUAL - DESPESA_ESTADUAL`. Com a receita trocada para a
+  # Receita Corrente Liquida, a subtracao deixou de fazer sentido: RCL e' receita
+  # CORRENTE e a despesa e' empenhada TOTAL, incluindo capital. Subtrair as duas
+  # daria um "deficit" estrutural que nao existe.
+  #
+  # O substituto natural seria o Resultado Primario do RREO Anexo 6, que e'
+  # publicado e padronizado. Ele foi sondado e RECUSADO por cobertura: a conta so'
+  # aparece a partir de 2023, e tres anos nao cobrem uma janela de mandato. Fica
+  # registrado em docs/LACUNAS.md como L-26.
 
   IDHM:
     nome: "Indice de Desenvolvimento Humano Municipal (agregado por UF)"

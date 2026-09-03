@@ -100,13 +100,13 @@ _GLOSSARIO = {
             "Mortes por agressão a cada 100 mil habitantes."),
     "MORTALIDADE_INFANTIL": ("Mortalidade infantil",
             "Mortes de crianças com menos de 1 ano a cada mil nascidas vivas."),
-    "RECEITA_ESTADUAL": ("Receita do estado",
-            "Quanto o governo estadual arrecadou no ano, já descontadas as deduções."),
+    "RECEITA_ESTADUAL": ("Receita Corrente Líquida",
+            "A medida de receita definida pela Lei de Responsabilidade Fiscal e "
+            "usada oficialmente para os limites de pessoal e de dívida. Já exclui "
+            "o que o estado repassa aos municípios por Constituição. É receita "
+            "corrente: não inclui receita de capital."),
     "DESPESA_ESTADUAL": ("Despesa do estado",
             "Quanto o governo estadual se comprometeu a gastar no ano."),
-    "RESULTADO_ORCAMENTARIO": ("Resultado do estado",
-            "Receita menos despesa. Positivo não é bom nem ruim: déficit pode ser "
-            "investimento, superávit pode ser gasto que não saiu."),
     "IDEB": ("IDEB (rede pública)",
             "Nota da educação básica pública, de 0 a 10, medida a cada dois anos."),
     "IDHM": ("IDHM",
@@ -434,7 +434,7 @@ def _atividade(c: Candidato) -> str:
 # DIZER que o numero e' nominal, na propria linha.
 _NOMINAIS = frozenset({
     "PIB", "PIB_PER_CAPITA",
-    "RECEITA_ESTADUAL", "DESPESA_ESTADUAL", "RESULTADO_ORCAMENTARIO",
+    "RECEITA_ESTADUAL", "DESPESA_ESTADUAL",
     "RECEITA_LIQUIDA_UNIAO", "DESPESA_PRIMARIA_UNIAO", "RESULTADO_PRIMARIO_UNIAO",
 })
 
@@ -1389,11 +1389,6 @@ _NOTAS_INDICADOR: dict[str, tuple[str, str, str]] = {
         "Quanto o governo estadual empenhou no ano.",
         "Declaração de Contas Anuais entregue ao Tesouro.",
         "A preços correntes. É despesa <b>empenhada</b>, não paga."),
-    "RESULTADO_ORCAMENTARIO": (
-        "Receita menos despesa do governo estadual.",
-        "Calculado aqui, a partir das duas séries acima.",
-        "<b>Positivo não é bom nem ruim</b>: déficit pode ser investimento, "
-        "superávit pode ser gasto que não saiu do papel."),
     "RECEITA_LIQUIDA_UNIAO": (
         "Receita líquida do Governo Central.",
         "Resultado do Tesouro Nacional, tabela 2.1.",
@@ -1606,13 +1601,29 @@ def _metodologia(quando: str, catalogo: list[dict]) -> str:
         inflou o indicador de fluxo escolar em 2021 — foi por isso que o próprio
         INEP comparou 2023 com 2019, e não com 2021. Uma janela de mandato que
         termine em 2021 mostra uma alta que o ano seguinte desfaz.</p>
-      <h3 style="margin:24px 0 8px;font-size:15px">O que não foi conferido</h3>
-      <p>Receita, despesa e resultado <b>do estado</b> no nível Brasil são a soma
-        dos 27 estados feita por este projeto: o SICONFI não publica um consolidado
-        estadual, então não existe número publicado contra o qual comparar o
-        agregado. Conferir exigiria ir estado a estado, contra o Balanço Geral de
-        cada um. <b>Isso não foi feito</b>, e fica dito aqui em vez de ficar
-        implícito.</p>
+      <h3 style="margin:24px 0 8px;font-size:15px">A conferência que achou um
+        erro grande</h3>
+      <p>O último indicador que faltava conferir era a receita dos estados, e a
+        conferência foi feita em 03/09/2026. Não havia número externo para
+        comparar o agregado — o SICONFI não publica consolidado estadual —, então
+        ela foi à <b>estrutura</b> do dado. E ali estava o problema.</p>
+      <p>A receita subtraía o FUNDEB, mas <b>não</b> as
+        <b>transferências constitucionais</b>: a parcela do ICMS e do IPVA que
+        pertence aos municípios por Constituição e que o estado nunca teve para
+        gastar. Em Minas Gerais, 2023, eram <b>R$ 23,8 bilhões</b> contados como
+        receita do estado — e o "resultado do estado", que era receita menos
+        despesa, publicava um <b>superávit de R$ 24 bilhões num estado em Regime
+        de Recuperação Fiscal</b>.</p>
+      <p>Pior: a declaração dessas deduções <b>muda</b>. Em 2023, 22 dos 27
+        estados declaravam as transferências e 5 não; São Paulo não declarava
+        dedução nenhuma em 2015 e 2019 e declarava FUNDEB em 2023. A variação
+        publicada tinha saltos que eram só mudança de critério contábil.</p>
+      <p>A receita passou a ser a <b>Receita Corrente Líquida</b>, definida pela
+        Lei de Responsabilidade Fiscal e obrigatória no mesmo formato para todo
+        ente — conferida ao centavo contra o RREO em quatro pontos. O
+        <b>resultado do estado saiu</b>: a RCL é receita corrente e a despesa é
+        empenhada total, e subtrair as duas daria um déficit que não existe. A
+        ficha diz que ele falta, pelo mesmo mecanismo que diz o resto.</p>
     </section>
 
     <section class="bloco">

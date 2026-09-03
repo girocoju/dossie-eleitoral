@@ -80,53 +80,20 @@ derivado as (
 
 -- receita e despesa lado a lado, para a subtracao ficar num passo separado da
 -- agregacao (o BigQuery recusa agregacao dentro de agregacao)
-pivo_orcamento as (
+/*
+  As CTEs `pivo_orcamento` e `orcamento`, que derivavam RESULTADO_ORCAMENTARIO de
+  `receita - despesa`, foram REMOVIDAS em 03/09/2026 (ADR-035).
 
-    select
-        sg_uf,
-        ano,
-        max(if(cod_indicador = 'RECEITA_ESTADUAL', valor, null))  as receita,
-        max(if(cod_indicador = 'DESPESA_ESTADUAL', valor, null))  as despesa,
-        max(_extracted_at)                                        as _extracted_at,
-        max(_source_url)                                          as _source_url
-    from observado
-    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL')
-    group by sg_uf, ano
+  A receita estadual passou a ser a Receita Corrente Liquida do RREO, definida
+  pela LRF. RCL e' receita CORRENTE; a despesa e' empenhada TOTAL, com capital.
+  Subtrair as duas produziria um deficit estrutural que nao existe — e o antigo
+  resultado ja' vinha errado por outra razao: a receita da DCA nao descontava as
+  transferencias constitucionais, e MG 2023 aparecia com superavit de R$ 24 bi.
 
-),
-
-orcamento as (
-
-    /*
-      Resultado orcamentario ESTADUAL = receita liquida menos despesa empenhada.
-      Positivo e' superavit, negativo e' deficit — e nenhum dos dois e' nota de
-      gestao: deficit pode ser investimento deliberado, superavit pode ser
-      contingenciamento. A tela mostra o numero com comparador, nunca um juizo
-      (Constituicao 0.1).
-
-      SO' ESTADOS. O equivalente federal NAO se calcula assim e nao mora aqui: a
-      receita da DCA inclui operacoes de credito, que para a Uniao chegaram a 45%
-      do total em 2020, e a conta tendia a zero por identidade contabil. O
-      resultado primario do Governo Central vem pronto do RTN, ja' observado, em
-      `RESULTADO_PRIMARIO_UNIAO`. Ver L-22 e ADR-017.
-
-      Nos estados a mesma distorcao e' de 0,1% a 1,1% da receita, e a conta vale.
-    */
-    select
-        'RESULTADO_ORCAMENTARIO'                            as cod_indicador,
-        sg_uf,
-        ano,
-        receita - despesa                                   as valor,
-        'R$ correntes'                                      as unidade,
-        'Calculado: SICONFI receita liquida menos despesa empenhada' as fonte,
-        1                                                   as n_periodos,
-        _extracted_at,
-        _source_url
-    from pivo_orcamento
-    where receita is not null
-      and despesa is not null
-
-),
+  O substituto seria o Resultado Primario do RREO Anexo 6, publicado e
+  padronizado, mas ele so' existe a partir de 2023 — tres anos nao cobrem uma
+  janela de mandato. Registrado como L-26.
+*/
 
 nacional_somado as (
 
@@ -144,16 +111,12 @@ nacional_somado as (
         ano,
         sum(valor)                                          as valor,
         any_value(unidade)                                  as unidade,
-        'Tesouro Nacional — SICONFI/DCA (soma dos 27 estados)' as fonte,
+        'Tesouro Nacional — SICONFI (soma dos 27 estados)'   as fonte,
         1                                                   as n_periodos,
         max(_extracted_at)                                  as _extracted_at,
         any_value(_source_url)                              as _source_url
-    from (
-        select * from observado
-        union all
-        select * from orcamento
-    )
-    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL', 'RESULTADO_ORCAMENTARIO')
+    from observado
+    where cod_indicador in ('RECEITA_ESTADUAL', 'DESPESA_ESTADUAL')
       and sg_uf != 'BR'
     group by cod_indicador, ano
     having count(*) = 27   -- so' agrega ano completo; ano parcial nao vira "Brasil"
@@ -165,8 +128,6 @@ completo as (
     select * from observado
     union all
     select * from derivado
-    union all
-    select * from orcamento
     union all
     select * from nacional_somado
 

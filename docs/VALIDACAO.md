@@ -11,9 +11,9 @@ cada indicador conferido contra um número **publicado fora do pipeline**.
 
 | | |
 |---|---|
-| Confere com a fonte oficial | **14** de 18 |
+| Confere com a fonte oficial | **15** de 17 |
 | Série oficial diferente da mais divulgada, agora nomeada na tela | **1** (rendimento) |
-| Não validado contra publicação externa | **3** (trio SICONFI) |
+| Corrigidos por causa da conferência | **2** (desocupação e receita estadual) |
 
 > A primeira versão deste documento somou 14 quando a tabela tinha 13 linhas — a
 > desocupação ainda divergia. Hoje são 14 de verdade, com ela corrigida. A
@@ -44,6 +44,7 @@ passou da tabela trimestral para a série anual oficial e hoje confere ano a ano
 | RESULTADO_PRIMARIO_UNIAO | 2024 | −R$ 42.923.691.541 | −R$ 43 bi | Tesouro Nacional |
 | HOMICIDIOS | 2019–2024 | 22,0 … 20,1 | idêntico | **API do Ipeadata**, série `AVIOL12_THOMIC` |
 | DESOCUPACAO | 2022–2025 | 9,6 / 7,7 / 6,6 / 5,6 | idêntico | IBGE — SIDRA t/4562 (anual), desde ADR-030 |
+| RECEITA_ESTADUAL | SP/MG/GO 2023, MG 2019 | 229,66 / 92,08 / 38,41 / 64,07 bi | idêntico ao centavo | **RREO Anexo 3** (Receita Corrente Líquida), desde ADR-035 |
 
 ### Três armadilhas que a conferência atravessou
 
@@ -107,15 +108,32 @@ R$ 3.492 na série que termina em 2025 e valia outro número antes. Não é revi
 do dado, é troca de base. A variação entre dois anos continua válida; o valor
 absoluto não deve ser citado sem a data de extração ao lado.
 
-## Não validado contra publicação externa
+## O trio do SICONFI — conferido, e corrigido
 
-`RECEITA_ESTADUAL`, `DESPESA_ESTADUAL` e `RESULTADO_ORCAMENTARIO` no nível
-Brasil são a **soma dos 27 estados feita por este projeto** — o SICONFI não
-publica consolidado estadual, como o próprio `fct_indicador_uf_ano` registra.
-Não há número publicado contra o qual comparar o agregado.
+**Conferido em 03/09/2026 — e o resultado foi encontrar um erro.**
 
-Validar isso exige conferir **um estado por vez** contra o Balanço Geral daquele
-estado. Não foi feito. Fica registrado como pendência, e não como "conferido".
+A conferência não achou um número publicado contra o qual comparar o agregado (o
+SICONFI não divulga consolidado estadual). Foi então à **estrutura** do dado, e
+ali estava o problema:
+
+`RECEITA_ESTADUAL` subtraía FUNDEB e "Outras Deduções", mas **não** as
+**Deduções - Transferências Constitucionais** — a parcela do ICMS e do IPVA que
+pertence aos municípios por Constituição. Em Minas Gerais, 2023, eram
+**R$ 23,8 bilhões** contados como receita do estado, e o `RESULTADO_ORCAMENTARIO`
+publicava um **superávit de R$ 24 bilhões num estado em Regime de Recuperação
+Fiscal**.
+
+E o problema era maior que a dedução faltante: **a declaração muda**. Em 2023, 22
+dos 27 estados declaram transferências constitucionais e 5 não; São Paulo não
+declarava dedução nenhuma em 2015 e 2019 e declarava FUNDEB em 2023. A razão
+dedução/bruta ia de 7,9% (DF, que não tem municípios a quem repassar) a 37,8%
+(MT). A variação publicada na ficha de governador tinha saltos artificiais.
+
+**Correção (ADR-035):** a receita passou a ser a **Receita Corrente Líquida** do
+RREO Anexo 3 — definida pela Lei de Responsabilidade Fiscal, obrigatória e
+padronizada, cobrindo 2015–2025 nos 27 entes. `DESPESA_ESTADUAL` ficou como
+estava: é uma linha única, sempre declarada, sem o problema.
+`RESULTADO_ORCAMENTARIO` **saiu** — ver L-26.
 
 ## Como refazer
 

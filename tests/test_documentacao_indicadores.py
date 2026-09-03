@@ -35,7 +35,7 @@ CODIGOS = sorted(catalogo())
 
 
 def test_o_catalogo_foi_encontrado():
-    assert len(CODIGOS) >= 18, CODIGOS
+    assert len(CODIGOS) >= 17, CODIGOS
 
 
 @pytest.mark.parametrize("cod", CODIGOS)

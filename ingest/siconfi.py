@@ -58,6 +58,40 @@ DEDUCOES = ("DEDUCOES - FUNDEB", "OUTRAS DEDUCOES DA RECEITA")
 DESPESA_EMPENHADA = "DESPESAS EMPENHADAS"
 
 CONTA_RECEITA = "TotalReceitas"
+
+# ═══════════════════════════════════════════════════════════════════════
+# A RECEITA VEM DO RREO, NAO DA DCA — E O MOTIVO IMPORTA
+# ═══════════════════════════════════════════════════════════════════════
+#
+# Ate' 03/09/2026 a receita saia da DCA: "Receitas Brutas Realizadas" menos as
+# deducoes declaradas. A validacao dos indicadores (Regra 6) mostrou que essa
+# conta NAO E' COMPARAVEL, e o problema era duplo:
+#
+#   1. Faltava descontar "Deducoes - Transferencias Constitucionais" — a parcela
+#      do ICMS e do IPVA que pertence aos municipios por Constituicao. Em MG 2023
+#      eram R$ 23,8 bi contados como receita do estado, e o resultado publicado
+#      virava um superavit de R$ 24 bi num estado que estava em Regime de
+#      Recuperacao Fiscal.
+#
+#   2. Pior: a DECLARACAO das deducoes muda. Em 2023, 22 dos 27 estados declaram
+#      transferencias constitucionais e 5 nao. E o mesmo estado muda de regua
+#      entre anos — Sao Paulo nao declara deducao NENHUMA em 2015 e 2019, e
+#      declara FUNDEB em 2023. A razao deducao/bruta vai de 7,9% (DF, que nao tem
+#      municipios a quem repassar) a 37,8% (MT).
+#
+# Corrigir a deducao faltante consertaria (1) e deixaria (2) de pe': a variacao
+# que a ficha de governador publica continuaria com salto artificial toda vez que
+# o estado mudasse a forma de declarar.
+#
+# A RECEITA CORRENTE LIQUIDA resolve os dois. Ela e' definida pela Lei de
+# Responsabilidade Fiscal, obrigatoria para todo ente e usada oficialmente para
+# os limites de pessoal e de divida — padronizada por construcao, e publicada no
+# RREO Anexo 3 para os 27 estados de 2015 a 2025. Ver ADR-035.
+API_RREO = "https://apidatalake.tesouro.gov.br/ords/siconfi/tt/rreo"
+ANEXO_RCL = "RREO-Anexo 03"
+CONTA_RCL = "RECEITA CORRENTE L"          # prefixo; o rotulo traz a formula junto
+COLUNA_RCL = "TOTAL (ULTIMOS 12 MESES)"
+PERIODO_RCL = 6                            # 6o bimestre = exercicio fechado
 CONTA_DESPESA = "TotalDespesas"
 
 FONTE = "Tesouro Nacional — SICONFI/DCA"
@@ -136,6 +170,40 @@ def despesa_empenhada(itens: list[dict[str, Any]]) -> float | None:
     return None
 
 
+def consultar_rreo(ano: int, anexo: str, cod_ibge: str) -> list[dict[str, Any]]:
+    url = (
+        f"{API_RREO}?an_exercicio={ano}&nr_periodo={PERIODO_RCL}"
+        f"&co_tipo_demonstrativo=RREO&no_anexo={anexo.replace(' ', '%20')}"
+        f"&id_ente={cod_ibge}"
+    )
+    try:
+        payload = get_json(url, timeout=90, attempts=3)
+    except Exception as exc:  # noqa: BLE001 — fonte fora do ar vira aviso (ADR-022)
+        log.warning("%s %s ente %s: %s", anexo, ano, cod_ibge, str(exc)[:110])
+        return []
+    return payload.get("items") or []
+
+
+def receita_corrente_liquida(itens: list[dict[str, Any]]) -> float | None:
+    """RCL do exercicio fechado — a linha "TOTAL (ULTIMOS 12 MESES)".
+
+    O RREO traz varias linhas de RCL na mesma consulta: a RCL cheia, a ajustada
+    para calculo de limite e a deduzida. Ficamos com a PRIMEIRA que casa o
+    prefixo, que e' a RCL propriamente dita — as demais respondem outra pergunta
+    (quanto cabe no limite de pessoal), e misturar as tres daria uma serie que
+    salta sem que nada tenha acontecido.
+    """
+    for i in itens:
+        conta = _rotulo(i.get("conta"))
+        if not conta.startswith(CONTA_RCL):
+            continue
+        if _rotulo(i.get("coluna")) != COLUNA_RCL:
+            continue
+        if i.get("valor") is not None:
+            return float(i["valor"])
+    return None
+
+
 def coletar(ano_inicio: int, ano_fim: int, *, dry_run: bool = False) -> list[Observacao]:
     extraido_em = utc_now()
     obs: list[Observacao] = []
@@ -147,7 +215,8 @@ def coletar(ano_inicio: int, ano_fim: int, *, dry_run: bool = False) -> list[Obs
             feitas += 1
             if dry_run:
                 continue
-            rec = receita_liquida(consultar(ano, ANEXO_RECEITA, uf.cod_ibge))
+            rec = receita_corrente_liquida(
+                consultar_rreo(ano, ANEXO_RCL, uf.cod_ibge))
             time.sleep(PAUSA)
             des = despesa_empenhada(consultar(ano, ANEXO_DESPESA, uf.cod_ibge))
             time.sleep(PAUSA)

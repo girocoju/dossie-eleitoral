@@ -490,6 +490,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-035 | A receita estadual passa a ser a Receita Corrente Líquida | A conferência achou que faltava descontar as transferências constitucionais (R$ 23,8 bi em MG 2023) e que a declaração das deduções muda entre estados e anos; a RCL é padronizada por lei. O resultado orçamentário saiu | Aceita |
 | ADR-034 | Atividade legislativa do Senado, com o mesmo rigor da Câmara | `ordem = 1` como equivalente do `proponente`, validado em 48 comparações contra a flag oficial do endpoint descontinuado; classes mapeadas pela lista oficial de siglas, não pelo formato | Aceita |
 | ADR-033 | Página de quem financia as campanhas | 23.532 repasses numa linha por financiador × candidatura; publicar todas as pessoas físicas foi decisão explícita do dono do projeto, com o número de exposição na mão. Sem CPF | Aceita |
 | ADR-032 | Ficha própria para o vice de presidente e de governador | 216 candidaturas que só existiam como cartão na ficha do titular; Alckmin tem três mandatos de governador que não tinham onde aparecer. Suplente de senador fica de fora | Aceita |
@@ -514,9 +515,9 @@ dossie-eleitoral/
 - ~~`RENDIMENTO_MEDIO` usa a série "efetivamente recebido"...~~
   **Respondida em 01/09/2026 (ADR-030):** mantém-se o efetivamente recebido, e a tela
   passa a nomear a série. A base de deflação, que anda a cada divulgação, também está dita.
-- **O trio do SICONFI nunca foi conferido contra publicação externa.** No nível Brasil
-  ele é a soma dos 27 estados feita aqui, e não existe consolidado publicado para
-  comparar. Conferir estado a estado contra o Balanço Geral de cada um?
+- ~~O trio do SICONFI nunca foi conferido contra publicação externa.~~
+  **Respondida em 03/09/2026 (ADR-035):** conferido pela estrutura, não pelo agregado — e
+  achou um erro. A receita virou Receita Corrente Líquida; o resultado saiu (L-26).
 - O TSE 2026 já traz `cod_cargo` e layout iguais a 2022? (Verificar no leiame antes da T-101.)
 - Quais séries do Ipeadata têm granularidade UF anual completa desde 1999?
 - ~~IDHM 2021 (atualização do Atlas) está disponível por UF em formato aberto?~~

@@ -199,7 +199,7 @@ SICONFI, e o federal estava errado.
 
 | Nivel | Fonte | Indicadores |
 |---|---|---|
-| Estados | SICONFI/DCA | `RECEITA_ESTADUAL`, `DESPESA_ESTADUAL`, `RESULTADO_ORCAMENTARIO` |
+| Estados | SICONFI/RREO (receita) e DCA (despesa) | `RECEITA_ESTADUAL` (Receita Corrente Líquida, LRF), `DESPESA_ESTADUAL` (empenhada) |
 | Uniao | Tesouro/RTN | `RECEITA_LIQUIDA_UNIAO`, `DESPESA_PRIMARIA_UNIAO`, `RESULTADO_PRIMARIO_UNIAO` |
 
 **Por que.** A receita da DCA inclui operacoes de credito — divida emitida para
