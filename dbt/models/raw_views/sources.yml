@@ -195,6 +195,26 @@ sources:
               100% preenchido na medicao de 29/08/2026 — a Camara publica CPF no
               detalhe do deputado, inclusive de quem ja' saiu. E' o que permite
               casar com o TSE sem risco de homonimia.
+      - name: senado_autoria
+        description: >
+          F-22 — uma linha por (processo, senador autor), fechando a L-20. O
+          Senado nao publica arquivo em bloco com a marca de autoria: ela so'
+          existe no DETALHE de cada processo, e por isso a ingestao mantem um
+          indice em disco do que ja' extraiu.
+        columns:
+          - name: autor_principal
+            description: >
+              `ordem_assinatura = 1` — o equivalente do `proponente = 1` da
+              Camara, validado contra o campo oficial `IndicadorAutorPrincipal`
+              do endpoint antigo em 48 comparacoes, sem divergencia. A tela conta
+              SO' estas; as coautorias ficam gravadas para que a separacao possa
+              ser conferida, nunca somada por engano.
+          - name: classe_proposicao
+            description: >
+              Mesmas quatro classes da Camara, mapeadas a partir da lista OFICIAL
+              de siglas do Senado — nao do formato da sigla. `RQI` parece
+              "Requerimento de Informacao" e e' "Requerimento da Comissao de
+              Servicos de Infraestrutura".
       - name: proposicoes
         description: >
           Proposicoes da legislatura 2023-2026 em que um deputado e PROPONENTE.

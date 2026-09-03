@@ -129,6 +129,7 @@ class Candidato:
     indicadores: list[dict] = field(default_factory=list)
     indicadores_ausentes: list[dict] = field(default_factory=list)
     atividade: list[dict] = field(default_factory=list)
+    atividade_senado: list[dict] = field(default_factory=list)
     # Financiamento (F-11 / ADR-020). `None` e `[]` NAO sao a mesma coisa aqui:
     # lista vazia = a candidatura nao consta na prestacao de contas, e a tela
     # precisa dizer "ainda nao entregue", nunca "R$ 0,00".
@@ -307,6 +308,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
     _anexar_indicadores(cliente, ids)
     _anexar_indicadores_ausentes(cliente, ids)
     _anexar_atividade(cliente, ids)
+    _anexar_atividade_senado(cliente, ids)
     _anexar_planos(cliente, {c.sk: c for c in saida})
     _anexar_financiamento(cliente, {c.sk: c for c in saida})
     _anexar_plenario(cliente, ids)
@@ -497,10 +499,10 @@ def _anexar_indicadores_ausentes(cliente, por_pessoa: dict[str, list[Candidato]]
 def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
     """Atividade na Camara de quem ja' foi deputado federal.
 
-    Vale para 43 dos 317 candidatos a senador e 5 dos 197 a governador — os que
-    passaram pela Camara antes. Nao existe equivalente para o SENADO: a fonte nao
-    publica marca de proponente, e uma contagem sem esse filtro pareceria
-    comparavel a' da Camara sem ser (L-20).
+    Vale para quem passou pela Camara. O equivalente do Senado existe desde
+    02/09/2026 em `_anexar_atividade_senado` (F-22): a marca de autoria principal
+    fica no detalhe de cada processo, e foi validada contra o campo oficial do
+    endpoint antigo antes de virar contagem (L-20 fechada).
 
     A classe faz parte da chave de proposito: somar projeto de lei com requerimento
     de retirada de pauta produz um numero sem significado.
@@ -559,6 +561,52 @@ def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
             })
             n += 1
     log.info("%d linhas de atividade legislativa anexadas", n)
+
+
+def _anexar_atividade_senado(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """Atividade no Senado de quem ja' foi senador (F-22, fecha a L-20).
+
+    Espelha `_anexar_atividade` de proposito, ate' na quebra por legislatura: a
+    legislatura e' de quatro anos e vale para AS DUAS CASAS — senador serve duas
+    seguidas. Os dois blocos ficam lado a lado na ficha e nunca sao somados nem
+    comparados entre si: deputado e senador nao propoem as mesmas coisas nem no
+    mesmo volume.
+
+    So' entram autorias PRINCIPAIS. O filtro ja' aconteceu no mart.
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    lista = "','".join(por_pessoa)
+    sql = f"""
+        select id_pessoa, classe_proposicao,
+               52 + div(ano - 2003, 4)          as legislatura,
+               2003 + 4 * div(ano - 2003, 4)    as leg_inicio,
+               2006 + 4 * div(ano - 2003, 4)    as leg_fim,
+               sum(qt_proposicoes)              as total,
+               sum(qt_em_tramitacao)            as tramitando,
+               min(ano) as a1, max(ano) as a2
+        from `{p}.marts.fct_atividade_senado`
+        where id_pessoa in ('{lista}') and ligado_ao_tse and ano >= 2003
+        group by 1, 2, 3, 4, 5
+        order by legislatura desc, total desc
+    """
+    try:
+        linhas = list(cliente.query(sql).result())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("fct_atividade_senado indisponivel (%s) — site sai sem o bloco",
+                    str(exc)[:90])
+        return
+    n = 0
+    for r in linhas:
+        for c in por_pessoa.get(r.id_pessoa, []):
+            c.atividade_senado.append({
+                "classe": r.classe_proposicao, "total": r.total,
+                "tramitando": r.tramitando, "a1": r.a1, "a2": r.a2,
+                "leg": r.legislatura, "leg_ini": r.leg_inicio, "leg_fim": r.leg_fim,
+            })
+            n += 1
+    log.info("%d linhas de atividade no Senado anexadas", n)
 
 
 def _anexar_financiamento(cliente, por_sk: dict[str, Candidato]) -> None:

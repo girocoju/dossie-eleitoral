@@ -249,6 +249,92 @@ def _legenda(c: Candidato) -> str:
             f'<dl class="campos">{"".join(partes)}</dl></section>')
 
 
+def _milhar(n) -> str:
+    """1234 -> "1.234". Formata O NUMERO, nao a linha inteira.
+
+    O padrao anterior era `f"...{n:,}...".replace(",", ".")` sobre o `<tr>`
+    inteiro — e isso troca virgula em QUALQUER lugar, inclusive no rotulo. O
+    bloco da Camara publicava "Rito. homenagem. emenda" desde a F-16, e o do
+    Senado nasceu com o mesmo defeito porque copiou o padrao. Formatar o numero
+    e' trabalho do numero.
+    """
+    if n is None:
+        return "—"
+    return f"{n:,}".replace(",", ".")
+
+
+def _atividade_senado(c: Candidato) -> str:
+    """Atividade no Senado de quem ja' foi senador (F-22, fecha a L-20).
+
+    Espelha o bloco da Camara ate' na quebra por legislatura, e por isso os dois
+    ficam lado a lado sem que ninguem precise traduzir um para o outro.
+
+    O QUE ELE NAO FAZ: comparar as duas casas. Deputado e senador nao propoem as
+    mesmas coisas nem no mesmo volume, e nada aqui soma um com o outro nem os
+    poe em placar.
+
+    So' entram autorias PRINCIPAIS — o equivalente do `proponente` da Camara. Era
+    esta a condicao que a L-20 impunha: sem ela, um senador com 200 assinaturas
+    de apoio apareceria ao lado de um deputado com 200 projetos proprios.
+    """
+    if not c.atividade_senado:
+        return ""
+    rotulos = {
+        "normativa": "Propôs criar ou mudar lei",
+        "fiscalizacao": "Exigiu contas ou investigação",
+        "relatoria": "Relatou proposta de outro",
+        "procedimental": "Rito, homenagem, requerimento de comissão",
+    }
+    por_leg: dict[int, list[dict]] = {}
+    for a in c.atividade_senado:
+        por_leg.setdefault(a.get("leg") or 0, []).append(a)
+
+    blocos = []
+    for leg in sorted(por_leg, reverse=True):
+        itens = sorted(por_leg[leg], key=lambda x: -x["total"])
+        ini, fim = itens[0].get("leg_ini"), itens[0].get("leg_fim")
+        periodo = f"{ini}–{fim}" if ini else "período não identificado"
+        total = sum(a["total"] for a in itens)
+        linhas = "".join(
+            f"<tr><td>{rotulos.get(a['classe'], a['classe'])}</td>"
+            f"<td class='num'>{_milhar(a['total'])}</td>"
+            f"<td class='num'>{_milhar(a['tramitando']) if a['tramitando'] else '—'}</td></tr>"
+            for a in itens
+        )
+        blocos.append(f"""
+      <h3 style="margin:24px 0 8px;font-size:15px">{leg}ª legislatura · {periodo}
+        <small style="font-weight:400;color:var(--ink-3)"> — {_milhar(total)} proposições
+        </small></h3>
+      <div class="rolagem"><table>
+        <thead><tr><th>Tipo de proposição</th><th>Apresentadas</th>
+        <th>Ainda tramitando</th></tr></thead><tbody>{linhas}</tbody></table></div>""")
+
+    return f"""<section class="bloco">
+      <h2>Atividade no Senado Federal</h2>
+      <p style="font-size:13px;color:var(--ink-3);margin:0 0 4px">
+        Só entram as proposições em que a pessoa é <b>autora principal</b> — quem
+        assina junto não conta. É o mesmo critério do bloco da Câmara, e sem ele
+        um senador com duzentas assinaturas de apoio apareceria como quem propôs
+        duzentas coisas.</p>
+      {"".join(blocos)}
+      <p style="font-size:12.5px;color:var(--ink-3);margin:12px 0 0">
+        Os tipos aparecem separados porque somá-los não significa nada: uma
+        proposta de emenda à Constituição e um requerimento de comissão custam
+        coisas muito diferentes. <b>Não há taxa de aprovação</b>: aprovar depende
+        de estar na base do governo, não do mérito do texto.
+        E <b>este bloco não se compara ao da Câmara</b> — as duas casas não
+        propõem as mesmas coisas nem no mesmo volume.</p>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        <b>Relatoria não aparece aqui, e isso não quer dizer que não houve.</b> No
+        Senado o parecer é documento dentro da tramitação de uma matéria, não uma
+        matéria com autoria própria — a fonte devolve zero pareceres, e não há
+        como atribuí-los a um senador por este caminho. Na Câmara o parecer é
+        proposição e por isso aparece lá. Registrado em
+        <a href="https://github.com/girocoju/dossie-eleitoral/blob/main/docs/LACUNAS.md">
+        LACUNAS.md</a> como L-25.</p>
+    </section>"""
+
+
 def _atividade(c: Candidato) -> str:
     """Atividade na Camara de quem ja' foi deputado federal.
 
@@ -290,8 +376,8 @@ def _atividade(c: Candidato) -> str:
                  "neste período</span>")
         linhas = "".join(
             f"<tr><td>{rotulos.get(a['classe'], a['classe'])}</td>"
-            f"<td class='num'>{a['total']:,}</td>"
-            f"<td class='num'>{a['norma'] or '—'}</td></tr>".replace(",", ".")
+            f"<td class='num'>{_milhar(a['total'])}</td>"
+            f"<td class='num'>{_milhar(a['norma']) if a['norma'] else '—'}</td></tr>"
             for a in itens
         )
         total = sum(a["total"] for a in itens)
@@ -300,15 +386,15 @@ def _atividade(c: Candidato) -> str:
         pl = next((x for x in plenario if x["leg"] == leg), None)
         extra = "" if not pl else f"""
       <dl class="campos" style="margin:10px 0 0">
-        <div><dt>Votações em que votou</dt><dd>{pl['votacoes']:,}</dd></div>
+        <div><dt>Votações em que votou</dt><dd>{_milhar(pl['votacoes'])}</dd></div>
         <div><dt>Sessões de plenário</dt><dd>{pl['plenario'] or '—'}</dd></div>
         <div><dt>Eventos no total</dt><dd>{pl['eventos'] or '—'}
           <span class='ajuda' tabindex='0' title='Plenário e comissões somados.
           Não é taxa de presença: a fonte não diz a quantos eventos o
           parlamentar deveria ter comparecido.'>?</span></dd></div>
-        <div><dt>Como votou</dt><dd>{pl['sim']:,} sim · {pl['nao']:,} não
-          · {pl['abstencao']:,} abst. · {pl['obstrucao']:,} obstr.</dd></div>
-      </dl>""".replace(",", ".")
+        <div><dt>Como votou</dt><dd>{_milhar(pl['sim'])} sim · {_milhar(pl['nao'])} não
+          · {_milhar(pl['abstencao'])} abst. · {_milhar(pl['obstrucao'])} obstr.</dd></div>
+      </dl>"""
         blocos.append(f"""
       <h3 style="margin:24px 0 8px;font-size:15px">{leg}ª legislatura · {periodo}
         <small style="font-weight:400;color:var(--ink-3)"> — {total:,} proposições</small>
@@ -952,6 +1038,7 @@ def _ficha(c: Candidato, quando: str) -> str:
     partes.append(_chapa(c))
     partes.append(_chapa_titular(c))
     partes.append(_atividade(c))
+    partes.append(_atividade_senado(c))
     partes.append(_financiamento(c))
     partes.append(_indicadores(c))
     partes.append("</div></div>")

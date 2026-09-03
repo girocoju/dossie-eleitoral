@@ -490,6 +490,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-034 | Atividade legislativa do Senado, com o mesmo rigor da Câmara | `ordem = 1` como equivalente do `proponente`, validado em 48 comparações contra a flag oficial do endpoint descontinuado; classes mapeadas pela lista oficial de siglas, não pelo formato | Aceita |
 | ADR-033 | Página de quem financia as campanhas | 23.532 repasses numa linha por financiador × candidatura; publicar todas as pessoas físicas foi decisão explícita do dono do projeto, com o número de exposição na mão. Sem CPF | Aceita |
 | ADR-032 | Ficha própria para o vice de presidente e de governador | 216 candidaturas que só existiam como cartão na ficha do titular; Alckmin tem três mandatos de governador que não tinham onde aparecer. Suplente de senador fica de fora | Aceita |
 | ADR-031 | A ausência de um indicador é dita na ficha, não só respeitada | Omitir a linha sem dizer que omitiu é indistinguível de esconder; o rodapé de cada mandato passa a listar o que falta e por quê, derivado do alcance real da série | Aceita |

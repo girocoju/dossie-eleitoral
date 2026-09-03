@@ -409,9 +409,18 @@ mapa municipal de uma eleicao proporcional e' ruido, nao informacao.
 
 ---
 
-## L-20 · O Senado nao tem atividade legislativa no projeto
+## L-20 · FECHADA em 02/09/2026 — o Senado tem atividade legislativa
 
-**Situacao:** ABERTA · registrada em 28/08/2026
+**Situacao:** FECHADA. A condicao que ela impunha foi cumprida: existe
+equivalente estruturado ao `proponente` da Camara — `documento.autoria[].ordem`,
+sendo `ordem = 1` o autor principal. Foi validado contra o campo oficial
+`IndicadorAutorPrincipal` do endpoint antigo em 48 comparacoes nas duas direcoes,
+sem divergencia. Ver F-22 e `ingest/senado.py`.
+
+O texto original fica abaixo, porque o risco que ele descreve continua real e e'
+o motivo de o filtro existir.
+
+**Situacao original:** ABERTA · registrada em 28/08/2026
 
 A F-16 cobre **so' a Camara**. Os 81 senadores tem a ponte de identidade (F-15) e
 aparecem em `dim_parlamentar`, mas nao ha' nenhuma proposicao, relatoria ou voto
@@ -568,3 +577,28 @@ distincao da ADR-013 entre "nao apresentou plano" e "nao e' exigido plano".
 ja' e' verificavel: o total de uma candidatura confere ao centavo com a pagina
 oficial (ADR-020, seccao Verificacao).
 
+---
+
+## L-25 · Relatoria no Senado nao e' atribuivel ao senador
+
+**Situacao:** ABERTA · registrada em 02/09/2026
+
+A F-22 trouxe a atividade do Senado com as mesmas quatro classes da Camara, mas
+uma delas vem sempre vazia: **relatoria**. Sao ZERO linhas em 57.170.
+
+**Por que:** no Senado o parecer e' documento dentro da tramitacao de uma
+materia, nao uma materia com autoria propria. A consulta por sigla confirma:
+`/processo?sigla=PAR&ano=2025` devolve zero. Na Camara o parecer E' proposicao
+(PRL, PAR, SBT) e por isso aparece la'.
+
+**Impacto:** um senador relata constantemente, e a ficha nao mostra nada disso. A
+leitura errada seria concluir que ele nao relatou — por isso o bloco DIZ que a
+ausencia e' da fonte, e nao da pessoa (ADR-031: ausencia nomeada, nunca
+silenciosa).
+
+**Como fechar:** exigiria percorrer a tramitacao de cada materia atras do
+relator designado, o que e' outra ordem de grandeza de requisicoes e outra
+fonte de verdade. Nao foi tentado.
+
+**O que NAO fazer:** preencher com o numero de relatorias da Camara, ou somar as
+duas casas. Sao coisas diferentes e a tela ja' avisa que nao se comparam.

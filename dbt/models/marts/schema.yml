@@ -438,6 +438,34 @@ models:
       - name: id_ambiguo
         tests: [not_null]
 
+  - name: fct_atividade_senado
+    description: >
+      F-22 — atividade legislativa por senador, ano e classe, contando SO'
+      autoria principal. Fecha a L-20. Espelha `fct_atividade_legislativa`; os
+      dois nunca sao somados nem comparados entre si.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [id_casa, ano, classe_proposicao]
+    columns:
+      - name: id_casa
+        description: "`codigoParlamentar` do Senado. Nao tem relacao com o `id_deputado` da Camara."
+        tests: [not_null]
+      - name: classe_proposicao
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [normativa, fiscalizacao, relatoria, procedimental]
+      - name: qt_proposicoes
+        description: >
+          Quantas proposicoes o senador apresentou como AUTOR PRINCIPAL naquele
+          ano e naquela classe. Nunca somar as classes: rito e producao normativa
+          sao ordens de grandeza diferentes.
+        tests: [not_null]
+      - name: id_pessoa
+        description: "Nulo quando a ponte de identidade (F-15) nao casou."
+
   - name: fct_atividade_legislativa
     description: >
       Atividade legislativa por deputado, ano e CLASSE de proposicao (F-16). A
