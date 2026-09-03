@@ -191,15 +191,31 @@ fica em `reeleicao_declarada`.
 
 ---
 
-## L-10 · Vinculacao de pessoa em anos sem CPF
+## L-10 · FECHADA em 02/09/2026 — vinculacao de pessoa medida por ano
 
-**O que falta:** medir a taxa real por ano.
+**Situacao:** FECHADA. A analise `relatorio_vinculacao_pessoa` foi rodada contra o
+historico carregado. Percentuais MEDIDOS, nao estimados:
 
-**Impacto:** onde o CPF nao existe, `id_pessoa` cai no fallback nome+nascimento e
-`link_confiavel = false`. Trajetorias que dependem disso sao sinalizadas na tela.
+| ano | candidaturas | por CPF | fallback nome+nascimento | sem chave |
+|---|---|---|---|---|
+| 1998 | 15.040 | 96,9% | 3,0% (445) | 0,1% (14) |
+| 2002 | 18.049 | 98,1% | 0,6% (113) | 1,3% (233) |
+| 2006 | 19.263 | **100%** | 0 | 0 |
+| 2010 | 22.537 | **100%** | 0 | 0 |
+| 2014 | 26.195 | 99,9% | 0,1% (24) | 0 |
+| 2018 | 29.227 | 99,6% | 0 | 0,4% (108) |
+| 2022 | 29.270 | 99,9% | 0 | 0,1% (29) |
+| 2026 | 20.837 | **100%** | 0 | 0,01% (3) |
 
-**Como fechar:** rodar a analise `relatorio_vinculacao_pessoa` depois da carga do
-historico e registrar aqui os percentuais por ano — **medidos, nao estimados**.
+**O que isso quer dizer:** a trajetoria eleitoral e' quase inteiramente ligada por
+CPF, que nao tem homonimia. O fallback por nome + data de nascimento — o unico que
+poderia juntar duas pessoas diferentes — pesa em **1998 e 2002, e so'**: 558
+candidaturas nos dois anos somados, de 33 mil. Onde ele foi usado, a tela sinaliza
+`link_confiavel = false`.
+
+**O que continua verdadeiro:** o ano com mais candidatura sem chave nenhuma e' 2002
+(1,3%). Essas nao entram em `fct_mandato` e nao viram trajetoria — ausencia
+declarada, nunca aproximada por nome.
 
 ---
 

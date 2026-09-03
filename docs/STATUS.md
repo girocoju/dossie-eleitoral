@@ -28,7 +28,7 @@
 | T-102 Bens, complementar, vagas, coligacoes | ✅ | 5 datasets, 28 arquivos cada |
 | T-103 `stg_tse__candidaturas` + testes | ✅ | Materializado no BigQuery: 20.765 linhas, testes verdes |
 | T-104 `dim_candidato`, `dim_partido`, `fct_candidatura` | ✅ | 20.765 / 30 / 20.765 linhas materializadas |
-| T-105 Dossie Eleitoral: gerador do site (Candidatos, Presidencia, Governadores) | 🟡 | Layout aprovado; gerador a escrever. Power BI arquivado — ver ADR-018 |
+| T-105 Dossie Eleitoral: gerador do site | ✅ | `scripts/gerar_site.py` + `render_site.py`: 960 paginas no ar em `datadubaintel.com/dossie-eleitoral`. O texto "gerador a escrever" ficou parado uma semana depois de o gerador existir |
 
 **Numeros reais da carga de 2026** (`data/staging/qa/`):
 
@@ -63,7 +63,7 @@ Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 
 | T-202 Ingestao do historico + resultados por UF | ✅ | 8 anos: 180.718 candidaturas, 509.136 bens, **142.086 linhas de votacao** (L-02 fechada) |
 | T-203 Mapa de colunas por ano em `layouts/tse_{ano}.yml` | ✅ | **8 anos conferidos** contra os arquivos reais (L-01 fechada) |
 | T-204 `fct_mandato` + teste de cobertura | ✅ | 11.777 mandatos, 1999–2026. 7 por eleicao suplementar, 7 interrompidos |
-| T-205 Vinculacao de pessoa + relatorio de taxa de match | 🟡 | `analyses/relatorio_vinculacao_pessoa.sql` escrito; medicao pendente ([L-10](LACUNAS.md)) |
+| T-205 Vinculacao de pessoa + relatorio de taxa de match | ✅ | **Medido em 02/09/2026**: vinculacao por CPF em 96,9% (1998) a 100% (2006, 2010, 2026) das candidaturas. O fallback por nome+nascimento so pesa em 1998 (445) e 2002 (113); sem chave nenhuma, no maximo 1,3% (2002). L-10 fechada |
 
 ## Fase 3 — Socioeconomico e "Durante o mandato"
 
@@ -72,7 +72,7 @@ Candidaturas por cargo: 1 Presidente 13 · 2 Vice-Presidente 13 · 3 Governador 
 | T-301 `ingest/ibge_sidra.py`, `ingest/ipeadata.py` | ✅ | 4 series conferidas contra a API real; S8–S10 em [LACUNAS](LACUNAS.md) |
 | T-302 `fct_indicador_uf_ano` + `dim_indicador` | ✅ | 3.360 linhas, 5 indicadores, **0 sem comparador nacional** |
 | T-303 `fct_mandato_indicador` com comparadores | ✅ | 818 linhas: 197 mandatos de Presidente/Governador x 5 indicadores |
-| T-304 Paginas "Durante o Mandato" e "Contexto Socioeconomico" | 🟡 | Tabelas e medidas no modelo; visuais faltam |
+| T-304 Paginas "Durante o Mandato" e "Contexto Socioeconomico" | ✅ | Entregue pelo SITE, nao pelo Power BI (ADR-018): o bloco "Durante mandatos anteriores" esta em cada ficha, separado por mandato (ADR-028) e com a ausencia de indicador dita (ADR-031) |
 
 **Indicadores em `fct_indicador_uf_ano`** — 9 series, 4.307 linhas:
 
@@ -124,15 +124,15 @@ de 1998.
 | Task | Estado | Nota |
 |---|---|---|
 | T-401 Pagina Metodologia + `docs/METODOLOGIA.md` | ✅ | Documento escrito; pagina do relatorio a montar |
-| T-402 Perfil de candidatos completo (F-08) | 🟡 | Medidas de perfil no modelo; filtros a montar no Desktop |
+| T-402 Perfil de candidatos completo (F-08) | ✅ | Entregue pelo SITE (ADR-018): bloco "Perfil declarado ao TSE" em 960 fichas, mais as listagens filtraveis por UF e partido. "Filtros a montar no Desktop" era Power BI Desktop, aposentado em 28/08 |
 | T-403 Atualizacao diaria (F-10) | OK | Roda na maquina do usuario pelo `atualizar.bat` no Agendador de Tarefas do Windows; as fontes ANUAIS entram sozinhas aos domingos. O workflow perdeu o `schedule` e continua como rede de seguranca, por push e disparo manual |
 | T-409 Atividade legislativa do Senado (F-22, ADR-034) | OK | 02/09/2026: fecha a L-20. 80 senadores, 28.600 proposicoes como AUTOR PRINCIPAL, em 42 fichas de 2026. `ordem = 1` validado em 48 comparacoes contra a flag oficial do endpoint descontinuado; classes mapeadas pela lista oficial de siglas. Relatoria vem vazia por limite da fonte, e a tela diz isso (L-25) |
 | T-408 Pagina de quem financia as campanhas (ADR-033) | OK | 01/09/2026: `/doadores/` com 23.532 repasses, uma linha por financiador x candidatura, sem CPF. Publicar todas as pessoas fisicas foi decisao explicita do usuario, com o numero de exposicao (704 hoje -> 14.958) na mao. JSON de 2,8 MB que o servidor entrega em 443 KB por Brotli; a pagina desenha 200 linhas por vez |
 | T-407 Ficha propria para os vices (ADR-032) | OK | 01/09/2026: 216 candidaturas (13 a vice-presidente, 203 a vice-governador) ganharam ficha, listagem, navegacao e sitemap. Vinculo com o titular nos dois sentidos. O site foi de 739 para 956 paginas. Suplente de senador (665) fica de fora — decisao separada |
 | T-406 Ausencia de indicador dita na ficha (ADR-031) | OK | 01/09/2026: cada bloco de mandato passa a listar no rodape o que NAO esta' la' e por que, derivado do alcance real de cada serie (`fct_mandato_indicador_ausente`). Nasceu da pergunta "por que o Lula nao tem desemprego nos dois primeiros mandatos?" — a PNAD Continua comeca em 2012 (L-06), e a tela nao dizia. A metodologia afirmava que a ficha dizia; agora diz de verdade |
 | T-405 Validacao dos indicadores contra fonte oficial (Regra 6) | OK | 01/09/2026: **14 de 18 conferem** com a publicacao oficial, varios exatos ate' o ultimo digito. A DESOCUPACAO foi trocada para a serie anual do IBGE por causa da conferencia (ADR-030) e passou a conferir. RENDIMENTO_MEDIO fica no "efetivamente recebido", agora nomeado na tela. O trio SICONFI segue sem publicacao externa para comparar. A pagina de metodologia tem a secao **Conferencia com a fonte oficial**. Ver [VALIDACAO.md](VALIDACAO.md) |
-| T-404 Rename para Dossie Eleitoral (ADR-026) | OK | Repo `girocoju/dossie-eleitoral`, pasta local, site em `datadubaintel.com/dossie-eleitoral`, bucket `dossie-eleitoral-fotos`, variaveis `DOSSIE_*` (o prefixo `RADAR_` ainda resolve, com aviso). Publicado e conferido em 31/08/2026. O WIF amarra o repo em DOIS lugares (condicao do provider **e** binding da service account) — os dois aceitam os dois nomes; remover o antigo e' limpeza opcional. Ver ADR-011 |
-| T-404 Publish to web, README com prints, post | 🟡 | Publicacao automatizada: job `publicar` envia `site/` para a Hostinger por FTPS a cada carga diaria (ADR-018). Falta o post |
+| T-410 Rename para Dossie Eleitoral (ADR-026) | OK | Repo `girocoju/dossie-eleitoral`, pasta local, site em `datadubaintel.com/dossie-eleitoral`, bucket `dossie-eleitoral-fotos`, variaveis `DOSSIE_*` (o prefixo `RADAR_` ainda resolve, com aviso). Publicado e conferido em 31/08/2026. O WIF amarra o repo em DOIS lugares (condicao do provider **e** binding da service account) — os dois aceitam os dois nomes; remover o antigo e' limpeza opcional. Ver ADR-011 |
+| T-404 Publicacao do site | ✅ | "Publish to web" era recurso do Power BI e morreu com a ADR-018. A publicacao real: FTPS para a Hostinger, 1016 arquivos, com retomada por reconexao (ADR-027). O post de divulgacao nao e tarefa de engenharia e sai daqui |
 
 ## Fase 5 — Pos-eleicao
 
