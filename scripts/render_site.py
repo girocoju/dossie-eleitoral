@@ -27,6 +27,7 @@ from scripts.gerar_site import (
     VICES,
     Candidato,
     brl,
+    carimbo_de_publicacao,
     e,
 )
 
@@ -1840,6 +1841,9 @@ def escrever_site(destino: Path, majoritarios: list[Candidato],
             bruto = json.dumps(linhas, ensure_ascii=False, separators=(",", ":"))
             grava(f"dados/{chave}/{uf}.json", bruto)
         grava(f"{chave}/index.html", _listagem_proporcional(chave, nome, por_uf, quando))
+
+    grava(".publicacao.json",
+          json.dumps(carimbo_de_publicacao(), ensure_ascii=False, indent=2))
 
     if doadores:
         grava("dados/doadores.json",

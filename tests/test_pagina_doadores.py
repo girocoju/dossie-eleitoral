@@ -14,6 +14,7 @@ import re
 
 from scripts.gerar_site import CARGO_CURTO_DOADOR, RAMO_OBVIO
 from scripts.render_site import _pagina_doadores
+from tests.conftest import contem_frase
 
 # [nome, tipo, cnpj, uf, ramo, valor, qt, proprio, candidato, partido, cargo,
 #  uf_cand, n_candidaturas, ficha]
@@ -58,10 +59,7 @@ def test_nenhum_cpf_no_payload_nem_na_pagina():
 
 
 def test_a_pagina_diz_que_cpf_nunca_e_publicado():
-    # Sem `split`, o teste quebra quando o paragrafo muda de quebra de linha —
-    # e' o texto que importa, nao onde a linha termina no fonte.
-    texto = " ".join(_html().split())
-    assert "CPF de pessoa física nunca é publicado nem armazenado" in texto
+    assert contem_frase(_html(), "CPF de pessoa física nunca é publicado nem armazenado")
 
 
 def test_a_pagina_nao_desenha_tudo_de_uma_vez():

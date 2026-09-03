@@ -403,7 +403,12 @@ def download(
             last_error = exc
             status = getattr(exc, "code", None)
             if status in (401, 404, 410):
-                raise DownloadError(f"{url} respondeu {status} — URL invalida") from exc
+                # Aqui a causa vai explicita para o objeto tambem: 401/404/410
+                # devem mesmo ser permanentes, e agora isso e' afirmado pelo
+                # codigo do HTTPError, nao por `causa` ter ficado None por
+                # descuido.
+                raise DownloadError(
+                    f"{url} respondeu {status} — URL invalida", exc) from exc
             if attempt == MAX_ATTEMPTS:
                 break
             wait = BACKOFF_BASE * (2 ** (attempt - 1))
@@ -426,8 +431,20 @@ def download(
                 "%s nao pode ser rebaixado (%s) — seguindo com a copia local de %s",
                 dest.name, type(last_error).__name__, fallback.extracted_at)
             return fallback
+        # `causa=last_error` NAO E' DECORACAO — e' o que faz `transitoria`
+        # funcionar. `from last_error` alimenta o traceback; quem guarda a causa
+        # e' o construtor. Sem ela, `self.causa` fica None, `transitoria` avalia
+        # None e devolve False, e TODO timeout de download virava erro
+        # permanente: `executar` re-levantava, o processo saia com 1 e o job
+        # inteiro caia.
+        #
+        # Foi o que aconteceu em 03/09/2026: um `<urlopen error timed out>` do
+        # INEP derrubou a carga e pulou a publicacao do site. O mecanismo da
+        # ADR-022 existia inteiro e estava desligado por um argumento que faltava
+        # em UMA das tres chamadas — as de `get_texto` e `get_json` passavam.
         raise DownloadError(
-            f"nao foi possivel baixar {url} apos {MAX_ATTEMPTS} tentativas: {last_error}"
+            f"nao foi possivel baixar {url} apos {MAX_ATTEMPTS} tentativas: {last_error}",
+            last_error,
         ) from last_error
 
     part.replace(dest)

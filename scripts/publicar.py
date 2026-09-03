@@ -78,8 +78,10 @@ some da carga: preferir o resto a mais do que o resto a menos.
 from __future__ import annotations
 
 import argparse
-import ftplib  # noqa: S402 — o canal e' TLS; ver o cabecalho deste modulo
+import ftplib
+import json
 import ssl
+import subprocess  # noqa: S402 — o canal e' TLS; ver o cabecalho deste modulo
 import sys
 import time
 from collections.abc import Callable
@@ -309,6 +311,86 @@ def _liberar_caminho(sessao: ftplib.FTP, destino: str) -> None:
                 destino)
 
 
+CARIMBO = ".publicacao.json"
+
+
+def _carimbo_remoto(sessao: ftplib.FTP, raiz: str) -> dict | None:
+    """Le' o carimbo do site que ja' esta' no servidor, se houver."""
+    pedacos: list[bytes] = []
+    caminho = f"{raiz.rstrip('/')}/{CARIMBO}" if raiz.rstrip("/") else CARIMBO
+    try:
+        sessao.retrbinary(f"RETR {caminho}", pedacos.append)
+    except ftplib.all_errors:
+        return None            # primeira publicacao, ou carimbo apagado
+    try:
+        return json.loads(b"".join(pedacos).decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+
+def _e_ancestral(commit: str, de: str) -> bool | None:
+    """`commit` e' ancestral de `de`? None quando nao da' para saber."""
+    if not commit or not de or commit == de:
+        return False
+    try:
+        r = subprocess.run(("git", "merge-base", "--is-ancestor", commit, de),
+                           capture_output=True, timeout=15, check=False)
+    except Exception:  # noqa: BLE001
+        return None
+    if r.returncode == 0:
+        return True
+    if r.returncode == 1:
+        return False
+    return None                # commit desconhecido neste clone
+
+
+def conferir_regressao(sessao: ftplib.FTP, origem: Path, raiz: str,
+                       *, forcar: bool = False) -> None:
+    """Recusa publicar por cima de um site gerado de um commit MAIS NOVO.
+
+    O criterio e' LINHAGEM, nao horario. Em 03/09/2026 uma execucao do CI gerou
+    as 02:54 a partir de um commit anterior e sobrescreveu uma publicacao manual
+    de 01:41 que ja' trazia a correcao da metodologia — a mais recente no relogio
+    era a mais velha no conteudo, e a pagina voltou a afirmar que uma conferencia
+    nao tinha sido feita no dia em que ela foi feita.
+
+    Arvore suja nunca e' considerada ancestral: o conteudo publicado a mao nao
+    esta' em commit nenhum, e trata-lo como "antigo" bloquearia justamente a
+    correcao urgente.
+    """
+    local_path = origem / CARIMBO
+    if not local_path.exists():
+        log.warning("site sem %s — publicando sem conferir regressao", CARIMBO)
+        return
+    local = json.loads(local_path.read_text(encoding="utf-8"))
+    remoto = _carimbo_remoto(sessao, raiz)
+    if not remoto:
+        return
+
+    if local.get("arvore_suja") == "sim" or remoto.get("arvore_suja") == "sim":
+        return
+
+    ancestral = _e_ancestral(local.get("commit", ""), remoto.get("commit", ""))
+    if ancestral is None:
+        log.warning("nao foi possivel comparar %s com %s — publicando assim mesmo",
+                    local.get("commit", "?")[:8], remoto.get("commit", "?")[:8])
+        return
+    if not ancestral:
+        return
+
+    aviso = (
+        f"RECUSADO: este site vem de {local.get('commit', '?')[:8]}, que e' "
+        f"ANCESTRAL de {remoto.get('commit', '?')[:8]}, ja' publicado em "
+        f"{remoto.get('gerado_em', '?')}. "
+        "Publicar sobrescreveria conteudo mais novo com conteudo mais velho. "
+        "Se for mesmo o que se quer (rollback deliberado), use --forcar."
+    )
+    if forcar:
+        log.warning("%s — seguindo por --forcar", aviso[:80])
+        return
+    raise SystemExit(aviso)
+
+
 def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
            seco: bool, reconectar: Callable[[], ftplib.FTP] | None = None,
            ) -> tuple[int, int]:
@@ -386,6 +468,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--origem", default="site", type=Path)
     parser.add_argument("--dry-run", action="store_true",
                         help="lista o que subiria, sem conectar nem enviar")
+    parser.add_argument("--forcar", action="store_true",
+                        help="publica mesmo sobrescrevendo conteudo mais novo — "
+                             "so' para rollback deliberado")
     parser.add_argument("--certificado", action="store_true",
                         help="mostra a identidade TLS do servidor e sai; "
                              "nao envia credencial")
@@ -417,6 +502,8 @@ def main(argv: list[str] | None = None) -> int:
         return viva["sessao"]
 
     try:
+        conferir_regressao(viva["sessao"], origem, str(cfg["raiz"]),
+                           forcar=args.forcar)
         n, tamanho = enviar(viva["sessao"], origem, str(cfg["raiz"]), seco=False,
                             reconectar=reconectar)
         log.info("publicados %d arquivos, %.1f MB em %s%s",

@@ -40,6 +40,7 @@ import re
 import sys
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -195,6 +196,38 @@ CARGO_CURTO_DOADOR = {
     5: "Senador", 6: "Dep. federal", 7: "Dep. estadual", 8: "Dep. distrital",
     9: "1º Supl.", 10: "2º Supl.",
 }
+
+
+def carimbo_de_publicacao() -> dict[str, str]:
+    """Quem gerou este site, quando, e de qual commit (ADR-036).
+
+    O carimbo viaja junto com o site e fica no servidor. `scripts/publicar.py`
+    le' o do servidor antes de enviar e RECUSA publicar por cima de um site que
+    veio de um commit mais novo.
+
+    O criterio e' linhagem, nao horario. Em 03/09/2026 uma execucao do CI gerou
+    as 02:54 a partir de um commit ANTERIOR e sobrescreveu uma publicacao manual
+    de 01:41 que ja' tinha a correcao — a mais recente no relogio era a mais
+    velha no conteudo. Comparar horario teria deixado passar.
+    """
+    import subprocess
+
+    def git(*args: str) -> str:
+        try:
+            return subprocess.run(("git", *args), capture_output=True, text=True,
+                                  timeout=15, check=False).stdout.strip()
+        except Exception:  # noqa: BLE001 — sem git o carimbo sai incompleto, nao quebra
+            return ""
+
+    commit = git("rev-parse", "HEAD")
+    sujo = bool(git("status", "--porcelain"))
+    return {
+        "gerado_em": datetime.now(UTC).isoformat(timespec="seconds"),
+        "commit": commit or "desconhecido",
+        # Arvore suja e' o caso da publicacao manual: o conteudo NAO esta' em
+        # nenhum commit, entao ele nao pode ser tratado como ancestral de nada.
+        "arvore_suja": "sim" if sujo else "nao",
+    }
 
 
 def carregar_doadores(cliente) -> list[list]:

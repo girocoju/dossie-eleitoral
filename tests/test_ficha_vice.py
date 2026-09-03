@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 from scripts.gerar_site import CARGOS, VICES
 from scripts.render_site import _chapa, _chapa_titular
+from tests.conftest import contem_frase
 
 
 def _cand(cod_cargo=2, chapa=None, titular=None, financiamento=None):
@@ -41,7 +42,7 @@ def test_a_ficha_do_vice_diz_que_vice_nao_recebe_voto_proprio():
     """Sem isso, a ficha sugere uma candidatura que se elege sozinha."""
     t = {"nome": "X", "completo": "X", "cargo": "Governador", "partido": "P",
          "foto": None, "url": "https://x/c/1/"}
-    assert "não recebe voto próprio" in _chapa_titular(_cand(titular=t))
+    assert contem_frase(_chapa_titular(_cand(titular=t)), "não recebe voto próprio")
 
 
 def test_titular_sem_vice_nao_gera_bloco():
