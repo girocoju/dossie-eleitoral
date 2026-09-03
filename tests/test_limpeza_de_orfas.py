@@ -22,6 +22,8 @@ from scripts.publicar import (
     LIMITE_REMOCAO,
     MANIFESTO,
     PISO_REMOCAO,
+    corpo_do_manifesto,
+    hashes_locais,
     listar_arquivos,
     remover_orfas,
 )
@@ -143,12 +145,22 @@ def test_falha_ao_apagar_uma_nao_derruba_a_publicacao():
     assert n == 2 and "b.html" not in s.apagados
 
 
-def test_o_manifesto_gravado_e_json_de_lista(tmp_path):
+def test_o_manifesto_gravado_traz_nome_e_hash(tmp_path):
+    """Formato v2 (ADR-039). O v1 era so' a lista de nomes."""
     _site(tmp_path, ["index.html"])
-    (tmp_path / MANIFESTO).write_text(
-        json.dumps(listar_arquivos(tmp_path), ensure_ascii=False), encoding="utf-8")
-    lido = json.loads((tmp_path / MANIFESTO).read_text(encoding="utf-8"))
-    assert isinstance(lido, list) and "index.html" in lido
+    nomes = listar_arquivos(tmp_path)
+    lido = json.loads(corpo_do_manifesto(hashes_locais(tmp_path, nomes)))
+    assert lido["versao"] == 2
+    assert set(lido["arquivos"]) == {"index.html"}
+    assert len(lido["arquivos"]["index.html"]) == 16
+
+
+def test_o_proprio_manifesto_nunca_entra_na_lista(tmp_path):
+    """Ele sobe por ultimo e sozinho — entrar em `atuais` o faria subir no meio,
+    afirmando o fim da publicacao antes da hora."""
+    _site(tmp_path, ["index.html"])
+    (tmp_path / MANIFESTO).write_text("{}", encoding="utf-8")
+    assert listar_arquivos(tmp_path) == ["index.html"]
 
 
 def test_punhado_de_orfas_nunca_precisa_de_forcar():

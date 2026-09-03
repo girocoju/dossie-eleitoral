@@ -8,23 +8,31 @@ entao pagar query por visita seria desperdicio (Constituicao 5).
 O QUE E' GERADO
 
     /                          porta de entrada
-    /presidente/               13 candidaturas
-    /governador/               198
-    /senador/                  318
-    /deputado-federal/         listagem filtravel (JSON)
-    /deputado-estadual/        listagem filtravel (JSON)
-    /candidato/<slug>-<sq>/    ficha propria — SO' para os 529 majoritarios
+    /presidente/ ... /senador/ listagem de cada cargo majoritario
+    /deputado-*/               listagem filtravel por estado (JSON por UF)
+    /candidato/<slug>-<sq>/    ficha propria — TODA candidatura (F-18)
+    /doadores/                 quem financiou quem
+    /metodologia/              fontes, cobertura e glossario
     /dados/*.json              base das listagens filtraveis
-    /sitemap.xml
+    /dossie.css                a folha de estilo, uma vez para o site inteiro
+    /sitemap.xml               indice, apontando para /sitemaps/*.xml
 
-POR QUE SO' 529 FICHAS PROPRIAS
+TODA CANDIDATURA TEM FICHA — E ANTES NAO TINHA
 
-Sao 20.765 candidaturas. Gerar uma pagina para cada produziria 19 mil paginas
-quase identicas — o Google chama isso de conteudo raso e pode penalizar o dominio
-inteiro. Majoritario tem plano de governo, trajetoria densa e disputa nacional ou
-estadual; proporcional tem meia duzia de campos declarados.
+Ate' 03/09/2026 so' os 529 majoritarios tinham pagina propria. O argumento era
+que 19 mil paginas com poucos campos distintos sao o que buscador classifica
+como conteudo raso, e o risco nao era penalidade: era o site inteiro passar a
+ser lido como de baixa qualidade.
 
-Entao: ficha indexavel para quem tem conteudo, listagem filtravel para o resto.
+O criterio que decidiu nao foi ranqueamento, foi utilidade publica
+(Constituicao 0). Quem decide o voto para deputado enfrenta 1.126 nomes so' em
+Sao Paulo, e e' ai' que uma ficha ajuda MAIS, nao menos. Ficha sem endereco
+proprio nao e' compartilhavel, e um site de consulta serve quem chega por link.
+
+O que a ficha do deputado NAO tem: indicador socioeconomico atribuido ao mandato
+dele. `fct_mandato_indicador` so' tem linha para mandato EXECUTIVO, entao o bloco
+so' aparece para quem ja' foi Presidente ou Governador — e fala do periodo
+daquele mandato, nunca do de deputado (SPEC 2.2).
 
 SEM DEPENDENCIA NOVA
 
@@ -71,6 +79,26 @@ PROPORCIONAIS = {
     6: ("deputado-federal", "Deputado Federal"),
     7: ("deputado-estadual", "Deputado Estadual"),
     8: ("deputado-distrital", "Deputado Distrital"),
+}
+
+# Ate' a F-18 so' cargo majoritario tinha ficha, e por isso `CARGOS` bastava
+# para descobrir o nome e a listagem de origem de uma ficha. Agora as 19.418
+# candidaturas proporcionais tambem tem — e `CARGOS[6]` seria KeyError.
+TODOS_CARGOS: dict[int, tuple[str, str]] = {
+    **{cod: (chave, nome) for cod, (chave, nome, _) in CARGOS.items()},
+    **PROPORCIONAIS,
+}
+
+# Plano de governo e' exigido de Prefeito, Governador e Presidente (Lei 9.504/97,
+# art. 11, par. 1, IX). Dizer isso na ficha de um deputado sem dizer o que ele e'
+# deixaria o leitor concluindo que o candidato deixou de entregar algo.
+_CARGO_NA_NOTA = {
+    5: "Senador é majoritário, mas não consta da lista",
+    6: "Deputado Federal não consta da lista",
+    7: "Deputado Estadual não consta da lista",
+    8: "Deputado Distrital não consta da lista",
+    2: "o plano da chapa é o do titular",
+    4: "o plano da chapa é o do titular",
 }
 
 _NAO_ALFANUM = re.compile(r"[^a-z0-9]+")
@@ -170,7 +198,17 @@ class Candidato:
 
     @property
     def cargo_nome(self) -> str:
-        return CARGOS[self.cod_cargo][1]
+        return TODOS_CARGOS[self.cod_cargo][1]
+
+    @property
+    def cargo_chave(self) -> str:
+        """A listagem de onde a ficha veio — serve de link de volta e de aba
+        acesa na navegacao."""
+        return TODOS_CARGOS[self.cod_cargo][0]
+
+    @property
+    def e_proporcional(self) -> bool:
+        return self.cod_cargo in PROPORCIONAIS
 
 
 # ── consultas ───────────────────────────────────────────────────────────────
@@ -283,8 +321,41 @@ def carregar_doadores(cliente) -> list[list]:
     return linhas
 
 
-def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
+# ACIMA DISTO O FILTRO `in (...)` DEIXA DE COMPENSAR.
+#
+# Com os 529 majoritarios, listar os `id_pessoa` na consulta evitava ler tabelas
+# inteiras. Com as 19.947 fichas da F-18 a lista cobre praticamente toda a base
+# de 2026: o SQL passa de 700 kB — perto do teto de 1 MB do BigQuery — e filtra
+# quase nada. Acima do teto a consulta vem inteira e o recorte acontece em
+# Python, no `por_pessoa.get()` que ja' existe em toda funcao.
+_TETO_FILTRO_SQL = 4000
+
+
+def _filtro(chaves: dict, coluna: str = "id_pessoa") -> str:
+    if len(chaves) > _TETO_FILTRO_SQL:
+        return "true"
+    lista = "','".join(chaves)
+    return f"{coluna} in ('{lista}')"
+
+
+def carregar_fichas(cliente, cargos: tuple[int, ...],
+                    limite: int | None = None) -> list[Candidato]:
+    """Toda candidatura que ganha pagina propria.
+
+    Ate' 03/09/2026 so' os 529 cargos majoritarios entravam aqui. A F-18 trouxe
+    as 19.418 candidaturas proporcionais para a MESMA funcao, de proposito: duas
+    rotinas de carga divergiriam com o tempo, e a divergencia apareceria como
+    ficha de deputado com menos rigor que a de senador — exatamente o contrario
+    do que a F-18 argumenta (quem enfrenta 1.126 nomes precisa de MAIS ajuda).
+
+    O bloco de indicadores socioeconomicos aparece em qualquer ficha, mas so'
+    existe para quem ja' foi Presidente ou Governador: `fct_mandato_indicador` so'
+    tem linha para mandato EXECUTIVO. Um candidato a deputado que governou um
+    estado ve' o periodo daquele mandato; nenhum numero e' atribuido ao mandato
+    de deputado, que e' o que a F-18 e o SPEC 2.2 proibem.
+    """
     lim = f"limit {limite}" if limite else ""
+    codigos = ", ".join(str(c) for c in cargos)
     p = cliente.project
     sql = f"""
         select
@@ -310,7 +381,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
         -- aconteceu com GUTO SCHIAVETTO na pagina de senadores. As duas linhas
         -- continuam no mart; a tela mostra uma. Ver a CTE `repetidos` em
         -- `fct_candidatura`.
-        where d.ano_eleicao = 2026 and d.cod_cargo in (1, 2, 3, 4, 5)
+        where d.ano_eleicao = 2026 and d.cod_cargo in ({codigos})
           and f.e_registro_exibido
         order by d.cod_cargo, d.sg_uf, d.nome_urna
         {lim}
@@ -337,7 +408,7 @@ def carregar_majoritarios(cliente, limite: int | None) -> list[Candidato]:
         saida.append(c)
         if r.id_pessoa:
             ids.setdefault(r.id_pessoa, []).append(c)
-    log.info("%d candidaturas majoritarias", len(saida))
+    log.info("%d candidaturas com ficha propria", len(saida))
     _anexar_trajetoria(cliente, ids)
     _anexar_mudancas(cliente, {c.sk: c for c in saida})
     _anexar_indicadores(cliente, ids)
@@ -387,7 +458,6 @@ def _anexar_trajetoria(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
     if not por_pessoa:
         return
     p = cliente.project
-    lista = "','".join(por_pessoa)
     sql = f"""
         select d.id_pessoa, d.ano_eleicao, g.descricao as cargo, d.sg_uf,
                d.sigla_partido, f.votos_nominais,
@@ -403,7 +473,7 @@ def _anexar_trajetoria(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
         from `{p}.marts.dim_candidato` d
         join `{p}.marts.fct_candidatura` f using (sk_candidatura)
         join `{p}.marts.dim_cargo` g on g.cod_cargo = d.cod_cargo
-        where d.id_pessoa in ('{lista}') and d.ano_eleicao < 2026
+        where {_filtro(por_pessoa, 'd.id_pessoa')} and d.ano_eleicao < 2026
           and f.e_registro_exibido
         order by d.ano_eleicao desc
     """
@@ -470,7 +540,6 @@ def _anexar_indicadores(cliente, por_pessoa: dict[str, list[Candidato]]) -> None
     if not por_pessoa:
         return
     p = cliente.project
-    lista = "','".join(por_pessoa)
     sql = f"""
         select m.id_pessoa, m.cod_indicador, i.nome as indicador, m.unidade,
                m.nm_ue, m.sg_uf, m.ano_inicio, m.ano_fim, m.cod_cargo,
@@ -479,7 +548,7 @@ def _anexar_indicadores(cliente, por_pessoa: dict[str, list[Candidato]]) -> None
                m.variacao_brasil_pct, m.delta_vs_brasil, m.janela_incompleta
         from `{p}.marts.fct_mandato_indicador` m
         join `{p}.marts.dim_indicador` i using (cod_indicador)
-        where m.id_pessoa in ('{lista}')
+        where {_filtro(por_pessoa, 'm.id_pessoa')}
         -- A ordem final e' decidida no render (o glossario troca o nome
         -- exibido, entao ordenar por `i.nome` aqui daria outra coisa na
         -- tela). Isto aqui e' so' para a saida ser deterministica.
@@ -512,12 +581,11 @@ def _anexar_indicadores_ausentes(cliente, por_pessoa: dict[str, list[Candidato]]
     if not por_pessoa:
         return
     p = cliente.project
-    lista = "','".join(por_pessoa)
     sql = f"""
         select id_pessoa, ano_inicio, ano_fim, nm_ue, sg_uf, cod_cargo,
                cod_indicador, motivo, serie_inicio, serie_fim
         from `{p}.marts.fct_mandato_indicador_ausente`
-        where id_pessoa in ('{lista}')
+        where {_filtro(por_pessoa)}
         order by ano_inicio desc, cod_indicador
     """
     n = 0
@@ -546,7 +614,6 @@ def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
     if not por_pessoa:
         return
     p = cliente.project
-    lista = "','".join(por_pessoa)
     sql = f"""
         with atividade as (
         -- POR LEGISLATURA, e nao pela vida inteira.
@@ -567,7 +634,7 @@ def _anexar_atividade(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
                sum(qt_virou_norma) as virou_norma,
                min(ano) as a1, max(ano) as a2
         from `{p}.marts.fct_atividade_legislativa`
-        where id_pessoa in ('{lista}') and ligado_ao_tse and ano >= 2003
+        where {_filtro(por_pessoa)} and ligado_ao_tse and ano >= 2003
         group by 1, 2, 3, 4, 5
     ),
     com_mandato as (
@@ -654,7 +721,6 @@ def _anexar_atividade_senado(cliente, por_pessoa: dict[str, list[Candidato]]) ->
     if not por_pessoa:
         return
     p = cliente.project
-    lista = "','".join(por_pessoa)
     sql = f"""
         select id_pessoa, classe_proposicao,
                52 + div(ano - 2003, 4)          as legislatura,
@@ -664,7 +730,7 @@ def _anexar_atividade_senado(cliente, por_pessoa: dict[str, list[Candidato]]) ->
                sum(qt_em_tramitacao)            as tramitando,
                min(ano) as a1, max(ano) as a2
         from `{p}.marts.fct_atividade_senado`
-        where id_pessoa in ('{lista}') and ligado_ao_tse and ano >= 2003
+        where {_filtro(por_pessoa)} and ligado_ao_tse and ano >= 2003
         group by 1, 2, 3, 4, 5
         order by legislatura desc, total desc
     """
@@ -762,7 +828,6 @@ def _anexar_plenario(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
     if not por_pessoa:
         return
     p = cliente.project
-    lista = "','".join(por_pessoa)
     sql = f"""
         select id_pessoa,
                id_legislatura                       as leg,
@@ -776,7 +841,7 @@ def _anexar_plenario(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
                sum(qt_eventos)                      as eventos,
                sum(qt_eventos_plenario)             as eventos_plenario
         from `{p}.marts.fct_plenario_deputado`
-        where id_pessoa in ('{lista}') and ligado_ao_tse
+        where {_filtro(por_pessoa)} and ligado_ao_tse
         group by 1, 2, 3, 4
     """
     n = 0
@@ -911,6 +976,12 @@ def carregar_proporcionais(cliente) -> dict[str, list[dict]]:
     for r in cliente.query(sql).result():
         chave = PROPORCIONAIS[r.cod_cargo][0]
         por_cargo.setdefault(chave, []).append({
+            # `s` e' o pedaco do endereco da ficha (F-18). Vai pronto do
+            # gerador porque `slug()` normaliza acento em NFD e descarta o que
+            # nao e' ASCII — reimplementar isso em JavaScript daria endereco
+            # diferente para "JOSÉ" em algum navegador, e link quebrado numa
+            # ficha e' pior que link nenhum.
+            "s": slug(r.nome_urna or "SEM NOME"),
             "sq": str(r.sq_candidato), "nome": r.nome_urna, "uf": r.sg_uf,
             "nr": r.nr_candidato, "fed": r.sg_federacao,
             "partido": r.sigla_partido, "situacao": r.situacao_julgamento,
@@ -935,6 +1006,10 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="gerar_site", description=__doc__)
     ap.add_argument("--saida", default="site", help="diretorio de saida (padrao: site)")
     ap.add_argument("--limite", type=int, help="gera so' N fichas — para testar rapido")
+    ap.add_argument("--sem-proporcionais", action="store_true",
+                    help="gera so' os cargos majoritarios — para iterar rapido "
+                         "no visual. NAO publique: a limpeza de orfas recusa uma "
+                         "saida assim, por ser indistinguivel de geracao truncada")
     ap.add_argument("--base", help="prefixo dos links (padrao: %(default)s)",
                     default=BASE_URL)
     args = ap.parse_args(argv)
@@ -949,13 +1024,14 @@ def main(argv: list[str] | None = None) -> int:
 
     cliente = _cliente()
     quando = extraido_em(cliente)
-    majoritarios = carregar_majoritarios(cliente, args.limite)
+    cargos = tuple(CARGOS) if args.sem_proporcionais else tuple(TODOS_CARGOS)
+    fichas = carregar_fichas(cliente, cargos, args.limite)
     proporcionais = carregar_proporcionais(cliente)
     doadores = carregar_doadores(cliente)
     catalogo = catalogo_indicadores(cliente)
 
     destino = Path(args.saida)
-    escrever_site(destino, majoritarios, proporcionais, quando, catalogo,
+    escrever_site(destino, fichas, proporcionais, quando, catalogo,
                   doadores)
     n = sum(1 for _ in destino.rglob("*.html"))
     log.info("site em %s — %d paginas HTML", destino.resolve(), n)

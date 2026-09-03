@@ -255,12 +255,15 @@ registrados depois da última publicação em lote do TSE (L-23).
 
 ---
 
-**F-18 — Ficha própria para as candidaturas proporcionais** · P1 · **backlog, aprovada em 29/08/2026**
+**F-18 — Ficha própria para as candidaturas proporcionais** · P1 · **Implementada em 03/09/2026**
+
+> Ver [ADR-040](docs/adr/ADR-040-ficha-para-toda-candidatura.md).
 
 **Por que entra.** O projeto foi mostrado a pessoas reais e a falta mais citada
 foi esta: quem decide o voto para deputado enfrenta 1.126 nomes só em São Paulo,
-e é justamente aí que uma ficha ajuda mais — não menos. Hoje os 529 majoritários
-têm página própria e as 20.765 candidaturas proporcionais têm apenas listagem.
+e é justamente aí que uma ficha ajuda mais — não menos. Até 03/09/2026 os 529
+majoritários tinham página própria e as candidaturas proporcionais, apenas
+listagem.
 
 **O contra-argumento, e por que ele perde.** Vinte mil páginas com poucos campos
 distintos é o padrão que buscadores classificam como conteúdo raso, e o risco não
@@ -274,15 +277,20 @@ formato da dos majoritários: foto oficial, perfil declarado, legenda completa
 (federação, coligação e composição), número na urna, trajetória eleitoral,
 prestação de contas e — para quem tem — atividade legislativa.
 
-**O que muda na engenharia, e não é pouco:**
-- a geração passa de ~740 para ~21 mil páginas;
-- o envio por FTP deixa de caber numa execução: hoje são 790 arquivos em 13
-  minutos, e 21 mil no mesmo ritmo passariam de cinco horas. **Exige sincronização
-  incremental** — enviar só o que mudou, comparando hash contra um manifesto no
-  servidor. É o item que precisa ser resolvido antes de qualquer outro;
-- o `sitemap.xml` passa de 738 para ~21 mil URLs, e deve ser dividido em índice
-  mais sitemaps por cargo e UF (o limite por arquivo é 50 mil URLs, mas arquivos
-  menores são rastreados melhor).
+**Alcance real:** 19.418 candidaturas proporcionais com ficha, mais as 529
+majoritárias — 20.400 páginas HTML.
+
+**O que a engenharia exigiu, e não foi pouco:**
+- **envio incremental** ([ADR-039](docs/adr/ADR-039-so-sobe-o-que-mudou.md)) —
+  era o pré-requisito declarado, e só passou a valer alguma coisa depois de a
+  data por ficha ([ADR-038](docs/adr/ADR-038-a-ficha-diz-quando-o-dado-mudou.md))
+  parar de fazer 100% das páginas mudarem por dia;
+- **o CSS saiu de dentro da página** — 9,1 kB embutidos em 19.947 páginas seriam
+  180 MB da mesma folha copiada. Vira arquivo com impressão digital no endereço;
+- **o `sitemap.xml` virou índice** apontando para sitemaps por cargo e UF;
+- **o filtro `in (...)` das consultas caiu acima de 4.000 chaves** — com 19.947
+  `id_pessoa` o SQL passaria de 700 kB, perto do teto de 1 MB do BigQuery, e
+  filtraria quase nada.
 
 **O que NÃO muda.** Nenhum ranking, nenhuma nota, nenhum indicador
 socioeconômico atribuído a deputado — o vínculo entre um parlamentar e um número
@@ -490,6 +498,8 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-040 | Ficha própria para toda candidatura | 19 mil páginas com poucos campos distintos são o padrão de conteúdo raso, mas o critério que decide é utilidade pública: quem enfrenta 1.126 nomes precisa de mais ajuda, e ficha sem URL não é compartilhável | Aceita |
+| ADR-039 | A publicação só envia o que mudou | Manifesto passa a guardar hash, e sobe por ÚLTIMO — subindo antes, uma publicação interrompida afirmaria o hash de arquivos que nunca chegaram, e a página errada ficaria congelada no ar | Aceita |
 | ADR-038 | A ficha diz quando o dado mudou, não quando o site rodou | A data global no rodapé fazia 100% das páginas mudarem por dia, quando só ~5% das candidaturas mudam; a data por ficha vem do snapshot e destrava o envio incremental da F-18 | Aceita |
 | ADR-037 | O site remove do servidor o que não gera mais | O gerador não limpa a saída, e seis fichas com nome de urna antigo estavam vivas no ar; manifesto no servidor identifica as órfãs, com teto, piso e recusa de inventário parcial | Aceita |
 | ADR-036 | Publicar não sobrescreve conteúdo mais novo | Uma execução do CI de um commit anterior republicou por cima de uma correção manual já no ar; o critério de linhagem do commit pega o caso que o de horário deixava passar | Aceita |

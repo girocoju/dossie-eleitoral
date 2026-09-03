@@ -59,26 +59,41 @@ ninguem descobriria que a senha passou a viajar em claro. Existe uma valvula
 explicita — `DOSSIE_FTP_INSEGURO=1` — que precisa ser ligada por alguem que leu
 esta linha.
 
-O QUE ESTE SCRIPT NAO FAZ: APAGAR
+SO' SOBE O QUE MUDOU (ADR-039)
 
-Ele envia e sobrescreve. Um erro no calculo de caminho, num processo que roda
-sozinho todo dia contra um site publico, apagaria o site — e o custo de um
-arquivo velho sobrando e' incomparavelmente menor. Arquivo orfao fica onde esta',
-e remove-lo e' decisao de gente.
+O manifesto `.arquivos.json` guarda o hash de cada arquivo que a publicacao
+anterior deixou no servidor. Arquivo cujo hash local bate nao sobe. Com a data
+por ficha (ADR-038), isso e' ~5% das paginas por dia.
 
-A UNICA excecao esta' em `_liberar_caminho`: um diretorio VAZIO ocupando o lugar
-exato de um arquivo que vai ser escrito. E' auto-reparo de um bug que este
-proprio modulo cometeu, e nao consegue apagar conteudo — `RMD` recusa diretorio
-nao-vazio.
+O manifesto sobe POR ULTIMO, depois de todo o resto — ele e' a afirmacao de que a
+publicacao terminou. Subindo primeiro, uma publicacao interrompida na metade
+deixaria no servidor um manifesto afirmando o hash de arquivos que nunca
+chegaram, e a publicacao seguinte pularia exatamente esses. `--completo` reenvia
+tudo, para quando servidor e manifesto discordarem.
 
-E' o mesmo motivo pelo qual candidatura que some da publicacao do TSE (L-23) nao
-some da carga: preferir o resto a mais do que o resto a menos.
+O QUE ESTE SCRIPT APAGA, E O QUE NAO APAGA
+
+Ate' o ADR-037 ele nao apagava nada, e por isso seis fichas com nome de urna
+antigo ficaram vivas no ar. Hoje `remover_orfas` apaga o que o site nao gera
+mais — e SO' o que esteve no manifesto da publicacao anterior. Arquivo que
+alguem colocou no servidor a mao nunca esteve la' e nao e' tocado. A remocao
+tem teto de 25% e piso de 20 arquivos, e recusa inventario incompleto: geracao
+truncada nao pode virar limpeza.
+
+`_liberar_caminho` remove um diretorio VAZIO ocupando o lugar exato de um arquivo
+que vai ser escrito. E' auto-reparo de um bug que este proprio modulo cometeu, e
+nao consegue apagar conteudo — `RMD` recusa diretorio nao-vazio.
+
+O que continua valendo: candidatura que some da publicacao do TSE (L-23) nao some
+da carga. Preferir o resto a mais do que o resto a menos.
 """
 
 from __future__ import annotations
 
 import argparse
 import ftplib
+import hashlib
+import io
 import json
 import ssl
 import subprocess  # noqa: S402 — o canal e' TLS; ver o cabecalho deste modulo
@@ -112,7 +127,16 @@ BLOCO = 1024 * 64
 # `error_temp` (4xx) sao instabilidade: reconecta e continua do mesmo arquivo.
 TENTATIVAS_POR_ARQUIVO = 4
 ESPERA_BASE = 2.0          # segundos: 2, 4, 8
-RECONEXOES_MAX = 40        # rede ruim tem limite; alem disso e' outra coisa
+# Quarenta reconexoes eram folga para 738 arquivos e viram teto para 20 mil: o
+# servidor corta a cada ~100 arquivos, entao o numero de quedas cresce junto com
+# o site. O que precisa ter limite e' a TAXA — rede que cai a cada 50 arquivos
+# deixou de ser instabilidade. O piso continua valendo para site pequeno.
+RECONEXOES_MAX = 40
+RECONEXOES_POR_ARQUIVO = 1 / 50
+
+
+def _orcamento_de_reconexao(n_arquivos: int) -> int:
+    return max(RECONEXOES_MAX, int(n_arquivos * RECONEXOES_POR_ARQUIVO))
 
 # `error_perm` fica DE FORA de proposito: e' a excecao que precisa subir.
 TRANSITORIAS = (OSError, EOFError, ftplib.error_temp)
@@ -314,6 +338,56 @@ def _liberar_caminho(sessao: ftplib.FTP, destino: str) -> None:
 CARIMBO = ".publicacao.json"
 MANIFESTO = ".arquivos.json"
 
+# ENVIO INCREMENTAL (ADR-039).
+#
+# O manifesto ja' existia para achar orfas — uma lista de nomes. Guardando
+# tambem o HASH de cada arquivo, ele responde a outra pergunta pelo mesmo preco
+# de um download: o que MUDOU desde a ultima publicacao.
+#
+# Com a data por ficha (ADR-038) a resposta e' ~5% das paginas por dia. Sem
+# isto, subir as 20 mil fichas da F-18 significaria reenviar 20 mil arquivos
+# todo dia para trocar mil.
+#
+# O manifesto v1 (lista de nomes) continua sendo lido: sem hash, tudo sobe de
+# novo. E' o comportamento certo para a primeira publicacao depois desta
+# mudanca, e para qualquer manifesto de formato desconhecido.
+VERSAO_MANIFESTO = 2
+
+# 16 hex de sha256 = 64 bits. A chance de dois arquivos do site colidirem e'
+# desprezivel, e o manifesto inteiro cabe em ~1 MB com 20 mil linhas.
+TAMANHO_HASH = 16
+
+
+def hash_de(caminho: Path) -> str:
+    h = hashlib.sha256()
+    with caminho.open("rb") as f:
+        for bloco in iter(lambda: f.read(BLOCO), b""):
+            h.update(bloco)
+    return h.hexdigest()[:TAMANHO_HASH]
+
+
+def hashes_locais(origem: Path, relativos: list[str]) -> dict[str, str]:
+    return {rel: hash_de(origem / rel) for rel in relativos}
+
+
+def _ler_manifesto(dados: object) -> dict[str, str | None] | None:
+    """Aceita o formato v1 e o v2. Formato estranho vira None, e None faz o
+    publicador reenviar tudo — que e' sempre seguro, so' lento."""
+    if isinstance(dados, list):
+        if not all(isinstance(x, str) for x in dados):
+            return None
+        return dict.fromkeys(dados)          # v1: sem hash, tudo sobe de novo
+    if isinstance(dados, dict):
+        arquivos = dados.get("arquivos")
+        if isinstance(arquivos, dict):
+            return {k: v for k, v in arquivos.items() if isinstance(k, str)}
+    return None
+
+
+def corpo_do_manifesto(hashes: dict[str, str]) -> str:
+    return json.dumps({"versao": VERSAO_MANIFESTO, "arquivos": hashes},
+                      ensure_ascii=False, sort_keys=True)
+
 # Teto de seguranca para a remocao de orfas. Uma geracao que falhe pela metade
 # produz poucos arquivos, e sem teto a limpeza apagaria o site inteiro achando
 # que tudo virou orfao. Acima disso o publicador PARA e pede `--forcar`.
@@ -409,15 +483,22 @@ def conferir_regressao(sessao: ftplib.FTP, origem: Path, raiz: str,
 
 def listar_arquivos(origem: Path) -> list[str]:
     """Caminhos relativos, em POSIX — o mesmo formato do manifesto e do servidor."""
+    # O MANIFESTO fica FORA: ele nao e' conteudo do site, e sobe por ultimo,
+    # sozinho, depois que todo o resto chegou (ver `main`).
     return sorted(
-        p.relative_to(origem).as_posix()
+        rel
         for p in origem.rglob("*")
         if p.is_file() and not any(parte in NUNCA_ENVIAR for parte in p.parts)
+        and (rel := p.relative_to(origem).as_posix()) != MANIFESTO
     )
 
 
-def _manifesto_remoto(sessao: ftplib.FTP, raiz: str) -> list[str] | None:
-    """A lista do que a publicacao anterior deixou no servidor."""
+def _manifesto_remoto(sessao: ftplib.FTP, raiz: str) -> dict[str, str | None] | None:
+    """O que a publicacao anterior deixou no servidor, e com que conteudo.
+
+    Chave: caminho relativo. Valor: hash, ou None quando o manifesto e' do
+    formato antigo e nao guarda hash nenhum.
+    """
     pedacos: list[bytes] = []
     base = raiz.rstrip("/")
     caminho = f"{base}/{MANIFESTO}" if base else MANIFESTO
@@ -429,7 +510,7 @@ def _manifesto_remoto(sessao: ftplib.FTP, raiz: str) -> list[str] | None:
         dados = json.loads(b"".join(pedacos).decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
-    return dados if isinstance(dados, list) else None
+    return _ler_manifesto(dados)
 
 
 def _varrer_remoto(sessao: ftplib.FTP, base: str, prefixo: str = "",
@@ -481,7 +562,8 @@ def _varrer_remoto(sessao: ftplib.FTP, base: str, prefixo: str = "",
 
 
 def remover_orfas(sessao: ftplib.FTP, raiz: str, atuais: list[str],
-                  anterior: list[str] | None, *, forcar: bool = False) -> int:
+                  anterior: dict[str, str | None] | list[str] | None,
+                  *, forcar: bool = False) -> int:
     """Apaga do servidor o que o site nao gera mais (ADR-037).
 
     O GERADOR NAO LIMPA O DIRETORIO, e por isso pagina de geracao antiga ficava
@@ -571,13 +653,24 @@ def remover_orfas(sessao: ftplib.FTP, raiz: str, atuais: list[str],
 
 def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
            seco: bool, reconectar: Callable[[], ftplib.FTP] | None = None,
+           *, ja_no_servidor: dict[str, str | None] | None = None,
+           hashes: dict[str, str] | None = None,
            ) -> tuple[int, int]:
-    arquivos = sorted(p for p in origem.rglob("*") if p.is_file())
-    arquivos = [p for p in arquivos
-                if not any(parte in NUNCA_ENVIAR for parte in p.parts)]
-    if not arquivos:
+    """Envia o site. Devolve (arquivos enviados, bytes enviados).
+
+    `ja_no_servidor` e `hashes` ligam o envio incremental (ADR-039): arquivo
+    cujo hash local bate com o do manifesto do servidor nao sobe. Sem eles o
+    comportamento e' o de sempre — sobe tudo.
+    """
+    relativos = listar_arquivos(origem)
+    if not relativos:
         raise SystemExit(f"{origem} esta' vazio — nada a publicar. "
                          "Rode `python -m scripts.gerar_site` antes.")
+    arquivos = [origem / rel for rel in relativos]
+    if ja_no_servidor is not None and hashes is None:
+        hashes = hashes_locais(origem, relativos)
+    orcamento = _orcamento_de_reconexao(len(arquivos))
+    pulados = 0
 
     base = raiz_remota.rstrip("/")
     # A pasta de destino JA' EXISTE — a conta de FTP esta' enraizada nela. Marcar
@@ -603,6 +696,17 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
         # subpasta, e a raiz vem tarde na ordem alfabetica.
         pasta = destino.rsplit("/", 1)[0] if "/" in destino else ""
 
+        # O ARQUIVO JA' ESTA' LA', BYTE A BYTE. `ja_no_servidor` so' afirma isso
+        # de um arquivo que a publicacao ANTERIOR terminou de enviar — o
+        # manifesto sobe por ultimo, depois de todo o resto (ver `main`). Uma
+        # publicacao que morre no meio nao deixa manifesto novo, e a seguinte
+        # reenvia tudo o que ficou pelo caminho.
+        if (ja_no_servidor is not None and hashes is not None
+                and ja_no_servidor.get(rel) is not None
+                and ja_no_servidor.get(rel) == hashes.get(rel)):
+            pulados += 1
+            continue
+
         if seco:
             log.info("[dry-run] %s -> %s (%d bytes)", rel, destino,
                      caminho.stat().st_size)
@@ -620,7 +724,7 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
                 if reconectar is None or tentativa == TENTATIVAS_POR_ARQUIVO:
                     raise
                 reconexoes += 1
-                if reconexoes > RECONEXOES_MAX:
+                if reconexoes > orcamento:
                     raise SystemExit(
                         f"{reconexoes} reconexoes em uma publicacao — isso deixou "
                         "de ser instabilidade de rede. Verifique a conexao e o "
@@ -634,11 +738,48 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
                 # `feitas` segue valendo depois de reconectar.
                 sessao = reconectar()
         bytes_enviados += caminho.stat().st_size
-        if i % 100 == 0:
-            log.info("%d/%d enviados (%.1f MB)", i, len(arquivos),
+        if (i - pulados) % 200 == 0:
+            log.info("%d de %d enviados, %d inalterados (%.1f MB)",
+                     i - pulados, len(arquivos) - pulados, pulados,
                      bytes_enviados / 1e6)
 
-    return len(arquivos), bytes_enviados
+    if pulados:
+        log.info("%d arquivos inalterados nao subiram (%.0f%% do site)",
+                 pulados, 100 * pulados / len(arquivos))
+    return len(arquivos) - pulados, bytes_enviados
+
+
+def enviar_manifesto(sessao: ftplib.FTP, raiz: str, hashes: dict[str, str],
+                     reconectar: Callable[[], ftplib.FTP] | None = None) -> bool:
+    """Sobe o manifesto DEPOIS de todo o resto. Devolve se conseguiu.
+
+    A ordem e' a garantia inteira do envio incremental. Se o manifesto subisse
+    primeiro — como subia, por ser o primeiro na ordem alfabetica — uma
+    publicacao interrompida na metade deixaria no servidor um manifesto
+    afirmando o hash de arquivos que nunca chegaram. A publicacao seguinte
+    pularia exatamente esses, e a pagina errada ficaria congelada para sempre.
+
+    Subindo por ultimo, o manifesto so' descreve publicacao que terminou. O pior
+    caso vira o caso seguro: o manifesto antigo continua la', e a proxima
+    publicacao reenvia o que ja' tinha subido. Custa banda, nunca corretude.
+    """
+    base = raiz.rstrip("/")
+    destino = f"{base}/{MANIFESTO}" if base else MANIFESTO
+    dados = corpo_do_manifesto(hashes).encode("utf-8")
+    for tentativa in range(1, TENTATIVAS_POR_ARQUIVO + 1):
+        try:
+            sessao.storbinary(f"STOR {destino}", io.BytesIO(dados), blocksize=BLOCO)
+            return True
+        except TRANSITORIAS as erro:
+            if reconectar is None or tentativa == TENTATIVAS_POR_ARQUIVO:
+                # Falhar aqui NAO invalida a publicacao: o site subiu inteiro.
+                # So' custa um envio completo na proxima vez.
+                log.warning("nao consegui gravar o %s (%s) — a proxima publicacao "
+                            "sobe tudo de novo", MANIFESTO, str(erro)[:60])
+                return False
+            time.sleep(ESPERA_BASE * 2 ** (tentativa - 1))
+            sessao = reconectar()
+    return False
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -649,6 +790,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--forcar", action="store_true",
                         help="publica mesmo sobrescrevendo conteudo mais novo — "
                              "so' para rollback deliberado")
+    parser.add_argument("--completo", action="store_true",
+                        help="reenvia TODO arquivo, mesmo o que nao mudou — para "
+                             "quando o servidor e o manifesto discordarem")
     parser.add_argument("--certificado", action="store_true",
                         help="mostra a identidade TLS do servidor e sai; "
                              "nao envia credencial")
@@ -688,14 +832,14 @@ def main(argv: list[str] | None = None) -> int:
         anterior = _manifesto_remoto(viva["sessao"], raiz)
 
         atuais = listar_arquivos(origem)
-        (origem / MANIFESTO).write_text(
-            json.dumps(atuais, ensure_ascii=False), encoding="utf-8")
-        atuais = listar_arquivos(origem)          # agora inclui o proprio manifesto
+        locais = hashes_locais(origem, atuais)
 
         n, tamanho = enviar(viva["sessao"], origem, raiz, seco=False,
-                            reconectar=reconectar)
-        log.info("publicados %d arquivos, %.1f MB em %s%s",
-                 n, tamanho / 1e6, cfg["host"], cfg["raiz"])
+                            reconectar=reconectar,
+                            ja_no_servidor=None if args.completo else anterior,
+                            hashes=locais)
+        log.info("publicados %d de %d arquivos, %.1f MB em %s%s",
+                 n, len(atuais), tamanho / 1e6, cfg["host"], cfg["raiz"])
 
         # DEPOIS do envio: se a limpeza viesse antes e o envio falhasse, o site
         # ficaria sem as paginas novas E sem as antigas.
@@ -704,6 +848,11 @@ def main(argv: list[str] | None = None) -> int:
         if removidas:
             log.info("%d pagina(s) que o site nao gera mais foram removidas",
                      removidas)
+
+        # POR ULTIMO. Ver `enviar_manifesto`: o manifesto e' a afirmacao de que
+        # a publicacao terminou, e afirmar isso antes da hora e' o unico jeito
+        # de o envio incremental deixar uma pagina errada no ar.
+        enviar_manifesto(viva["sessao"], raiz, locais, reconectar)
     finally:
         try:
             viva["sessao"].quit()

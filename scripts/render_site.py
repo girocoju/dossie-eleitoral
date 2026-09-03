@@ -15,12 +15,14 @@ REGRAS DE TELA QUE ESTE MODULO IMPLEMENTA (Constituicao 0)
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
 
 from ingest.common.textnorm import strip_accents
 from scripts.gerar_site import (
+    _CARGO_NA_NOTA,
     BASE_URL,
     CARGOS,
     PROPORCIONAIS,
@@ -141,6 +143,23 @@ _UF_NOME = {
 
 CSS = (Path(__file__).parent / "dossie.css").read_text(encoding="utf-8")
 
+# O CSS SAI DE DENTRO DA PAGINA (ADR-040).
+#
+# Embutido, ele custava 9,1 kB em cada uma das 744 paginas — 6,8 MB, aceitavel.
+# Com as 19.418 fichas proporcionais da F-18 passaria de 180 MB de folha de
+# estilo repetida: mais da metade do site inteiro seria o mesmo arquivo copiado
+# vinte mil vezes, no disco, no FTP e no navegador de quem abre a segunda pagina.
+#
+# Como arquivo, o navegador baixa uma vez e reaproveita em toda a navegacao. O
+# custo e' uma requisicao a mais na PRIMEIRA pagina; o ganho e' 9 kB a menos em
+# todas as outras.
+#
+# A impressao digital no endereco (`?v=`) e' o que impede o pior caso do cache:
+# CSS novo com HTML novo e o navegador servindo o CSS velho, quebrando o layout
+# sem nenhum erro visivel. Mudou um byte da folha, muda o endereco.
+CSS_VERSAO = hashlib.sha256(CSS.encode("utf-8")).hexdigest()[:8]
+CSS_ARQUIVO = "dossie.css"
+
 
 
 def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
@@ -182,7 +201,7 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
 <meta property="og:description" content="{e(descricao)}">
 <meta property="og:url" content="{e(canonical)}">
 <meta property="og:site_name" content="Data Duba Intelligence">
-<style>{CSS}</style>
+<link rel="stylesheet" href="{BASE_URL}/{CSS_ARQUIVO}?v={CSS_VERSAO}">
 </head>
 <body>
 <header class="topo"><div class="wrap">
@@ -887,7 +906,7 @@ def _chapa_titular(c: Candidato) -> str:
 
 def _ficha(c: Candidato, quando: str) -> str:
     partes = [f"""
-<a href="{BASE_URL}/{CARGOS[c.cod_cargo][0]}/" style="font-size:13.5px">← {e(c.cargo_nome)}</a>
+<a href="{BASE_URL}/{c.cargo_chave}/" style="font-size:13.5px">← {e(c.cargo_nome)}</a>
 <div class="ficha">
   <div class="retrato">
     {_retrato(c)}
@@ -931,14 +950,17 @@ def _ficha(c: Candidato, quando: str) -> str:
                     f"<td>{_resultado(t)}</td><td class='num'>{votos}</td></tr>")
 
         linhas = "".join(_linha(t) for t in c.trajetoria)
-        partes.append(f"""<section class="bloco">
-      <h2>Trajetória eleitoral — {len(c.trajetoria)} candidaturas anteriores</h2>
-      <div class="rolagem"><table>
-        <thead><tr><th>Ano</th><th>Cargo</th><th>UF</th><th>Partido</th><th>Resultado</th><th>Votos</th></tr></thead>
-        <tbody>{linhas}</tbody></table></div>
-      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
-        São <b>candidaturas</b>, não mandatos: disputas perdidas também
-        aparecem. Série desde 1998.</p>
+
+        # A NOTA SO' APARECE QUANDO HA' O QUE EXPLICAR.
+        #
+        # Ela existe para dois rotulos: "apurado" e "resultado nao publicado".
+        # Numa ficha em que o TSE publicou o desfecho de todas as candidaturas —
+        # o caso comum de quem so' disputou de 2010 para ca' — sao 1,1 kB
+        # falando de eleicao presidencial de 2006 numa pagina de deputado
+        # estadual. Texto que nao explica nada do que esta' na tela nao ajuda
+        # ninguem a entender a tela; atrapalha.
+        nota = ("" if not any(t.get("origem") == "apurado dos votos"
+                              or t["eleito"] is None for t in c.trajetoria) else """
       <p class="aviso" style="margin:10px 0 0">
         <b>Sobre a eleição de 2006.</b> O TSE não publica o desfecho de 2006 no
         cadastro de candidaturas — nenhum dos candidatos a Presidente daquele ano
@@ -951,7 +973,16 @@ def _ficha(c: Candidato, quando: str) -> str:
         <b>Cargos proporcionais (deputado) nunca são apurados assim</b>, porque
         cadeira proporcional não vai para quem teve mais voto pessoal.
         Onde se lê <b>resultado não publicado</b>, a fonte é omissa e nada foi
-        calculado — é ausência de dado, <b>não</b> derrota.</p>
+        calculado — é ausência de dado, <b>não</b> derrota.</p>""")
+
+        partes.append(f"""<section class="bloco">
+      <h2>Trajetória eleitoral — {len(c.trajetoria)} candidaturas anteriores</h2>
+      <div class="rolagem"><table>
+        <thead><tr><th>Ano</th><th>Cargo</th><th>UF</th><th>Partido</th><th>Resultado</th><th>Votos</th></tr></thead>
+        <tbody>{linhas}</tbody></table></div>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        São <b>candidaturas</b>, não mandatos: disputas perdidas também
+        aparecem. Série desde 1998.</p>{nota}
     </section>""")
     else:
         partes.append("""<section class="bloco"><h2>Trajetória eleitoral</h2>
@@ -1007,7 +1038,7 @@ def _ficha(c: Candidato, quando: str) -> str:
     <section class="bloco"><h2>Bens declarados</h2>{bens}</section>
     <p class="nota-lei">Plano de governo não é exigido para este cargo. A Lei
       9.504/97 (art. 11, §1º, IX) o exige de Prefeito, Governador e Presidente;
-      Senador é majoritário, mas não consta da lista.</p>""")
+      {_CARGO_NA_NOTA.get(c.cod_cargo, 'este cargo não consta da lista')}.</p>""")
     else:
         partes.append(f"""
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px" class="par">
@@ -1051,7 +1082,7 @@ def _ficha(c: Candidato, quando: str) -> str:
     fonte_data = (f"dados desta candidatura como o TSE publicava em "
                   f"{e(c.dado_de)}" if c.dado_de else None)
     return _pagina(f"{c.nome_urna} — {c.cargo_nome} {c.sg_uf}", desc,
-                   "".join(partes), quando, c.url, CARGOS[c.cod_cargo][0],
+                   "".join(partes), quando, c.url, c.cargo_chave,
                    fonte_data=fonte_data)
 
 
@@ -1139,7 +1170,7 @@ saíram do arquivo. {original}</p>
     fonte_data = (f"dados desta candidatura como o TSE publicava em "
                   f"{e(c.dado_de)}" if c.dado_de else None)
     return _pagina(f"Plano de governo de {c.nome_urna}", desc, corpo, quando,
-                   f"{c.url}plano/", CARGOS[c.cod_cargo][0],
+                   f"{c.url}plano/", c.cargo_chave,
                    fonte_data=fonte_data)
 
 
@@ -1216,10 +1247,9 @@ Escolha o estado para começar.</p>
 federal</b> e busca reeleição: são as proposições em que a pessoa é proponente na
 legislatura atual. Para quem nunca teve mandato na Câmara, aparecem vazias — e vazio
 aqui significa "não se aplica", não "não fez nada".</p>
-<p class="aviso">Cargos proporcionais não têm ficha própria: o TSE exige plano de governo apenas
-de Prefeito, Governador e Presidente, e o perfil declarado cabe na própria listagem. Publicar
-{total:,} páginas quase idênticas seria conteúdo raso, e prejudicaria a indexação
-do site inteiro.</p>
+<p class="aviso">Clique no nome para abrir a ficha completa da candidatura: perfil
+declarado, legenda, trajetória eleitoral, prestação de contas e — para quem já teve
+mandato — atividade legislativa.</p>
 <div class="filtros">
   <select id="uf"><option value="">Escolha o estado…</option>{opcoes}</select>
   <select id="partido" disabled><option value="">Todos os partidos</option></select>
@@ -1236,6 +1266,7 @@ do site inteiro.</p>
   <tbody id="linhas"></tbody></table></div>
 <script>
 const BASE = "{BASE_URL}/dados/{chave}";
+const RAIZ = "{BASE_URL}";
 let dados = [];
 const $ = (id) => document.getElementById(id);
 function desenhar() {{
@@ -1248,7 +1279,7 @@ function desenhar() {{
   $("linhas").innerHTML = vis.map(d => `<tr>
     <td class="foto-lista">${{d.foto
       ? `<img src="${{d.foto}}" alt="" loading="lazy" decoding="async">` : ""}}</td>
-    <td>${{d.nome ?? ""}}</td>
+    <td><a href="${{RAIZ}}/candidato/${{d.s}}-${{d.sq}}/">${{d.nome ?? ""}}</a></td>
     <td class="urna-lista">${{d.nr ?? "—"}}</td>
     <td>${{d.partido ?? ""}}</td><td>${{d.fed ?? ""}}</td>
     <td>${{d.coligacao ?? ""}}</td><td>${{d.situacao ?? ""}}</td>
@@ -1288,7 +1319,8 @@ def _home(majoritarios: list[Candidato], prop: dict[str, list[dict]], quando: st
         n = len(prop.get(chave, []))
         if n:
             linhas.append(f"<li><a href='{BASE_URL}/{chave}/'>{nome}</a> — "
-                          f"{n:,} candidaturas em listagem filtrável</li>".replace(",", "."))
+                          f"{n:,} candidaturas, com listagem filtrável por estado "
+                          f"e ficha própria</li>".replace(",", "."))
     corpo = f"""<h1>Dossiê Eleitoral 2026</h1>
 <p class="sub">O que cada candidatura declarou ao TSE, organizado e conferível. Sem nota, sem
 ranking e sem cor de partido — o que está aqui é registro público, não avaliação.</p>
@@ -1689,18 +1721,55 @@ def _metodologia(quando: str, catalogo: list[dict]) -> str:
                    corpo, quando, f"{BASE_URL}/metodologia/", "metodologia")
 
 
-def _sitemap(majoritarios: list[Candidato], quando: str) -> str:
-    urls = [f"{BASE_URL}/", f"{BASE_URL}/metodologia/",
-            f"{BASE_URL}/doadores/"]
-    urls += [f"{BASE_URL}/{s}/" for s, _, _ in CARGOS.values()]
-    urls += [f"{BASE_URL}/{s}/" for s, _ in PROPORCIONAIS.values()]
-    urls += [c.url for c in majoritarios]
-    urls += [f"{c.url}plano/" for c in majoritarios if c.plano_texto]
+def _urlset(urls: list[str]) -> str:
     corpo = "".join(f"  <url><loc>{e(u)}</loc></url>\n" for u in urls)
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
             f"{corpo}</urlset>\n")
 
+
+def _indice_de_sitemaps(caminhos: list[str]) -> str:
+    corpo = "".join(f"  <sitemap><loc>{e(BASE_URL)}/{e(c)}</loc></sitemap>\n"
+                    for c in caminhos)
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            f"{corpo}</sitemapindex>\n")
+
+
+def sitemaps(fichas: list[Candidato]) -> dict[str, str]:
+    """O mapa do site, dividido por cargo e estado (F-18).
+
+    Vinte mil URLs cabem no limite formal de um arquivo so' (50 mil), e mesmo
+    assim nao e' o que se deve entregar: arquivos menores sao rastreados com
+    mais frequencia, e um sitemap por cargo e UF permite que a mudanca de um
+    estado seja vista sem reprocessar os outros vinte e seis.
+
+    `/sitemap.xml` continua sendo o unico endereco que alguem precisa conhecer.
+    O que muda e' o que ele contem: em vez das URLs, a lista dos sitemaps.
+    """
+    saida: dict[str, str] = {}
+
+    fixas = [f"{BASE_URL}/", f"{BASE_URL}/metodologia/", f"{BASE_URL}/doadores/"]
+    fixas += [f"{BASE_URL}/{k}/" for k, _, _ in CARGOS.values()]
+    fixas += [f"{BASE_URL}/{k}/" for k, _ in PROPORCIONAIS.values()]
+    saida["sitemaps/paginas.xml"] = _urlset(fixas)
+
+    majoritarios = [c for c in fichas if c.cod_cargo in CARGOS]
+    urls = [c.url for c in majoritarios]
+    urls += [f"{c.url}plano/" for c in majoritarios if c.plano_texto]
+    saida["sitemaps/majoritarios.xml"] = _urlset(sorted(urls))
+
+    # Por cargo E por UF. Sao Paulo sozinho tem 1.126 candidaturas a deputado
+    # federal; quebrar so' por cargo ainda deixaria oito mil URLs num arquivo.
+    grupos: dict[tuple[str, str], list[str]] = {}
+    for c in fichas:
+        if c.cod_cargo in PROPORCIONAIS:
+            grupos.setdefault((c.cargo_chave, c.sg_uf), []).append(c.url)
+    for (chave, uf), lista in grupos.items():
+        saida[f"sitemaps/{chave}-{uf.lower()}.xml"] = _urlset(sorted(lista))
+
+    saida["sitemap.xml"] = _indice_de_sitemaps(sorted(saida))
+    return saida
 
 def _pagina_doadores(linhas: list[list], quando: str) -> str:
     """Quem financiou quem — uma linha por doador x candidatura (ADR-033).
@@ -1818,21 +1887,31 @@ fetch("{BASE_URL}/dados/doadores.json").then(r => r.json()).then(d => {{
                    corpo, quando, f"{BASE_URL}/doadores/", "doadores")
 
 
-def escrever_site(destino: Path, majoritarios: list[Candidato],
+def escrever_site(destino: Path, fichas: list[Candidato],
                   proporcionais: dict[str, list[dict]], quando: str,
                   catalogo: list[dict], doadores: list[list] | None = None) -> None:
+    """Grava o site inteiro.
+
+    `fichas` sao TODAS as candidaturas com pagina propria — os cinco cargos
+    majoritarios e, desde a F-18, os tres proporcionais. `proporcionais` e' outra
+    coisa: a base das listagens filtraveis, que continua sendo um JSON por
+    estado, carregado no navegador.
+    """
     def grava(caminho: str, conteudo: str) -> None:
         alvo = destino / caminho
         alvo.parent.mkdir(parents=True, exist_ok=True)
         alvo.write_text(conteudo, encoding="utf-8")
 
+    majoritarios = [c for c in fichas if c.cod_cargo in CARGOS]
+
+    grava(CSS_ARQUIVO, CSS)
     grava("index.html", _home(majoritarios, proporcionais, quando))
 
     for cod, (chave, nome, _) in CARGOS.items():
         do_cargo = [c for c in majoritarios if c.cod_cargo == cod]
         grava(f"{chave}/index.html", _listagem_majoritaria(chave, nome, do_cargo, quando))
 
-    for c in majoritarios:
+    for c in fichas:
         grava(f"{c.caminho}/index.html", _ficha(c, quando))
         if c.plano_texto:
             grava(f"{c.caminho}/plano/index.html", _pagina_plano(c, quando))
@@ -1860,4 +1939,5 @@ def escrever_site(destino: Path, majoritarios: list[Candidato],
         grava("doadores/index.html", _pagina_doadores(doadores, quando))
 
     grava("metodologia/index.html", _metodologia(quando, catalogo))
-    grava("sitemap.xml", _sitemap(majoritarios, quando))
+    for caminho, xml in sitemaps(fichas).items():
+        grava(caminho, xml)
