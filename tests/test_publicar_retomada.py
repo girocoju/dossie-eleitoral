@@ -129,10 +129,26 @@ class TestResiduoOculto:
             "/candidato/x-1/.in.index.html. already exists")
     DESTINO = "candidato/x-1/index.html"
 
-    def test_reconhece_o_residuo_do_proprio_envio(self):
+    def test_reconhece_o_residuo_e_devolve_caminho_RELATIVO(self):
+        """O caminho e' DERIVADO do destino, nao copiado da mensagem.
+
+        A mensagem do servidor traz o caminho ABSOLUTO
+        (`/candidato/x-1/.in.index.html`), e o resto da sessao trabalha em
+        caminho relativo a' raiz da conta FTP. O servidor resolve os dois de
+        forma diferente: em 04/09/2026 o `STOR` dizia que o oculto existe e o
+        `DELE` no caminho absoluto respondia "No such file or directory". A
+        publicacao morreu com 11.800 de 20.906 ja' enviados.
+        """
         from scripts.publicar import _residuo_de
-        assert _residuo_de(ftplib.error_perm(self.ERRO), self.DESTINO) == \
-            "/candidato/x-1/.in.index.html"
+        achado = _residuo_de(ftplib.error_perm(self.ERRO), self.DESTINO)
+        assert achado == "candidato/x-1/.in.index.html"
+        assert not achado.startswith("/"), "absoluto nao resolve nesta sessao"
+
+    def test_arquivo_na_raiz_tambem_tem_residuo(self):
+        from scripts.publicar import _residuo_de
+        msg = ("550 index.html: Temporary hidden file /.in.index.html. "
+               "already exists")
+        assert _residuo_de(ftplib.error_perm(msg), "index.html") == ".in.index.html"
 
     def test_outro_550_continua_sendo_erro_de_verdade(self):
         """Caminho errado e permissao negada tambem sao 550, e precisam subir."""
@@ -142,16 +158,50 @@ class TestResiduoOculto:
                     "550 Not a regular file"):
             assert _residuo_de(ftplib.error_perm(msg), self.DESTINO) is None, msg
 
-    def test_nao_obedece_caminho_que_o_servidor_mandar(self):
-        """O caminho vem da mensagem, mas so' vale se for `.in.<basename>.` na
-        mesma pasta. Um servidor hostil nao consegue nos fazer apagar outra
-        coisa."""
+    def test_o_servidor_nao_escolhe_o_que_apagamos(self):
+        """A mensagem serve para RECONHECER o caso; o endereco sai do destino.
+
+        Nao importa o que o servidor mande — `/etc/passwd`, outra pasta, outro
+        nome — o unico caminho que este modulo apaga e' o oculto do arquivo que
+        ele mesmo esta' tentando escrever.
+        """
         from scripts.publicar import _residuo_de
         for falso in ("/etc/passwd",
                       "/candidato/x-1/.in.outro.html.",
                       "/outra/pasta/.in.index.html."):
             msg = f"550 x: Temporary hidden file {falso} already exists"
-            assert _residuo_de(ftplib.error_perm(msg), self.DESTINO) is None, falso
+            achado = _residuo_de(ftplib.error_perm(msg), self.DESTINO)
+            assert achado == "candidato/x-1/.in.index.html", falso
+
+    def test_um_arquivo_que_nao_limpa_nao_derruba_a_publicacao(self, tmp_path):
+        """A versao anterior derrubava tudo. Em 04/09/2026 isso aconteceu com
+        11.800 de 20.906 ja' enviados, por causa de UM arquivo.
+
+        O arquivo fica FORA do manifesto, e por isso a proxima publicacao tenta
+        de novo — perder uma pagina ate' amanha e' incomparavelmente melhor que
+        perder a publicacao inteira hoje.
+        """
+        from scripts.publicar import enviar
+
+        class SempreOcupado(FTPFalso):
+            def storbinary(self, cmd, f, blocksize=8192):
+                alvo = cmd.removeprefix("STOR ")
+                if alvo == "b.html":
+                    raise ftplib.error_perm(
+                        f"550 {alvo}: Temporary hidden file /x/.in.index.html. "
+                        "already exists")
+                return super().storbinary(cmd, f, blocksize)
+
+            def delete(self, caminho):
+                raise ftplib.error_perm("550 No such file or directory")
+
+        ftp = SempreOcupado()
+        pendentes: list[str] = []
+        n, _ = enviar(ftp, _site(tmp_path), "", seco=False,
+                      nao_enviados=pendentes)
+        assert pendentes == ["b.html"]
+        assert {"index.html", "a.html", "c.html"} <= set(ftp.enviados)
+        assert n == len(ftp.enviados)
 
     def test_remove_o_residuo_e_reenvia(self, tmp_path):
         """O arquivo tem de chegar, nao so' o erro sumir."""

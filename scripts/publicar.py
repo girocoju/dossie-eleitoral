@@ -355,23 +355,24 @@ def _residuo_de(erro: Exception, destino: str) -> str | None:
     Devolve None para qualquer outro 550 — caminho errado e permissao negada
     continuam subindo como erro, que e' o certo.
 
-    O caminho vem da MENSAGEM do servidor, mas nao e' obedecido cegamente: so'
-    vale se o nome do arquivo for exatamente `.in.<basename do destino>.`, e se
-    ele estiver na mesma pasta. Um servidor que respondesse com outro caminho
-    nao consegue nos fazer apagar outra coisa.
+    ── O CAMINHO E' DERIVADO, NAO COPIADO DA MENSAGEM ──
+
+    A primeira versao usava o caminho que o servidor informa, e ele vem ABSOLUTO
+    (`/candidato/x/.in.index.html`). O resto da sessao trabalha em caminho
+    RELATIVO a' raiz da conta FTP, e o servidor resolve os dois de forma
+    diferente: o `STOR` dizia que o oculto existe e o `DELE` no caminho absoluto
+    respondia `550 ... No such file or directory`. Medido em 04/09/2026.
+
+    Entao a mensagem serve so' para RECONHECER o caso; o endereco a apagar sai
+    do proprio `destino`, do mesmo jeito que o `STOR` monta o dele. Como efeito
+    colateral, um servidor hostil nao tem como nos mandar apagar outra coisa.
     """
-    achado = _TEMP_OCULTO.search(str(erro))
-    if not achado:
+    if not _TEMP_OCULTO.search(str(erro)):
         return None
-    caminho = achado.group("caminho").rstrip(".")
-    base = destino.rsplit("/", 1)[-1]
-    pasta = destino.rsplit("/", 1)[0] if "/" in destino else ""
-    esperado = f".in.{base}"
-    if caminho.rsplit("/", 1)[-1] != esperado:
-        return None
-    if pasta and not caminho.lstrip("/").startswith(pasta.lstrip("/")):
-        return None
-    return caminho
+    if "/" in destino:
+        pasta, base = destino.rsplit("/", 1)
+        return f"{pasta}/.in.{base}"
+    return f".in.{destino}"
 
 
 def _liberar_caminho(sessao: ftplib.FTP, destino: str) -> None:
@@ -737,6 +738,7 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
            seco: bool, reconectar: Callable[[], ftplib.FTP] | None = None,
            *, ja_no_servidor: dict[str, str | None] | None = None,
            hashes: dict[str, str] | None = None,
+           nao_enviados: list[str] | None = None,
            ) -> tuple[int, int]:
     """Envia o site. Devolve (arquivos enviados, bytes enviados).
 
@@ -811,6 +813,7 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
             bytes_enviados += caminho.stat().st_size
             continue
 
+        falhou = False
         for tentativa in range(1, TENTATIVAS_POR_ARQUIVO + 1):
             try:
                 garantir_pasta(sessao, pasta, feitas)
@@ -826,13 +829,36 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
                     raise
                 log.warning("%s: residuo de envio interrompido (%s) — removendo",
                             rel, residuo)
-                try:
-                    sessao.delete(residuo)
-                except ftplib.all_errors as exc:
-                    # Nao conseguimos limpar: o erro original e' que vale.
-                    log.warning("nao removi %s (%s)", residuo, str(exc)[:60])
-                    raise erro from exc
-                continue
+                # O servidor as vezes nomeia o oculto com ponto no fim. Tentar
+                # as duas formas custa uma requisicao e evita desistir a' toa.
+                limpou = False
+                for alvo in (residuo, residuo + "."):
+                    try:
+                        sessao.delete(alvo)
+                        limpou = True
+                        break
+                    except ftplib.all_errors as exc:
+                        ultimo = exc
+                if limpou:
+                    continue
+
+                # NAO CONSEGUIMOS LIMPAR — E ISSO NAO PODE CUSTAR OS OUTROS
+                # 20.905 ARQUIVOS.
+                #
+                # A versao anterior derrubava a publicacao inteira aqui. Em
+                # 04/09/2026 isso aconteceu com 11.800 de 20.906 ja' enviados,
+                # por causa de UM arquivo.
+                #
+                # O arquivo fica de fora, e por ficar de fora ele nao entra no
+                # manifesto — a proxima publicacao tenta de novo. Perder uma
+                # pagina ate' amanha e' incomparavelmente melhor que perder a
+                # publicacao inteira hoje.
+                log.warning("nao removi %s (%s) — %s fica para a proxima",
+                            residuo, str(ultimo)[:60], rel)
+                if nao_enviados is not None:
+                    nao_enviados.append(rel)
+                falhou = True
+                break
             except TRANSITORIAS as erro:
                 if reconectar is None or tentativa == TENTATIVAS_POR_ARQUIVO:
                     raise
@@ -850,6 +876,8 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
                 # A pasta ja' criada continua criada do outro lado, entao
                 # `feitas` segue valendo depois de reconectar.
                 sessao = reconectar()
+        if falhou:
+            continue
         bytes_enviados += caminho.stat().st_size
         if (i - pulados) % 200 == 0:
             log.info("%d de %d enviados, %d inalterados (%.1f MB)",
@@ -859,7 +887,11 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
     if pulados:
         log.info("%d arquivos inalterados nao subiram (%.0f%% do site)",
                  pulados, 100 * pulados / len(arquivos))
-    return len(arquivos) - pulados, bytes_enviados
+    if nao_enviados:
+        log.warning("%d arquivo(s) nao subiram e ficam FORA do manifesto — a "
+                    "proxima publicacao tenta de novo: %s", len(nao_enviados),
+                    ", ".join(nao_enviados[:5]))
+    return len(arquivos) - pulados - len(nao_enviados or []), bytes_enviados
 
 
 def enviar_manifesto(sessao: ftplib.FTP, raiz: str, hashes: dict[str, str],
@@ -964,10 +996,16 @@ def main(argv: list[str] | None = None) -> int:
         log.info("conferindo o que mudou em %d arquivos...", len(atuais))
         locais = hashes_locais(origem, atuais)
 
+        # O QUE NAO SUBIU NAO PODE ENTRAR NO MANIFESTO. Se entrasse, a proxima
+        # publicacao acharia que ja' esta' la' e a pagina velha ficaria no ar
+        # para sempre — o mesmo modo de falha que o ADR-039 evita.
+        nao_enviados: list[str] = []
         n, tamanho = enviar(viva["sessao"], origem, raiz, seco=False,
                             reconectar=reconectar,
                             ja_no_servidor=None if args.completo else anterior,
-                            hashes=locais)
+                            hashes=locais, nao_enviados=nao_enviados)
+        for rel in nao_enviados:
+            locais.pop(rel, None)
         log.info("publicados %d de %d arquivos, %.1f MB em %s%s",
                  n, len(atuais), tamanho / 1e6, cfg["host"], cfg["raiz"])
 

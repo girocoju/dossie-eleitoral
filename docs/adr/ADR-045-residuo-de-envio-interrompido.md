@@ -23,14 +23,38 @@ tinha sido deixado por duas publicações que eu mesmo interrompi mais cedo.
 ## Decisão
 
 Este 550 específico é reconhecido, o oculto é removido e o envio é refeito.
-
-**Não é confiança cega na mensagem do servidor.** O caminho vem dela, mas só vale
-se o nome do arquivo for exatamente `.in.<basename do destino>.` e estiver na
-mesma pasta. Um servidor que respondesse `Temporary hidden file /etc/passwd
-already exists` não consegue nos fazer apagar outra coisa — há teste para os três
-casos adversariais.
-
 Qualquer outro 550 continua subindo como erro.
+
+### O caminho é derivado, não copiado da mensagem
+
+A primeira versão usava o caminho que o servidor informa — e **ele vem
+absoluto**: `/candidato/x/.in.index.html`. O resto da sessão trabalha em caminho
+**relativo** à raiz da conta FTP, e o servidor resolve os dois de forma
+diferente. O resultado, medido em 04/09/2026:
+
+```
+STOR candidato/x/index.html   → 550 Temporary hidden file … already exists
+DELE /candidato/x/.in.index.html → 550 No such file or directory
+```
+
+O mesmo arquivo, existindo por um caminho e não existindo pelo outro. A
+publicação morreu com **11.800 de 20.906** já enviados.
+
+Hoje a mensagem serve só para **reconhecer** o caso; o endereço a apagar sai do
+próprio destino, do mesmo jeito que o `STOR` monta o dele. Como efeito colateral,
+um servidor hostil não tem como nos mandar apagar outra coisa — não importa o que
+ele responda, o único caminho que este módulo apaga é o oculto do arquivo que ele
+mesmo está tentando escrever.
+
+### Não conseguir limpar não pode custar o resto do site
+
+A primeira versão derrubava a publicação inteira quando a remoção falhava. Um
+arquivo de 20.906 apagando o trabalho dos outros 20.905 é a troca errada.
+
+O arquivo que não sobe fica **fora do manifesto** — e por ficar de fora, a
+próxima publicação tenta de novo. Perder uma página até amanhã é
+incomparavelmente melhor que perder a publicação inteira hoje. O log nomeia os
+arquivos que ficaram para trás.
 
 ## Por que apagar aqui é seguro
 
