@@ -255,6 +255,29 @@ registrados depois da última publicação em lote do TSE (L-23).
 
 ---
 
+**F-23 — Buscar uma candidatura pelo nome** · P1 · **Implementada em 03/09/2026**
+
+> Ver [ADR-041](docs/adr/ADR-041-buscador-por-prefixo.md).
+
+**Por que entra.** A F-18 deu ficha própria a 20.162 candidaturas, e chegar a uma
+delas passou a exigir saber o cargo **e** o estado: escolher "Deputado Estadual",
+escolher "SP", filtrar entre 1.126 nomes. Quem lê um nome no jornal não sabe nem o
+cargo nem a UF — sabe o nome. Sem busca, a ficha existe e não é alcançável.
+
+**Alcance.** Campo na home, sobre todas as fichas, por nome de urna, nome completo
+declarado ao TSE ou número na urna.
+
+**A engenharia.** Índice quebrado em 409 arquivos por prefixo de duas letras; o
+navegador baixa um. O maior tem 417 kB — 136 kB comprimidos, menos que a listagem
+por UF que o projeto já aceita.
+
+**O que a busca não pode fazer.** Dizer "nada encontrado" quando o que houve foi
+um arquivo que não carregou. A home carrega a lista dos prefixos que existem, e
+por isso distingue ausência de falha (Regra 5). E a ordem dos resultados é
+relevância de digitação, nunca juízo sobre candidato (Constituição §0.1).
+
+---
+
 **F-18 — Ficha própria para as candidaturas proporcionais** · P1 · **Implementada em 03/09/2026**
 
 > Ver [ADR-040](docs/adr/ADR-040-ficha-para-toda-candidatura.md).
@@ -498,6 +521,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-041 | Buscador na home, um arquivo por prefixo | 20 mil fichas sem busca só são alcançáveis por quem já sabe o cargo e a UF; índice único teria 10 MB, e um 404 não pode virar "nada encontrado" | Aceita |
 | ADR-040 | Ficha própria para toda candidatura | 19 mil páginas com poucos campos distintos são o padrão de conteúdo raso, mas o critério que decide é utilidade pública: quem enfrenta 1.126 nomes precisa de mais ajuda, e ficha sem URL não é compartilhável | Aceita |
 | ADR-039 | A publicação só envia o que mudou | Manifesto passa a guardar hash, e sobe por ÚLTIMO — subindo antes, uma publicação interrompida afirmaria o hash de arquivos que nunca chegaram, e a página errada ficaria congelada no ar | Aceita |
 | ADR-038 | A ficha diz quando o dado mudou, não quando o site rodou | A data global no rodapé fazia 100% das páginas mudarem por dia, quando só ~5% das candidaturas mudam; a data por ficha vem do snapshot e destrava o envio incremental da F-18 | Aceita |

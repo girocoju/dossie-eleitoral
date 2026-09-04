@@ -23,14 +23,17 @@ from pathlib import Path
 from ingest.common.textnorm import strip_accents
 from scripts.gerar_site import (
     _CARGO_NA_NOTA,
+    _LIGACOES,
     BASE_URL,
     CARGOS,
     PROPORCIONAIS,
+    TODOS_CARGOS,
     VICES,
     Candidato,
     brl,
     carimbo_de_publicacao,
     e,
+    indice_de_busca,
 )
 
 FONTE = "TSE — Divulgação de Candidaturas"
@@ -1309,7 +1312,137 @@ $("busca").addEventListener("input", desenhar);
     return _pagina(nome, desc, corpo, quando, f"{BASE_URL}/{chave}/", chave)
 
 
-def _home(majoritarios: list[Candidato], prop: dict[str, list[dict]], quando: str) -> str:
+def _busca(prefixos: list[str], total: int) -> str:
+    """O campo de busca da home (F-23).
+
+    ── POR QUE A LISTA DE PREFIXOS VIAJA NA PAGINA ──
+
+    O indice esta' quebrado em ~700 arquivos, um por prefixo de duas letras, e o
+    navegador baixa UM. Sem saber quais existem, um `fetch` que volta 404 seria
+    indistinguivel de "nao ha' ninguem com esse nome" — e a tela diria "nada
+    encontrado" tanto para um nome ausente quanto para um arquivo que nao
+    carregou. Isso e' ausencia virando afirmacao (Regra 5).
+
+    A lista custa poucos kB e resolve a ambiguidade na origem: prefixo fora dela
+    e' certeza de que nao ha' ninguem; prefixo dentro dela e' obrigacao de dizer
+    que a busca falhou, em vez de mentir que nao achou.
+
+    ── NAO E' RANKING ──
+
+    A ordem e' alfabetica, com quem comeca pelo texto digitado antes de quem
+    apenas o contem. E' relevancia de digitacao, nao juizo sobre candidato — a
+    tela nao ordena por nada que o candidato tenha feito.
+    """
+    lista = json.dumps(sorted(prefixos), separators=(",", ":"))
+    cargos = json.dumps({c: n for c, (_, n) in TODOS_CARGOS.items()},
+                        ensure_ascii=False, separators=(",", ":"))
+    ligacoes = json.dumps(sorted(_LIGACOES), separators=(",", ":"))
+    return f"""<div class="filtros busca">
+  <label for="q" class="sr">Buscar candidatura pelo nome ou pelo número na urna</label>
+  <input id="q" type="search" autocomplete="off" spellcheck="false"
+         placeholder="Buscar entre {total:,} candidaturas — nome ou número na urna">
+</div>
+<p class="contagem" id="estado" role="status" aria-live="polite">Digite ao menos
+  duas letras do nome, ou o número na urna. A busca cobre o nome de urna
+  <b>e</b> o nome completo declarado ao TSE.</p>
+<div class="rolagem" style="max-height:none"><table class="res">
+  <thead><tr><th>Nome de urna</th><th>Cargo</th><th>UF</th><th>Partido</th>
+  <th title="o número que se digita na urna">Nº</th></tr></thead>
+  <tbody id="achados"></tbody></table></div>
+<script>
+const BUSCA = "{BASE_URL}/dados/busca";
+const RAIZ = "{BASE_URL}";
+const PREFIXOS = new Set({lista});
+const CARGO = {cargos};
+const LIGACOES = new Set({ligacoes});
+const TETO = 60;
+const cache = {{}};
+let pedido = 0;
+
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) =>
+  ({{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}}[c]));
+
+// TEM de casar com `normalizar()` do gerador: mesmo NFD, mesma remocao de
+// diacritico combinante, mesmo minusculo. Divergir aqui faria o navegador pedir
+// um arquivo que nao existe e a tela dizer "nada encontrado" para um nome que
+// esta' na base.
+const norm = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const termos = (t) => norm(t).replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean);
+
+function prefixo(ts) {{
+  for (const t of ts) if (t.length >= 2 && !LIGACOES.has(t)) return t.slice(0, 2);
+  return null;
+}}
+
+function dizer(msg) {{ $("estado").textContent = msg; }}
+
+function desenhar(linhas, ts) {{
+  const q = ts.join(" ");
+  linhas.sort((a, b) => {{
+    // Quem COMECA pelo que foi digitado vem antes de quem apenas contem. Dentro
+    // de cada grupo, ordem alfabetica — nada aqui julga o candidato.
+    const pa = norm(a[0]).startsWith(q), pb = norm(b[0]).startsWith(q);
+    if (pa !== pb) return pa ? -1 : 1;
+    return a[0].localeCompare(b[0], "pt-BR");
+  }});
+  $("achados").innerHTML = linhas.slice(0, TETO).map((r) => `<tr>
+    <td><a href="${{RAIZ}}/candidato/${{r[1]}}/">${{esc(r[0])}}</a>${{
+      r[6] ? `<div class="nc">${{esc(r[6])}}</div>` : ""}}</td>
+    <td>${{esc(CARGO[r[4]] || "")}}</td><td>${{esc(r[2])}}</td>
+    <td>${{esc(r[3])}}</td><td class="urna-lista">${{r[5] ?? "&mdash;"}}</td></tr>`).join("");
+  const n = linhas.length.toLocaleString("pt-BR");
+  dizer(linhas.length === 0 ? "Nenhuma candidatura com esse nome ou número."
+      : linhas.length > TETO ? n + " encontradas — mostrando as " + TETO +
+        " primeiras. Escreva mais para estreitar."
+      : n + (linhas.length === 1 ? " candidatura encontrada" : " candidaturas encontradas"));
+}}
+
+async function buscar() {{
+  const ts = termos($("q").value);
+  const p = prefixo(ts);
+  $("achados").innerHTML = "";
+  if (!p) {{ dizer("Digite ao menos duas letras do nome, ou o número na urna."); return; }}
+
+  // Prefixo que nao existe no indice e' CERTEZA de que ninguem se chama assim.
+  // So' por isso esta frase pode ser dita sem risco de estar errada.
+  if (!PREFIXOS.has(p)) {{ dizer("Nenhuma candidatura com esse nome ou número."); return; }}
+
+  const meu = ++pedido;
+  if (!cache[p]) {{
+    dizer("procurando…");
+    try {{
+      const r = await fetch(BUSCA + "/" + p + ".json");
+      if (!r.ok) throw new Error(r.status);
+      cache[p] = await r.json();
+    }} catch (erro) {{
+      // O prefixo EXISTE e mesmo assim nao veio. Dizer "nada encontrado" aqui
+      // seria afirmar ausencia sem ter olhado.
+      if (meu === pedido) dizer("Não foi possível carregar a busca agora. Tente de novo.");
+      return;
+    }}
+  }}
+  if (meu !== pedido) return;      // chegou tarde: o texto ja' mudou
+  // O ALVO TEM DE CONTER TUDO O QUE COLOCOU A LINHA NO ARQUIVO. Filtrar so'
+  // pelo nome de urna descartaria quem entrou pelo nome completo: encontrado
+  // pelo indice, jogado fora pelo filtro, e a tela dizendo "nada encontrado"
+  // para alguem que esta' na base.
+  desenhar(cache[p].filter((r) => {{
+    const alvo = norm(r[0] + " " + (r[6] ?? "")) + " " + (r[5] ?? "");
+    return ts.every((t) => alvo.includes(t));
+  }}), ts);
+}}
+
+let timer;
+$("q").addEventListener("input", () => {{
+  clearTimeout(timer);
+  timer = setTimeout(buscar, 130);
+}});
+</script>"""
+
+
+def _home(majoritarios: list[Candidato], prop: dict[str, list[dict]], quando: str,
+          prefixos: list[str] | None = None, total_fichas: int = 0) -> str:
     linhas = []
     for cod, (chave, nome, _) in CARGOS.items():
         n = sum(1 for c in majoritarios if c.cod_cargo == cod)
@@ -1321,11 +1454,14 @@ def _home(majoritarios: list[Candidato], prop: dict[str, list[dict]], quando: st
             linhas.append(f"<li><a href='{BASE_URL}/{chave}/'>{nome}</a> — "
                           f"{n:,} candidaturas, com listagem filtrável por estado "
                           f"e ficha própria</li>".replace(",", "."))
+    busca = _busca(prefixos or [], total_fichas) if prefixos else ""
     corpo = f"""<h1>Dossiê Eleitoral 2026</h1>
 <p class="sub">O que cada candidatura declarou ao TSE, organizado e conferível. Sem nota, sem
 ranking e sem cor de partido — o que está aqui é registro público, não avaliação.</p>
 <p class="aviso">Todo número nesta página vem de fonte oficial, com a data em que foi extraído.
 Onde o dado não existe, o site diz que não existe — nunca preenche a lacuna.</p>
+<h2 style="margin:28px 0 10px">Procurar uma candidatura</h2>
+{busca}
 <h2 style="margin:28px 0 10px">Por cargo</h2>
 <ul style="line-height:2;padding-left:20px">{''.join(linhas)}</ul>
 <h2 style="margin:28px 0 10px">O que este site não faz</h2>
@@ -1904,8 +2040,16 @@ def escrever_site(destino: Path, fichas: list[Candidato],
 
     majoritarios = [c for c in fichas if c.cod_cargo in CARGOS]
 
+    # ANTES da home: ela precisa saber quais prefixos existem para poder
+    # distinguir "ninguem se chama assim" de "o arquivo nao carregou".
+    indice = indice_de_busca(fichas)
+    for prefixo, registros in indice.items():
+        grava(f"dados/busca/{prefixo}.json",
+              json.dumps(registros, ensure_ascii=False, separators=(",", ":")))
+
     grava(CSS_ARQUIVO, CSS)
-    grava("index.html", _home(majoritarios, proporcionais, quando))
+    grava("index.html", _home(majoritarios, proporcionais, quando,
+                              prefixos=sorted(indice), total_fichas=len(fichas)))
 
     for cod, (chave, nome, _) in CARGOS.items():
         do_cargo = [c for c in majoritarios if c.cod_cargo == cod]

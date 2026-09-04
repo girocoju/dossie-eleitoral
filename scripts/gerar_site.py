@@ -109,6 +109,96 @@ def slug(texto: str) -> str:
     return _NAO_ALFANUM.sub("-", sem_acento.lower()).strip("-") or "sem-nome"
 
 
+# ── indice de busca (F-23) ──────────────────────────────────────────────────
+
+# Palavras que so' engordariam o indice: aparecem em milhares de nomes e ninguem
+# busca por elas. Continuam valendo na FILTRAGEM — quem digita "jose da silva"
+# casa contra o nome inteiro. Elas so' nao ganham atalho proprio.
+_LIGACOES = frozenset({"da", "de", "do", "das", "dos", "di", "du", "dr", "e"})
+
+# Quantos caracteres formam o nome do arquivo. Dois e' o equilibrio medido: com
+# um, "m" juntaria todo Marcos, Maria, Miguel e Moacir num arquivo so'; com
+# tres, seriam milhares de arquivos com meia duzia de linhas cada.
+PREFIXO_BUSCA = 2
+
+
+def normalizar(texto: str) -> str:
+    """Sem acento, minusculo. TEM de casar com o que o navegador faz.
+
+    O JavaScript da home faz `normalize("NFD")` e remove os diacriticos
+    combinantes (U+0300-U+036F), que e' exatamente o que
+    `encode("ascii","ignore")` faz aqui depois do mesmo NFD. Se os dois
+    divergissem, o navegador pediria um arquivo que nao existe e a tela diria
+    "nada encontrado" para um nome que esta' na base — ausencia virando
+    afirmacao, que e' o erro que este projeto mais persegue (Regra 5).
+    """
+    return unicodedata.normalize("NFD", texto).encode("ascii", "ignore").decode().lower()
+
+
+def termos_de(texto: str) -> list[str]:
+    return [t for t in _NAO_ALFANUM.sub(" ", normalizar(texto)).split() if t]
+
+
+def indice_de_busca(fichas: list[Candidato]) -> dict[str, list[list]]:
+    """Um arquivo por prefixo de duas letras. O navegador baixa UM.
+
+    Um indice unico com 20.162 nomes daria ~1,5 MB. Numa home aberta no celular
+    em rede fraca isso e' meio minuto antes de a primeira letra valer alguma
+    coisa — o mesmo motivo que ja' quebrou a listagem de deputado estadual por
+    UF (ADR-018).
+
+    Cada candidatura entra no arquivo de CADA termo do nome, e nao so' do
+    primeiro: quem procura "SILVA" nao deveria precisar saber que a pessoa se
+    chama "JOSE DA SILVA". O numero na urna tambem e' um termo — quem decide o
+    voto digita o numero.
+
+    ── O NOME COMPLETO ENTRA, E NAO E' DETALHE ──
+
+    Nome de urna e' apelido curto: "ZULU", "DR. TARCISIO", "PROFESSORA ANA".
+    Medido em 03/09/2026 sobre as 20.838 candidaturas exibidas:
+
+        SILVA    301 nomes de urna  x  3.322 nomes completos
+        JOSE      83 nomes de urna  x    335 nomes completos
+
+    Indexar so' o nome de urna faria a busca perder NOVE em cada dez pessoas
+    que alguem procuraria pelo sobrenome — quem le' o nome numa noticia nao sabe
+    qual apelido a pessoa registrou na urna.
+
+    O nome completo viaja na linha, e nao so' nos termos: o navegador filtra
+    contra o que esta' na linha, e um nome que entrasse no arquivo sem estar la'
+    seria encontrado pelo indice e descartado pelo filtro — "nada encontrado"
+    para alguem que esta' na base. Quando ele e' igual ao de urna (631 casos),
+    fica de fora para nao repetir bytes.
+
+    Custo medido: o maior arquivo vai de 173 kB para 415 kB — cerca de 45 kB no
+    fio, porque o servidor entrega JSON com Brotli (medido: 536 kB -> 56 kB). A
+    listagem por UF, que ja' e' aceita, e' maior que isso.
+    """
+    por_prefixo: dict[str, dict[str, list]] = {}
+    for c in fichas:
+        completo = c.nome_completo or ""
+        difere = completo.upper() != c.nome_urna.upper()
+        termos = termos_de(c.nome_urna) + (termos_de(completo) if difere else [])
+        if c.nr_candidato:
+            termos.append(str(c.nr_candidato))
+        linha = [c.nome_urna, f"{slug(c.nome_urna)}-{c.sq}", c.sg_uf,
+                 c.sigla_partido or "", c.cod_cargo, c.nr_candidato]
+        if difere and completo:
+            linha.append(completo)
+        for t in termos:
+            if len(t) < PREFIXO_BUSCA or t in _LIGACOES:
+                continue
+            # `setdefault` num dicionario por chave: a mesma candidatura entra
+            # uma vez por arquivo, mesmo que dois termos dela comecem igual
+            # ("MARIA MARIANA" tem dois termos em "ma").
+            por_prefixo.setdefault(t[:PREFIXO_BUSCA], {})[linha[1]] = linha
+    saida = {p: sorted(v.values(), key=lambda r: r[0]) for p, v in por_prefixo.items()}
+    maior = max(saida.items(), key=lambda kv: len(kv[1]))
+    log.info("indice de busca: %d arquivos, maior e' '%s' com %d nomes",
+             len(saida), maior[0], len(maior[1]))
+    return saida
+
+
 def e(valor: Any) -> str:
     """Escapa para HTML. Nunca interpolar texto de fonte externa sem passar aqui."""
     return html.escape(str(valor), quote=True) if valor is not None else ""
