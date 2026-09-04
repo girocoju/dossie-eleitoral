@@ -78,10 +78,15 @@ foi Presidente o tempo todo.
 
 ## O que fica de fora, e por quê
 
-**Filiação a partido, bloco, liderança e bancada.** A API também as chama de
-"órgão". Estar no PT não é ter assento na CCJ, e misturar as duas coisas na
-mesma lista seria dizer que são equivalentes. Ficam **classificadas**, não
-descartadas: continuam em `stg_camara__comissoes` para quem quiser outra tela.
+**Filiação a partido, bloco, liderança e bancada.** A tabela de tipos da API
+declara essas espécies como "órgão", e por isso o classificador as reconhece e
+as mantém fora da promoção a colegiado — estar no PT não é ter assento na CCJ.
+
+**Medição posterior, registrada por honestidade:** nenhum órgão desse tipo
+apareceu entre os 79.140 vínculos coletados, nem no catálogo com janela desde
+2003. A salvaguarda existe e **não precisou agir**. A versão anterior deste ADR
+dizia que ela filtrava vínculos partidários; isso não se confirmou, e afirmar um
+efeito que não aconteceu é o mesmo defeito que este projeto persegue no dado.
 
 **Comissão de medida provisória.** São 1.393 no catálogo, e participar delas é
 rotina; quarenta linhas "Comissão da MPV 936" afogariam as que importam.
