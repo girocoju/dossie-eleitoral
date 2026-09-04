@@ -268,6 +268,12 @@ class Candidato:
     # Quando os dados DESTA candidatura mudaram pela ultima vez (ADR-038).
     dado_de: str | None = None
 
+    # F-24: o que o patrimonio declarado E', e nao so' quanto soma.
+    bens: list[dict] = field(default_factory=list)
+    patrimonio: list[dict] = field(default_factory=list)
+    mandatos: list[dict] = field(default_factory=list)
+    exercicio: dict | None = None
+
     @property
     def partido_completo(self) -> str:
         """'Democracia Crista (DC)'. Quando o TSE publica nome igual a' sigla —
@@ -505,6 +511,10 @@ def carregar_fichas(cliente, cargos: tuple[int, ...],
     _anexar_indicadores_ausentes(cliente, ids)
     _anexar_atividade(cliente, ids)
     _anexar_atividade_senado(cliente, ids)
+    _anexar_bens(cliente, {c.sk: c for c in saida})
+    _anexar_patrimonio(cliente, ids)
+    _anexar_mandatos(cliente, ids)
+    _anexar_exercicio(cliente, ids)
     _anexar_data_do_dado(cliente, {c.sk: c for c in saida})
     _anexar_planos(cliente, {c.sk: c for c in saida})
     _anexar_financiamento(cliente, {c.sk: c for c in saida})
@@ -795,6 +805,150 @@ def _anexar_data_do_dado(cliente, por_sk: dict[str, Candidato]) -> None:
             c.dado_de = r.quando
             n += 1
     log.info("%d fichas com data propria do dado", n)
+
+
+GRUPOS_BEM = {
+    "imoveis": "Imóveis",
+    "moveis": "Bens móveis",
+    "participacoes": "Participação em empresas",
+    "aplicacoes": "Aplicações e investimentos",
+    "fundos": "Fundos",
+    "creditos": "Créditos e poupança vinculada",
+    "dinheiro": "Dinheiro em conta e em espécie",
+    "outros": "Outros bens e direitos",
+}
+
+
+def _anexar_bens(cliente, por_sk: dict[str, Candidato]) -> None:
+    """De que o patrimonio declarado e' feito (F-24).
+
+    A ficha dizia "R$ 2.221.000, 10 itens". A fonte tem 76.724 itens so' em 2026,
+    cada um com tipo oficial e valor.
+
+    A DESCRICAO do bem nao chega aqui nem ao mart: e' texto livre e traz endereco
+    residencial em 6,8% das linhas de 2026, alem de placa, chassi, CPF e CNPJ.
+    Ver o cabecalho de `fct_bem_candidatura`. O TIPO vem da tabela oficial de
+    codigos da Receita, e esse pode ir a' tela.
+    """
+    if not por_sk:
+        return
+    p = cliente.project
+    try:
+        linhas = list(cliente.query(f"""
+            select sk_candidatura, grupo_bem, tipo_bem, qt_itens, vl_total
+            from `{p}.marts.fct_bem_candidatura`
+            where ano_eleicao = 2026
+            order by vl_total desc
+        """).result())
+    except Exception as exc:  # noqa: BLE001 — sem o mart a ficha volta ao total simples
+        log.warning("fct_bem_candidatura indisponivel (%s) — ficha sai sem o detalhe",
+                    str(exc)[:90])
+        return
+    n = 0
+    for r in linhas:
+        c = por_sk.get(r.sk_candidatura)
+        if c is not None:
+            c.bens.append({"grupo": r.grupo_bem, "tipo": r.tipo_bem,
+                           "qt": r.qt_itens, "valor": float(r.vl_total)})
+            n += 1
+    log.info("%d linhas de bem anexadas", n)
+
+
+def _anexar_patrimonio(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """As declaracoes de patrimonio da mesma pessoa, ano a ano (F-24).
+
+    NAO ha' variacao calculada em lugar nenhum — nem aqui, nem no mart, nem na
+    tela. O TSE pede valor de AQUISICAO e nao de mercado, os valores sao
+    NOMINAIS, e a declaracao e' do proprio candidato. Um "+10%" afirmaria
+    crescimento onde pode haver queda real, compra ou venda.
+
+    Declaracao que soma zero nao chega aqui: o arquivo de 2006 publica itens
+    zerados e um terco daquele ano somaria zero (L-27).
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    try:
+        linhas = list(cliente.query(f"""
+            select id_pessoa, ano_eleicao, vl_total_declarado, qt_itens,
+                   cod_cargo, sg_uf
+            from `{p}.marts.fct_patrimonio_declarado`
+            where {_filtro(por_pessoa)}
+            order by ano_eleicao desc
+        """).result())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("fct_patrimonio_declarado indisponivel (%s)", str(exc)[:90])
+        return
+    n = 0
+    for r in linhas:
+        for c in por_pessoa.get(r.id_pessoa, []):
+            c.patrimonio.append({
+                "ano": r.ano_eleicao, "valor": float(r.vl_total_declarado),
+                "itens": r.qt_itens, "cargo": r.cod_cargo, "uf": r.sg_uf,
+            })
+            n += 1
+    log.info("%d declaracoes de patrimonio anexadas", n)
+
+
+def _anexar_mandatos(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """Mandatos exercidos (F-24).
+
+    A trajetoria mostra CANDIDATURAS — quem perdeu tambem aparece. Isto e' outra
+    pergunta: a pessoa chegou a exercer, por quanto tempo, e ainda esta' la'.
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    try:
+        linhas = list(cliente.query(f"""
+            select m.id_pessoa, m.cod_cargo, g.descricao as cargo, m.nm_ue, m.sg_uf,
+                   m.sigla_partido, m.ano_inicio, m.ano_fim, m.em_curso, m.titular
+            from `{p}.marts.fct_mandato` m
+            join `{p}.marts.dim_cargo` g on g.cod_cargo = m.cod_cargo
+            where {_filtro(por_pessoa, 'm.id_pessoa')} and m.link_confiavel
+            order by m.ano_inicio desc
+        """).result())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("fct_mandato indisponivel (%s)", str(exc)[:90])
+        return
+    n = 0
+    for r in linhas:
+        for c in por_pessoa.get(r.id_pessoa, []):
+            c.mandatos.append({
+                "cargo": r.cargo, "cod": r.cod_cargo, "ue": r.nm_ue, "uf": r.sg_uf,
+                "partido": r.sigla_partido, "a1": r.ano_inicio, "a2": r.ano_fim,
+                "em_curso": bool(r.em_curso), "titular": bool(r.titular),
+            })
+            n += 1
+    log.info("%d mandatos anexados", n)
+
+
+def _anexar_exercicio(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """Quem esta' EM EXERCICIO hoje na Camara ou no Senado (F-24).
+
+    Muda como se le' o resto da ficha: atividade legislativa e plenario de quem
+    esta' em exercicio sao do mandato atual, nao de um mandato antigo.
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    try:
+        linhas = list(cliente.query(f"""
+            select id_pessoa, casa, url_perfil, sigla_partido, sg_uf
+            from `{p}.marts.dim_parlamentar`
+            where {_filtro(por_pessoa)} and em_exercicio and casamento_confiavel
+        """).result())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("dim_parlamentar indisponivel (%s)", str(exc)[:90])
+        return
+    n = 0
+    for r in linhas:
+        for c in por_pessoa.get(r.id_pessoa, []):
+            # `casamento_confiavel` ja' filtra o homonimo; sem ele a ficha diria
+            # que uma pessoa esta' no Congresso por causa de um nome parecido.
+            c.exercicio = {"casa": r.casa, "url": r.url_perfil}
+            n += 1
+    log.info("%d candidaturas de quem esta' em exercicio", n)
 
 
 def _anexar_atividade_senado(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:

@@ -255,6 +255,30 @@ registrados depois da última publicação em lote do TSE (L-23).
 
 ---
 
+**F-24 — De que o patrimônio é feito, e o que a pessoa exerceu** · P1 · **Implementada em 03/09/2026**
+
+> Ver [ADR-042](docs/adr/ADR-042-o-que-o-patrimonio-e.md).
+
+**Por que entra.** A ficha dizia "Total declarado R$ 2.221.000 · Itens 10". Dois
+patrimônios do mesmo tamanho podem ser uma fazenda ou vinte apartamentos, e a
+diferença é o que alguém quer saber. Tudo o que entra aqui já estava no lake.
+
+**Alcance.** Quatro blocos: composição do patrimônio por tipo (12.732
+candidaturas proporcionais), declarações lado a lado desde 2006 (4.277),
+mandatos exercidos (2.006) e aviso de quem está em exercício hoje (501).
+
+**O que a ficha NÃO diz.** Nenhuma variação de patrimônio, nem percentual, nem
+seta: o TSE pede valor de **aquisição**, os valores são **nominais** e a
+declaração é do **próprio candidato**. E a descrição do bem não vai à tela nem ao
+mart — ela traz endereço residencial em 6,8% das linhas de 2026, além de placa,
+chassi, CPF e CNPJ, e a Constituição §0 proíbe expor endereço de candidato.
+
+**Conferido (Regra 6)** contra o DivulgaCandContas, outro sistema do TSE: 7 de 7
+declarações de 2026 e 5 de 5 de 2022 batem ao centavo. E contra a API da Câmara:
+513 deputados em exercício dos dois lados, zero divergência.
+
+---
+
 **F-23 — Buscar uma candidatura pelo nome** · P1 · **Implementada em 03/09/2026**
 
 > Ver [ADR-041](docs/adr/ADR-041-buscador-por-prefixo.md).
@@ -521,6 +545,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-042 | De que o patrimônio é feito | Um total e uma contagem não dizem se são vinte apartamentos ou uma fazenda; a descrição do bem fica fora do mart porque traz endereço residencial, e a série não calcula variação porque o valor é de aquisição e nominal | Aceita |
 | ADR-041 | Buscador na home, um arquivo por prefixo | 20 mil fichas sem busca só são alcançáveis por quem já sabe o cargo e a UF; índice único teria 10 MB, e um 404 não pode virar "nada encontrado" | Aceita |
 | ADR-040 | Ficha própria para toda candidatura | 19 mil páginas com poucos campos distintos são o padrão de conteúdo raso, mas o critério que decide é utilidade pública: quem enfrenta 1.126 nomes precisa de mais ajuda, e ficha sem URL não é compartilhável | Aceita |
 | ADR-039 | A publicação só envia o que mudou | Manifesto passa a guardar hash, e sobe por ÚLTIMO — subindo antes, uma publicação interrompida afirmaria o hash de arquivos que nunca chegaram, e a página errada ficaria congelada no ar | Aceita |

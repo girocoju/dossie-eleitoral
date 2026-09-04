@@ -183,3 +183,16 @@ def test_a_ordem_nao_perde_nem_duplica_arquivo():
         "dossie.css", "b.html", "a.html"]
     assert ordem_de_envio(["b.html", "a.html"]) == ["b.html", "a.html"]
     assert ordem_de_envio([]) == []
+
+
+def test_o_plano_e_anunciado_antes_do_primeiro_envio(tmp_path, caplog):
+    """Entre "conectado" e o primeiro lote de 200 havia minutos de silencio —
+    baixar o manifesto, ler o disco, calcular hash. Quem olha a tela nao tem
+    como distinguir trabalho de travamento."""
+    import logging
+    origem = _site(tmp_path, PAGINAS)
+    anterior = hashes_locais(origem, listar_arquivos(origem))
+    (origem / "candidato" / "b-2" / "index.html").write_text("v2", encoding="utf-8")
+    with caplog.at_level(logging.INFO):
+        enviar(FTPFalso(), origem, "", seco=False, ja_no_servidor=anterior)
+    assert "3 arquivos no site: 2 ja' estao no servidor, 1 a enviar" in caplog.text

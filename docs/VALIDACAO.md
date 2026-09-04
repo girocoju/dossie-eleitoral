@@ -146,3 +146,61 @@ select cod_indicador, ano, valor from marts.fct_indicador_uf_ano where sg_uf = '
 As fontes conferidas foram, sempre que possível, o **arquivo primário** que o
 próprio pipeline baixou (planilha do INEP, planilha do Tesouro) ou a **API da
 instituição** (Banco Central SGS, SIDRA, Ipeadata) — e não notícia sobre o dado.
+
+---
+
+# Patrimônio declarado e mandatos (F-24) — 03/09/2026
+
+O pipeline lê o pacote em **lote** do portal de dados abertos
+(`bem_candidato_*.csv`). A conferência lê o **DivulgaCandContas**, que é outro
+sistema do TSE, com outro formato e outra rota de publicação. Se os dois batem, o
+erro teria de estar nos dois lugares ao mesmo tempo.
+
+## Bens declarados em 2026
+
+Amostra do maior ao menor patrimônio entre as candidaturas proporcionais.
+
+| Candidatura | UF | No lake | No DivulgaCandContas | Itens |
+|---|---|---|---|---|
+| DRA. GEORGIA MICHELETT | AC | R$ 1.226.983.360,00 | R$ 1.226.983.360,00 | 4 = 4 |
+| ANDRÉ SILVA | AL | R$ 548.600.000,00 | R$ 548.600.000,00 | 3 = 3 |
+| FE | SP | R$ 501.085.000,00 | R$ 501.085.000,00 | 9 = 9 |
+| ALVAMIRO ALVES - BRANCO | MG | R$ 400.000.000,00 | R$ 400.000.000,00 | 1 = 1 |
+| EZEQUIEL DA PAULISTA | RO | R$ 843.018,66 | R$ 843.018,66 | 6 = 6 |
+| CÁSSIO SILVEIRA | RS | R$ 239.500,00 | R$ 239.500,00 | 6 = 6 |
+| MAYARA PROFESSORA | SP | R$ 20.000,00 | R$ 20.000,00 | 1 = 1 |
+
+**7 de 7 conferem ao centavo.**
+
+## Patrimônio de 2022, para a série histórica
+
+| Candidatura | UF | No lake | No DivulgaCandContas | Itens |
+|---|---|---|---|---|
+| EUNÍCIO | CE | R$ 158.184.458,79 | R$ 158.184.458,79 | 128 = 128 |
+| RUY MUNIZ | MG | R$ 158.051.565,55 | R$ 158.051.565,55 | 12 = 12 |
+| JOSÉ DIAS | RN | R$ 53.184.090,37 | R$ 53.184.090,37 | 180 = 180 |
+| JOSÉ NELTO | GO | R$ 48.492.170,57 | R$ 48.492.170,57 | 31 = 31 |
+| BERLANDA | SC | R$ 46.612.300,31 | R$ 46.612.300,31 | 18 = 18 |
+
+**5 de 5 conferem ao centavo**, incluindo uma declaração de 180 itens.
+
+## Em exercício, contra a API da Câmara
+
+| | |
+|---|---|
+| Deputados que a Câmara lista em exercício | 513 |
+| Que o pipeline marca em exercício | 513 |
+| Só na Câmara | **0** |
+| Só no pipeline | **0** |
+
+## O que a conferência encontrou
+
+Não uma divergência de valor, mas duas coisas que a conferência trouxe à tona:
+
+**As descrições de bem contêm endereço residencial** — 6,8% das linhas de 2026,
+além de placa, chassi, CPF e CNPJ. O campo foi mantido fora do mart
+(ADR-042).
+
+**O arquivo de bens de 2006 publica valores zerados** — 34,8% das declarações
+daquele ano somam exatamente zero, contra 0,0–0,1% em todos os outros. Virou a
+[L-27](LACUNAS.md), e o modelo corta essas linhas: zero ali não quer dizer zero.

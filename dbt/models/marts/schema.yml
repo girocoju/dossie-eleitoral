@@ -547,6 +547,79 @@ models:
         description: "Recurso proprio do candidato, isolado do que veio de terceiros."
         tests: [not_null]
 
+  - name: fct_bem_candidatura
+    description: >
+      Bens declarados por candidatura e TIPO, agrupados pela tabela oficial de
+      Bens e Direitos da Receita Federal que o TSE reusa. A ficha mostrava um
+      total e uma contagem; a fonte tem 76.724 itens so' em 2026.
+      `descricao_bem` NAO entra neste mart de proposito: e' texto livre e contem
+      endereco residencial (6,8% das linhas de 2026), placa, chassi, CPF e CNPJ.
+      O que nao chega ao mart nao chega a' tela por descuido de quem escrever a
+      proxima consulta. Ver o cabecalho do modelo.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [sk_candidatura, cd_tipo_bem]
+    columns:
+      - name: sk_candidatura
+        tests: [not_null]
+      - name: cd_tipo_bem
+        description: "Codigo oficial da tabela de Bens e Direitos (Receita/TSE)."
+        tests: [not_null]
+      - name: grupo_bem
+        description: >
+          Dezena do codigo oficial, que JA' e' o agrupamento da fonte: 01-19
+          imoveis, 21-29 moveis, 31-39 participacoes, 41-49 aplicacoes, 51-59
+          creditos, 61-69 dinheiro, 71-79 fundos, 91-99 outros. Classificar pelo
+          NOME seria adivinhar — foi o erro que a L-20 custou caro (ADR-034).
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [imoveis, moveis, participacoes, aplicacoes, creditos,
+                         dinheiro, fundos, outros]
+      - name: qt_itens
+        tests: [not_null]
+      - name: vl_total
+        description: >
+          Somavel entre linhas da mesma candidatura: sao parcelas do mesmo
+          patrimonio declarado, nao categorias incomparaveis.
+          PODE SER NEGATIVO: saldo de conta corrente no cheque especial entra na
+          declaracao com sinal negativo e o TSE publica assim (4 linhas em 2026,
+          todas em deposito bancario). Um teto inferior de zero aqui reprovaria
+          um dado correto — quem cuida do caso e' o teste singular
+          `assert_bem_negativo_so_em_deposito`, que falha se o negativo aparecer
+          num imovel ou num veiculo.
+        tests: [not_null]
+
+  - name: fct_patrimonio_declarado
+    description: >
+      Patrimonio declarado por pessoa e eleicao, desde 2006. Existe para a ficha
+      poder mostrar as declaracoes LADO A LADO.
+      NAO ha' coluna de variacao nem percentual: o TSE pede valor de AQUISICAO e
+      nao de mercado, os valores sao NOMINAIS, e a declaracao e' do proprio
+      candidato. Um "+10%" na tela afirmaria crescimento onde pode haver queda
+      real, compra ou venda. Ano sem declaracao nao vira linha de valor zero
+      (Regra 5).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [id_pessoa, ano_eleicao]
+    columns:
+      - name: id_pessoa
+        tests: [not_null]
+      - name: ano_eleicao
+        tests: [not_null]
+      - name: vl_total_declarado
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+      - name: qt_itens
+        tests: [not_null]
+
   - name: fct_doador_candidatura
     description: >
       Quem financiou cada candidatura, ja' somando as doacoes repetidas da mesma

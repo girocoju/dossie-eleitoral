@@ -26,6 +26,7 @@ from scripts.gerar_site import (
     _LIGACOES,
     BASE_URL,
     CARGOS,
+    GRUPOS_BEM,
     PROPORCIONAIS,
     TODOS_CARGOS,
     VICES,
@@ -130,6 +131,16 @@ _GLOSSARIO = {
 }
 
 _CARGO_CURTO = {1: "Presidente", 3: "Governador"}
+
+# Rotulo curto por codigo, para caber numa coluna estreita da serie de
+# patrimonio. Nao usa `TODOS_CARGOS` porque ali "Deputado Estadual" tem
+# 18 caracteres e a linha quebra em celular.
+_CARGO_CURTO_TRAJ = {
+    1: "Presidente", 2: "Vice-Pres.", 3: "Governador", 4: "Vice-Gov.",
+    5: "Senador", 6: "Dep. Federal", 7: "Dep. Estadual", 8: "Dep. Distrital",
+    9: "1º Suplente", 10: "2º Suplente", 11: "Prefeito", 12: "Vice-Prefeito",
+    13: "Vereador",
+}
 
 _UF_NOME = {
     "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia",
@@ -907,6 +918,159 @@ def _chapa_titular(c: Candidato) -> str:
     </section>"""
 
 
+def _bens(c: Candidato) -> str:
+    """De que o patrimonio declarado e' feito (F-24).
+
+    A ficha mostrava um total e uma contagem: "R$ 2.221.000, 10 itens". Dois
+    patrimonios do mesmo tamanho podem ser uma fazenda ou vinte apartamentos, e
+    a diferenca e' justamente o que alguem quer saber.
+
+    ── O QUE NAO APARECE, E NAO E' ESQUECIMENTO ──
+
+    A descricao que o candidato escreveu nao esta' aqui, nem no mart. Ela traz
+    endereco residencial em 6,8% das linhas de 2026 — "IMOVEL RESIDENCIAL NA RUA
+    (...), 145, AFOGADOS, RECIFE/PE" e' um exemplo real — alem de placa, chassi,
+    CPF e CNPJ. A Constituicao 0 proibe expor endereco de candidato.
+
+    O tipo, sim: ele vem da tabela oficial de Bens e Direitos da Receita, que o
+    TSE reusa, e diz "Apartamento" sem dizer qual.
+    """
+    if not c.bens:
+        if c.bens_total is not None:
+            return ""       # o total ja' aparece no bloco de bens declarados
+        return ""
+
+    por_grupo: dict[str, list[dict]] = {}
+    for b in c.bens:
+        por_grupo.setdefault(b["grupo"], []).append(b)
+
+    total = sum(b["valor"] for b in c.bens)
+    itens = sum(b["qt"] for b in c.bens)
+    linhas = []
+    for chave, rotulo in GRUPOS_BEM.items():
+        do_grupo = por_grupo.get(chave)
+        if not do_grupo:
+            continue
+        soma = sum(b["valor"] for b in do_grupo)
+        qt = sum(b["qt"] for b in do_grupo)
+        linhas.append(
+            f"<tr class='g'><td><b>{e(rotulo)}</b></td>"
+            f"<td class='num'><b>{qt}</b></td>"
+            f"<td class='num'><b>{brl(soma)}</b></td>"
+            f"<td class='num'>{_pct(soma, total)}</td></tr>")
+        for b in sorted(do_grupo, key=lambda x: -x["valor"]):
+            linhas.append(
+                f"<tr><td style='padding-left:22px'>{e(b['tipo'])}</td>"
+                f"<td class='num'>{b['qt']}</td>"
+                f"<td class='num'>{brl(b['valor'])}</td><td></td></tr>")
+
+    return f"""<section class="bloco">
+      <h2>De que é feito o patrimônio declarado</h2>
+      <p style="margin:0 0 10px;font-size:13px;color:var(--ink-3)">
+        {itens} {'item' if itens == 1 else 'itens'}, {brl(total)} no total,
+        agrupados pela tabela oficial de Bens e Direitos.</p>
+      <div class="rolagem"><table>
+        <thead><tr><th>Tipo</th><th>Itens</th><th>Valor declarado</th>
+        <th>Fatia</th></tr></thead>
+        <tbody>{''.join(linhas)}</tbody></table></div>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        Valor <b>declarado pelo candidato</b> ao TSE, de aquisição — não de
+        mercado. A descrição de cada bem <b>não</b> é publicada aqui: ela é texto
+        livre e contém endereço residencial, placa e documento em parte das
+        declarações.</p>
+    </section>"""
+
+
+def _patrimonio(c: Candidato) -> str:
+    """As declaracoes de patrimonio da mesma pessoa, lado a lado (F-24).
+
+    NAO ha' variacao, nem percentual, nem "enriqueceu". Tres motivos, e cada um
+    sozinho ja' bastaria:
+
+      1. O TSE pede valor de AQUISICAO. Um imovel comprado em 2005 e' declarado
+         pelo preco de 2005 em toda eleicao seguinte. A diferenca entre dois anos
+         mede compra e venda tanto quanto qualquer outra coisa.
+      2. Os valores sao NOMINAIS. R$ 500 mil em 2022 e R$ 550 mil em 2026 e'
+         QUEDA em termos reais, e um "+10%" afirmaria o contrario.
+      3. E' declaracao do proprio candidato, nao apuracao de ninguem.
+
+    A tela mostra as declaracoes e diz as tres coisas. Quem quiser concluir algo
+    conclui com o dado a' vista — o site registra, nao avalia (Constituicao 0.1).
+    """
+    if len(c.patrimonio) < 2:
+        return ""           # uma declaracao sozinha ja' esta' no bloco de bens
+    linhas = "".join(
+        f"<tr><td class='num'>{d['ano']}</td>"
+        f"<td>{e(_CARGO_CURTO_TRAJ.get(d['cargo'], '')) or '—'}"
+        f"{' · ' + e(d['uf']) if d['uf'] else ''}</td>"
+        f"<td class='num'>{d['itens']}</td>"
+        f"<td class='num'>{brl(d['valor'])}</td></tr>"
+        for d in sorted(c.patrimonio, key=lambda x: -x["ano"]))
+    return f"""<section class="bloco">
+      <h2>Patrimônio declarado a cada eleição</h2>
+      <div class="rolagem"><table>
+        <thead><tr><th>Ano</th><th>Candidatura</th><th>Itens</th>
+        <th>Valor declarado</th></tr></thead>
+        <tbody>{linhas}</tbody></table></div>
+      <p class="aviso" style="margin:10px 0 0">
+        <b>Estes números não medem enriquecimento, e a diferença entre eles não é
+        um ganho.</b> O TSE pede o valor de <b>aquisição</b>, não o de mercado:
+        um imóvel comprado em 2005 é declarado pelo preço de 2005 em toda eleição
+        seguinte. Os valores são <b>nominais</b> — R$ 500 mil em 2022 e R$ 550
+        mil em 2026 é queda depois da inflação. E tudo aqui é <b>declaração do
+        próprio candidato</b>. Ano em que a pessoa não se candidatou, ou não
+        declarou bens, <b>não aparece</b> — a linha ausente não é patrimônio
+        zero.</p>
+    </section>"""
+
+
+_SUPLENTE = "<span class='marca-dado m-na'>suplente</span>"
+
+
+def _mandatos(c: Candidato) -> str:
+    """Mandatos exercidos (F-24).
+
+    A trajetoria eleitoral mostra CANDIDATURAS, e quem perdeu tambem aparece
+    nela. Este bloco responde outra pergunta: a pessoa chegou a exercer, de
+    quando a quando, e ainda esta' la'.
+    """
+    if not c.mandatos:
+        return ""
+    linhas = "".join(
+        f"<tr><td class='num'>{m['a1']}–{m['a2']}</td><td>{e(m['cargo'])}</td>"
+        f"<td>{e(m['ue'] or m['uf'] or '')}</td>"
+        f"<td>{e(m['partido']) or '—'}</td>"
+        f"<td>{'<b>em curso</b>' if m['em_curso'] else ''}"
+        f'{"" if m["titular"] else _SUPLENTE}'
+        f"</td></tr>"
+        for m in c.mandatos)
+    n = len(c.mandatos)
+    return f"""<section class="bloco">
+      <h2>Mandatos exercidos — {n}</h2>
+      <div class="rolagem"><table>
+        <thead><tr><th>Período</th><th>Cargo</th><th>Onde</th><th>Partido</th>
+        <th></th></tr></thead>
+        <tbody>{linhas}</tbody></table></div>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        Diferente da trajetória acima, que lista <b>candidaturas</b> — inclusive
+        as perdidas. Aqui estão os mandatos que a pessoa chegou a exercer,
+        derivados das candidaturas eleitas. O período é o do <b>mandato do
+        cargo</b>, não a data de posse ou de saída de cada pessoa: o TSE não
+        publica saída antecipada, e por isso ela não aparece.</p>
+    </section>"""
+
+
+def _em_exercicio(c: Candidato) -> str:
+    if not c.exercicio:
+        return ""
+    casa = "Câmara dos Deputados" if c.exercicio["casa"] == "camara" else "Senado Federal"
+    perfil = (f' · <a href="{e(c.exercicio["url"])}" rel="nofollow noopener">'
+              f'perfil oficial ↗</a>' if c.exercicio.get("url") else "")
+    return (f'<p class="aviso" style="margin:0 0 18px">Está <b>em exercício</b> '
+            f'hoje na {casa}{perfil}. Os blocos de atividade legislativa e de '
+            f'plenário abaixo são desse mandato.</p>')
+
+
 def _ficha(c: Candidato, quando: str) -> str:
     partes = [f"""
 <a href="{BASE_URL}/{c.cargo_chave}/" style="font-size:13.5px">← {e(c.cargo_nome)}</a>
@@ -918,7 +1082,8 @@ def _ficha(c: Candidato, quando: str) -> str:
   </div>
   <div>
     <h1>{e(c.nome_urna)}</h1>
-    <p class="sub" style="margin-bottom:28px">{e(c.nome_completo or '')}</p>
+    <p class="sub" style="margin-bottom:18px">{e(c.nome_completo or '')}</p>
+    {_em_exercicio(c)}
 
     <section class="bloco"><h2>Perfil declarado ao TSE</h2>
     <dl class="campos">
@@ -1073,6 +1238,9 @@ def _ficha(c: Candidato, quando: str) -> str:
       continuou publicado. Esta página mostra um deles; nenhum campo da fonte
       indica qual prevalece.</p>""")
 
+    partes.append(_bens(c))
+    partes.append(_patrimonio(c))
+    partes.append(_mandatos(c))
     partes.append(_chapa(c))
     partes.append(_chapa_titular(c))
     partes.append(_atividade(c))

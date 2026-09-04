@@ -695,6 +695,21 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
     orcamento = _orcamento_de_reconexao(len(arquivos))
     pulados = 0
 
+    # DIZER O PLANO ANTES DE COMECAR. Entre "conectado" e o primeiro lote de 200
+    # arquivos enviados havia minutos de silencio absoluto: baixar o manifesto,
+    # ler 193 MB de disco e calcular hash. Quem esta' olhando a tela nao tem como
+    # saber se aquilo e' trabalho ou travamento — e a unica razao de o
+    # `publicar.bat` existir e' poder acompanhar.
+    if ja_no_servidor is not None and hashes is not None:
+        iguais = sum(1 for r in relativos
+                     if ja_no_servidor.get(r) is not None
+                     and ja_no_servidor.get(r) == hashes.get(r))
+        log.info("%d arquivos no site: %d ja' estao no servidor, %d a enviar",
+                 len(relativos), iguais, len(relativos) - iguais)
+    elif not seco:
+        log.info("%d arquivos a enviar (sem manifesto anterior: sobe tudo)",
+                 len(relativos))
+
     base = raiz_remota.rstrip("/")
     # A pasta de destino JA' EXISTE — a conta de FTP esta' enraizada nela. Marcar
     # ela e os ancestrais como "ja' feitos" evita um `mkd /public_html` inutil,
@@ -855,6 +870,7 @@ def main(argv: list[str] | None = None) -> int:
         anterior = _manifesto_remoto(viva["sessao"], raiz)
 
         atuais = listar_arquivos(origem)
+        log.info("conferindo o que mudou em %d arquivos...", len(atuais))
         locais = hashes_locais(origem, atuais)
 
         n, tamanho = enviar(viva["sessao"], origem, raiz, seco=False,

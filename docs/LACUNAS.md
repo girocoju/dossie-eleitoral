@@ -5,7 +5,7 @@
 > Nenhum item desta lista e' contornado por interpolacao, media ou estimativa.
 > Enquanto estiver aqui, o dado simplesmente nao existe no produto — e a tela diz isso.
 
-Ultima revisao: **2026-08-27**
+Ultima revisao: **2026-09-03**
 
 ---
 
@@ -645,3 +645,42 @@ tamanho da que fechou a L-20.
 
 **O que NAO fazer:** voltar a subtrair receita de despesa. Foi assim que MG 2023
 apareceu com superavit de R$ 24 bilhoes.
+
+---
+
+## L-27 · O arquivo de bens de 2006 publica valores zerados
+
+**Situacao:** ABERTA · registrada em 03/09/2026
+
+**O que falta:** valor de bem no arquivo `bem_candidato` de 2006. Medido em
+03/09/2026, sobre 509.450 itens de todos os anos:
+
+| ano | itens | zerados | candidaturas | somam zero |
+|---|---|---|---|---|
+| 2006 | 82.361 | 8.506 (10,3%) | 19.263 | **6.699 (34,8%)** |
+| 2010 | 81.226 | 0 (0,0%) | 13.545 | 0 |
+| 2014 | 83.053 | 4 (0,0%) | 15.300 | 0 |
+| 2018 | 93.527 | 4 (0,0%) | 17.646 | 1 |
+| 2022 | 92.559 | 410 (0,4%) | 18.249 | 26 |
+| 2026 | 76.724 | 261 (0,3%) | 13.831 | 14 |
+
+Um terco de 2006 contra praticamente nada em todos os outros anos nao e' um fato
+sobre as pessoas de 2006 — e' um fato sobre o arquivo daquele ano. E' o segundo
+problema conhecido dele; o primeiro e' a [L-16](#l-16), o desfecho da eleicao que
+ele nao publica.
+
+**Impacto:** `fct_patrimonio_declarado` deixaria "R$ 0 em 2006" ao lado de
+"R$ 500 mil em 2026" na mesma ficha, e o leitor concluiria uma historia que o
+dado nao conta.
+
+**Como esta' tratado:** o modelo corta declaracao cujo total e' zero
+(`having max(vl_total) > 0`), e o teste
+`assert_patrimonio_zero_nao_publicado` trava a volta do filtro. Quem nao declarou
+nada nao tem linha; quem declarou zero tambem nao, porque zero ali nao quer dizer
+zero.
+
+**O que NAO fazer:** publicar o zero como patrimonio. Seria ausencia virando
+afirmacao, sobre uma pessoa real, exatamente o que a Regra 5 proibe.
+
+**Como fechar:** ler o `leiame` do pacote de 2006 e conferir se o valor esta' em
+outra coluna naquele ano, como ja' aconteceu com o layout de candidaturas (L-01).
