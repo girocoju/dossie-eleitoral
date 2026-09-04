@@ -274,6 +274,7 @@ class Candidato:
     mandatos: list[dict] = field(default_factory=list)
     exercicio: dict | None = None
     comissoes: list[dict] = field(default_factory=list)
+    emendas: list[dict] = field(default_factory=list)
 
     @property
     def partido_completo(self) -> str:
@@ -517,6 +518,7 @@ def carregar_fichas(cliente, cargos: tuple[int, ...],
     _anexar_mandatos(cliente, ids)
     _anexar_exercicio(cliente, ids)
     _anexar_comissoes(cliente, ids)
+    _anexar_emendas(cliente, ids)
     _anexar_data_do_dado(cliente, {c.sk: c for c in saida})
     _anexar_planos(cliente, {c.sk: c for c in saida})
     _anexar_financiamento(cliente, {c.sk: c for c in saida})
@@ -962,6 +964,56 @@ CLASSES_COMISSAO = {
     "temporaria": "Comissões temporárias, especiais e CPIs",
     "mista": "Comissões mistas e do Congresso",
 }
+
+
+# Rotulo curto por tipo de emenda. O nome oficial e' longo demais para caber
+# numa coluna ("Emenda Individual - Transferencias com Finalidade Definida").
+TIPOS_EMENDA = {
+    "Emenda Individual - Transferências com Finalidade Definida": "Individual",
+    "Emenda Individual - Transferências Especiais": "Individual (transf. especial)",
+    "Emenda de Bancada": "De bancada",
+    "Emenda de Comissão": "De comissão",
+    "Emenda de Relator": "De relator",
+}
+
+
+def _anexar_emendas(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """Emendas parlamentares por ano (F-27).
+
+    UMA LINHA POR ANO, nunca um total de carreira. "Moveu R$ 300 milhoes" sem
+    dizer em quantos anos e' um numero grande e sem significado; o ano e' o que
+    da' escala a' cifra.
+
+    So' entra emenda cujo autor resolve para UMA pessoa. Nome ambiguo — RICARDO
+    IZAR, pai e filho, os dois deputados — fica de fora: atribuir milhoes a'
+    pessoa errada e' o pior erro possivel nesta tela.
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    try:
+        linhas = list(cliente.query(f"""
+            select id_pessoa, ano_emenda, tipo, qt_emendas, qt_municipios,
+                   qt_ufs, vl_empenhado, vl_pago, funcao_principal
+            from `{p}.marts.fct_emenda_autor`
+            where {_filtro(por_pessoa)}
+            order by ano_emenda desc, vl_pago desc
+        """).result())
+    except Exception as exc:  # noqa: BLE001 — sem o mart a ficha sai sem o bloco
+        log.warning("fct_emenda_autor indisponivel (%s)", str(exc)[:90])
+        return
+    n = 0
+    for r in linhas:
+        for c in por_pessoa.get(r.id_pessoa, []):
+            c.emendas.append({
+                "ano": r.ano_emenda, "tipo": r.tipo, "qt": r.qt_emendas,
+                "municipios": r.qt_municipios, "ufs": r.qt_ufs,
+                "empenhado": float(r.vl_empenhado or 0),
+                "pago": float(r.vl_pago or 0),
+                "funcao": r.funcao_principal,
+            })
+            n += 1
+    log.info("%d linhas de emenda anexadas", n)
 
 
 def _anexar_comissoes(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:

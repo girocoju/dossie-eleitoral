@@ -120,6 +120,23 @@ sources:
         warn_after: { count: 120, period: day }
         error_after: { count: 400, period: day }
     tables:
+      - name: emendas
+        description: >
+          F-27 — emendas parlamentares, do download em lote do Portal da
+          Transparencia (CGU). ARQUIVO UNICO CUMULATIVO: o ano no endereco e'
+          ignorado pelo Portal, e os treze anos devolvem o mesmo sha256. Sao
+          94.463 linhas cobrindo emendas de 2014 a 2026, com valor ja' acumulado.
+        columns:
+          - name: autor_e_pessoa
+            description: >
+              `false` para RELATOR GERAL, bancada, comissao e para as 15.962
+              linhas (17%) que o Portal publica SEM autor. Nenhuma delas pode ir
+              para a ficha de um candidato — seria atribuir a uma pessoa o que a
+              fonte atribui a um colegiado, ou a ninguem (L-29).
+          - name: ano_emenda
+            description: >
+              A unica dimensao temporal que a fonte oferece. NAO ha' ano de
+              execucao: os valores sao acumulados.
       - name: indicadores
         description: >
           Formato longo (cod_indicador, sg_uf, ano, valor), 2015-2025. SO' estados —

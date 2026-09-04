@@ -80,6 +80,10 @@ alguem colocou no servidor a mao nunca esteve la' e nao e' tocado. A remocao
 tem teto de 25% e piso de 20 arquivos, e recusa inventario incompleto: geracao
 truncada nao pode virar limpeza.
 
+Ele tambem remove o ARQUIVO OCULTO que uma transferencia interrompida deixa
+(`.in.<nome>.`). E' resto do nosso proprio envio bloqueando o caminho do arquivo
+que vai ser escrito por cima — nao e' conteudo de ninguem. Ver ADR-045.
+
 `_liberar_caminho` remove um diretorio VAZIO ocupando o lugar exato de um arquivo
 que vai ser escrito. E' auto-reparo de um bug que este proprio modulo cometeu, e
 nao consegue apagar conteudo — `RMD` recusa diretorio nao-vazio.
@@ -95,6 +99,7 @@ import ftplib
 import hashlib
 import io
 import json
+import re
 import ssl
 import subprocess  # noqa: S402 — o canal e' TLS; ver o cabecalho deste modulo
 import sys
@@ -127,6 +132,18 @@ BLOCO = 1024 * 64
 # `error_temp` (4xx) sao instabilidade: reconecta e continua do mesmo arquivo.
 TENTATIVAS_POR_ARQUIVO = 4
 ESPERA_BASE = 2.0          # segundos: 2, 4, 8
+
+# RECONECTAR TAMBEM FALHA (ADR-045).
+#
+# Em 04/09/2026 uma publicacao morreu com TimeoutError (WinError 10060) levantado
+# DENTRO do `except` que tratava a queda anterior: `conectar()` nao respondeu, e
+# excecao levantada dentro de um `except` escapa do laco de retentativa sem
+# passar por ele.
+#
+# Depois de centenas de reconexoes o servidor passa a recusar por um tempo. Seis
+# tentativas com espera dobrando dao ~2 minutos de paciencia, que e' o que
+# atravessa a recusa temporaria.
+TENTATIVAS_DE_RECONEXAO = 6
 # Quarenta reconexoes eram folga para 738 arquivos e viram teto para 20 mil: o
 # servidor corta a cada ~100 arquivos, entao o numero de quedas cresce junto com
 # o site. O que precisa ter limite e' a TAXA — rede que cai a cada 50 arquivos
@@ -312,6 +329,49 @@ def garantir_pasta(sessao: ftplib.FTP, caminho: str, ja_feitas: set[str]) -> Non
         if not str(exc).startswith("550"):
             raise
     ja_feitas.add(caminho)
+
+
+# RESIDUO DE ENVIO INTERROMPIDO (ADR-045).
+#
+# O servidor da Hostinger grava o upload num arquivo oculto `.in.<nome>.` e so'
+# renomeia no fim. Quando a transferencia morre no meio — conexao cortada, ou
+# alguem parando a publicacao — o oculto FICA. O `STOR` seguinte no mesmo caminho
+# responde:
+#
+#   550 candidato/x/index.html: Temporary hidden file
+#       /candidato/x/.in.index.html. already exists
+#
+# 550 e' `error_perm`, que este modulo trata como erro de verdade e deixa subir
+# (ADR-027, e com razao: caminho errado e permissao negada tambem sao 550). Mas
+# ESTE 550 e' resto do nosso proprio envio, e a publicacao inteira morria por
+# causa dele — foi o que aconteceu em 04/09/2026, depois de 6.200 arquivos.
+_TEMP_OCULTO = re.compile(
+    r"Temporary hidden file\s+(?P<caminho>\S+?)\.?\s+already exists", re.I)
+
+
+def _residuo_de(erro: Exception, destino: str) -> str | None:
+    """O caminho do oculto que esta' bloqueando `destino`, se for esse o caso.
+
+    Devolve None para qualquer outro 550 — caminho errado e permissao negada
+    continuam subindo como erro, que e' o certo.
+
+    O caminho vem da MENSAGEM do servidor, mas nao e' obedecido cegamente: so'
+    vale se o nome do arquivo for exatamente `.in.<basename do destino>.`, e se
+    ele estiver na mesma pasta. Um servidor que respondesse com outro caminho
+    nao consegue nos fazer apagar outra coisa.
+    """
+    achado = _TEMP_OCULTO.search(str(erro))
+    if not achado:
+        return None
+    caminho = achado.group("caminho").rstrip(".")
+    base = destino.rsplit("/", 1)[-1]
+    pasta = destino.rsplit("/", 1)[0] if "/" in destino else ""
+    esperado = f".in.{base}"
+    if caminho.rsplit("/", 1)[-1] != esperado:
+        return None
+    if pasta and not caminho.lstrip("/").startswith(pasta.lstrip("/")):
+        return None
+    return caminho
 
 
 def _liberar_caminho(sessao: ftplib.FTP, destino: str) -> None:
@@ -758,6 +818,21 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
                 with caminho.open("rb") as f:
                     sessao.storbinary(f"STOR {destino}", f, blocksize=BLOCO)
                 break
+            except ftplib.error_perm as erro:
+                # 550 continua sendo erro de verdade — exceto quando e' o
+                # oculto que a nossa propria transferencia interrompida deixou.
+                residuo = _residuo_de(erro, destino)
+                if residuo is None or tentativa == TENTATIVAS_POR_ARQUIVO:
+                    raise
+                log.warning("%s: residuo de envio interrompido (%s) — removendo",
+                            rel, residuo)
+                try:
+                    sessao.delete(residuo)
+                except ftplib.all_errors as exc:
+                    # Nao conseguimos limpar: o erro original e' que vale.
+                    log.warning("nao removi %s (%s)", residuo, str(exc)[:60])
+                    raise erro from exc
+                continue
             except TRANSITORIAS as erro:
                 if reconectar is None or tentativa == TENTATIVAS_POR_ARQUIVO:
                     raise
@@ -854,12 +929,28 @@ def main(argv: list[str] | None = None) -> int:
     viva: dict[str, ftplib.FTP] = {"sessao": conectar(cfg)}
 
     def reconectar() -> ftplib.FTP:
+        """Reconecta com paciencia. Ver TENTATIVAS_DE_RECONEXAO.
+
+        `SystemExit` — certificado que nao confere, credencial faltando — NAO e'
+        retentado: sao problemas que nao passam com o tempo.
+        """
         try:
             viva["sessao"].close()
         except Exception:  # noqa: BLE001, S110 — ja' esta' morta; fechar e' cortesia
             pass
-        viva["sessao"] = conectar(cfg)
-        return viva["sessao"]
+        for tentativa in range(1, TENTATIVAS_DE_RECONEXAO + 1):
+            try:
+                viva["sessao"] = conectar(cfg)
+                return viva["sessao"]
+            except TRANSITORIAS as erro:
+                if tentativa == TENTATIVAS_DE_RECONEXAO:
+                    raise
+                espera = ESPERA_BASE * 2 ** tentativa
+                log.warning("reconexao falhou (%s) — nova tentativa em %.0fs (%d/%d)",
+                            type(erro).__name__, espera, tentativa,
+                            TENTATIVAS_DE_RECONEXAO)
+                time.sleep(espera)
+        raise AssertionError("inalcancavel")  # pragma: no cover
 
     try:
         raiz = str(cfg["raiz"])

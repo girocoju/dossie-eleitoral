@@ -718,3 +718,36 @@ LGPD), o casamento passa a ser confiavel e o bloco vem junto.
 **O que NAO fazer:** exibir com casamento por nome. Homonimia com mesma data de
 nascimento e' improvavel, nao impossivel, e o custo do erro aqui e' atribuir a
 uma pessoa o assento de outra.
+
+---
+
+## L-29 · 17% das emendas o Portal publica sem autor
+
+**Situacao:** ABERTA · registrada em 04/09/2026 · **nao e' lacuna deste projeto**
+
+**O que falta:** o autor de 15.962 das 94.463 linhas do arquivo de emendas
+parlamentares do Portal da Transparencia. O campo vem preenchido com
+`Sem informação`.
+
+| | linhas | |
+|---|---|---|
+| autor individual identificado | 73.856 | 78% |
+| **autoria nao publicada** | **15.962** | **17%** |
+| relator geral, bancada, comissao | 4.645 | 5% |
+
+Sao **R$ 18,5 bilhoes pagos** que a fonte nao atribui a ninguem.
+
+**Impacto:** o bloco de emendas na ficha mostra apenas o que a fonte atribui.
+Sem dizer isso, ele sugeriria que a lista esta' completa — e um leitor concluiria
+que o parlamentar so' moveu o que aparece ali.
+
+**Como esta' tratado:** a tela diz, com numero, quanto o Portal nao atribui. As
+linhas continuam em `stg_transparencia__emendas`, marcadas com
+`autoria_nao_publicada`, para que a contagem possa ser refeita.
+
+**Como fechar:** nao esta' ao alcance deste projeto. A autoria existe no SIOP e
+nas atas da Comissao Mista de Orcamento; o Portal e' que nao a publica no arquivo
+em bloco. Fechar exigiria outra fonte, com outro casamento de identidade.
+
+**O que NAO fazer:** distribuir o valor sem autor entre os autores conhecidos,
+por rateio ou por qualquer criterio. Seria inventar autoria de dinheiro publico.

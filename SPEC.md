@@ -255,6 +255,31 @@ registrados depois da última publicação em lote do TSE (L-23).
 
 ---
 
+**F-27 — Emendas parlamentares** · P1 · **Implementada em 04/09/2026**
+
+> Fonte nova (S18). Ver [ADR-046](docs/adr/ADR-046-emendas-parlamentares.md).
+
+**Por que entra.** É o instrumento pelo qual um parlamentar destina recurso do
+orçamento federal — a informação de maior interesse público que faltava na ficha.
+
+**Alcance.** 788 fichas de 2026. Fonte: download em lote do Portal da
+Transparência (CGU), 94.463 linhas cobrindo emendas de 2014 a 2026.
+
+**Uma linha por ano, e nenhum total.** "Moveu R$ 300 milhões" sem dizer em
+quantos anos é um número grande e sem significado. Empenhado e pago aparecem
+separados: R$ 149,1 bi contra R$ 97,3 bi entre os autores identificados.
+
+**O que não entra em ficha nenhuma:** as 15.962 linhas (17%) que o Portal publica
+**sem autor** ([L-29](docs/LACUNAS.md)); emendas de bancada, comissão e relator
+geral, que são assinatura de colegiado; e os 7 autores cujo nome resolve para
+mais de uma pessoa — RICARDO IZAR, pai e filho, ambos deputados.
+
+**Conferido:** contra o próprio CSV somado fora do BigQuery (68.366 linhas e
+R$ 97,345 bi, exatos) e contra a cota anual de emendas individuais, que é
+pública — a mediana por parlamentar entre 2019 e 2022 fica colada no teto da LDO.
+
+---
+
 **F-26 — Comissões na Câmara** · P1 · **Implementada em 04/09/2026**
 
 > Fonte nova (S17). Ver [ADR-044](docs/adr/ADR-044-comissoes-da-camara.md).
@@ -589,6 +614,8 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-046 | Emendas: uma linha por ano, e nenhum total | O Portal ignora o ano no endereço e devolve sempre o mesmo arquivo — a primeira carga somou treze cópias; e um total de carreira seria um número grande sem significado, porque o ano é o que dá escala à cifra | Aceita |
+| ADR-045 | Resíduo de envio interrompido não mata a publicação | O servidor deixa um oculto `.in.<nome>.` quando a transferência morre, e o 550 seguinte derrubou uma publicação depois de 6.200 arquivos | Aceita |
 | ADR-044 | Comissões da Câmara | O endpoint sem data devolve um vínculo para quem presidiu a Casa; o catálogo padrão não tem a Mesa nem o Conselho de Ética; e o nome do tipo 15 chamaria a Bancada Negra de "Coordenadoria da Mulher" | Aceita |
 | ADR-043 | A situação no TSE ganha cor | Nove valores em texto puro numa lista de 1.126 nomes não são lidos; a cor diz o ponto do rito, nunca um juízo, e o rótulo continua escrito porque verde/vermelho é o par que some no daltonismo | Aceita |
 | ADR-042 | De que o patrimônio é feito | Um total e uma contagem não dizem se são vinte apartamentos ou uma fazenda; a descrição do bem fica fora do mart porque traz endereço residencial, e a série não calcula variação porque o valor é de aquisição e nominal | Aceita |
@@ -616,6 +643,13 @@ dossie-eleitoral/
 ---
 
 ## 11. Perguntas em aberto
+
+**Por que a mediana de emendas individuais por parlamentar salta de R$ 18,4 mi em
+2022 para R$ 32,1 mi em 2023?** Entre 2019 e 2022 ela fica colada no teto da LDO
+de cada ano, o que valida o casamento de autoria (ADR-046). De 2023 em diante os
+valores são bem maiores, e este projeto **não verificou** a cota desses anos. Até
+que verifique, a diferença é fato registrado e não explicação — a tela não afirma
+causa nenhuma.
 
 - ~~A taxa de desocupação do site não é a que o IBGE publica.~~
   **Respondida em 01/09/2026 (ADR-030):** trocada para a série anual oficial (SIDRA

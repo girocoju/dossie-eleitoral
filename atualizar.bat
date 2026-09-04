@@ -262,6 +262,11 @@ call :passo "Atividade legislativa da Camara" tolerante || goto :abortar
 rem Comissoes da Camara. Uma requisicao por deputado (1.991) mais o catalogo:
 rem cerca de vinte minutos. A composicao muda durante o ano - CPI nova, troca
 rem de titular por suplente - entao nao da' para tratar como carga historica.
+rem Emendas parlamentares. Arquivo unico de 32 MB, cumulativo - nao ha' um por
+rem ano, e pedir treze anos devolve treze copias do mesmo arquivo (ADR-046).
+set "CMD="%PY%" -m ingest.emendas load"
+call :passo "Emendas parlamentares" tolerante || goto :abortar
+
 set "CMD="%PY%" -m ingest.comissoes load"
 call :passo "Comissoes da Camara" tolerante || goto :abortar
 

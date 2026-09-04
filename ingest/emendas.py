@@ -11,14 +11,34 @@ exige chave cadastrada; o arquivo em bloco nao exige nada.
 Cuidado com o endereco: `download-de-dados/emendas` (sem o `-parlamentares`)
 existe, responde HTTP 500 e nao e' isto.
 
-── O ARQUIVO E' DE EXECUCAO, NAO DE APRESENTACAO ──
+── O ANO NA URL E' IGNORADO PELO PORTAL. E' UM ARQUIVO SO'. ──
 
-O arquivo de 2025 traz emendas cujo ANO e' 2014, 2019, 2023. O que ele lista e' o
-que foi EXECUTADO naquele exercicio — empenhado, liquidado, pago e restos a
-pagar. `Ano da Emenda` e' outra coluna, e as duas contam coisas diferentes.
+`/emendas-parlamentares/2014` e `/emendas-parlamentares/2026` devolvem o MESMO
+arquivo, byte a byte. Conferido em 04/09/2026, baixando os treze anos:
 
-A tela mostra empenhado E pago, separados, porque a diferenca e' o fato:
-R$ 345,7 bi empenhados contra R$ 195,3 bi pagos no arquivo de 2025.
+    13 downloads · 32.328.954 bytes cada · 1 sha256 distinto
+
+A primeira versao deste modulo baixava um por ano e carregava os treze. Como
+cada um tinha 94.463 linhas, o resultado era 1.228.019 — treze copias da mesma
+coisa. Nenhum erro apareceria: a carga terminaria verde, e toda soma por autor
+sairia multiplicada por treze.
+
+O que denunciou foi a contagem IDENTICA em todos os anos. Numero que se repete
+exato treze vezes nao e' coincidencia.
+
+O arquivo e' CUMULATIVO: 94.463 linhas, uma por (emenda, destino), cobrindo
+emendas de 2014 a 2026, com o valor JA' acumulado de empenho, liquidacao e
+pagamento. O ano de verdade e' a coluna `Ano da Emenda`:
+
+    2014  11.155 linhas   R$  0,13 bi pagos
+    2020   8.621 linhas   R$ 17,63 bi pagos
+    2025   6.311 linhas   R$ 32,48 bi pagos
+    2026   5.469 linhas   R$ 25,69 bi pagos
+
+Isso ELIMINA o risco de dupla contagem que existiria se fossem arquivos por
+exercicio: nao ha' o que somar entre arquivos, porque ha' um arquivo so'.
+
+A tela mostra empenhado E pago, separados, porque a diferenca e' o fato.
 
 ── 17% DAS LINHAS NAO TEM AUTOR, E ISSO E' A NOTICIA ──
 
@@ -77,8 +97,11 @@ log = get_logger("emendas")
 
 BASE = "https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares"
 
-# O Portal publica de 2014 em diante. Cada arquivo tem ~32 MB comprimidos.
-ANOS = tuple(range(2014, 2027))
+# O ano no endereco NAO filtra nada — ver o cabecalho. Qualquer um serve, e o
+# arquivo que volta e' o mesmo. Fica 2025 por ser um ano que existe; usar o ano
+# corrente faria o nome do arquivo em disco mudar todo 1o de janeiro sem que o
+# conteudo mudasse.
+ANO_NA_URL = 2025
 
 # Autor que nao e' pessoa. A comparacao e' feita no nome JA' normalizado.
 COLETIVOS = ("RELATOR", "COMISSAO", "BANCADA", "SEM INFORMA", "MESA DIRETORA")
@@ -108,7 +131,6 @@ COLUNAS = {
 
 @dataclass(frozen=True)
 class Emenda:
-    ano_execucao: int
     ano_emenda: int | None
     codigo: str
     numero: str
@@ -162,14 +184,15 @@ def inteiro(valor: object) -> int | None:
     return int(texto) if texto.isdigit() else None
 
 
-def baixar(ano: int, settings, *, force: bool = False, dry_run: bool = False) -> Path:
+def baixar(settings, *, force: bool = False, dry_run: bool = False) -> Path:
+    """O arquivo unico. Nome sem ano no disco, porque ele nao tem ano."""
     destino = settings.download_dir / "emendas"
-    art = download(f"{BASE}/{ano}", destino / f"emendas_{ano}.zip",
+    art = download(f"{BASE}/{ANO_NA_URL}", destino / "emendas.zip",
                    force=force, dry_run=dry_run)
     return Path(art.path)
 
 
-def ler(caminho: Path, ano_execucao: int) -> list[Emenda]:
+def ler(caminho: Path) -> list[Emenda]:
     z = zipfile.ZipFile(caminho)
     nome = next((n for n in z.namelist() if n.lower().endswith(".csv")), None)
     if nome is None:
@@ -183,7 +206,7 @@ def ler(caminho: Path, ano_execucao: int) -> list[Emenda]:
         # Falhar alto. Coluna que sumiu e vira campo vazio produz uma tela que
         # diz "R$ 0" para quem moveu milhoes.
         raise ValueError(
-            f"o arquivo de {ano_execucao} nao tem as colunas {faltando}. "
+            f"o arquivo de emendas nao tem as colunas {faltando}. "
             f"O Portal mudou o layout — confira antes de carregar.")
 
     saida: list[Emenda] = []
@@ -191,7 +214,6 @@ def ler(caminho: Path, ano_execucao: int) -> list[Emenda]:
         autor = (linha[COLUNAS["autor"]] or "").strip()
         norm = normalizar(autor)
         saida.append(Emenda(
-            ano_execucao=ano_execucao,
             ano_emenda=inteiro(linha[COLUNAS["ano"]]),
             codigo=(linha[COLUNAS["codigo"]] or "").strip(),
             numero=(linha[COLUNAS["numero"]] or "").strip(),
@@ -227,7 +249,6 @@ def _schema():
     schema = build_schema(textos)
     corte = len(textos)
     tipados = [
-        bigquery.SchemaField("ano_execucao", "INT64"),
         bigquery.SchemaField("ano_emenda", "INT64"),
         # BOOL de verdade: como STRING, "false" seria verdadeiro em SQL e autor
         # coletivo entraria na ficha de gente.
@@ -244,27 +265,18 @@ def cmd_load(args: argparse.Namespace) -> int:
     settings = get_settings()
     settings.ensure_dirs()
 
-    anos = [args.ano] if args.ano else list(ANOS)
-    todas: list[Emenda] = []
-    for ano in anos:
-        try:
-            caminho = baixar(ano, settings, force=args.force, dry_run=args.dry_run)
-        except Exception as exc:  # noqa: BLE001
-            # Ano que nao existe ainda (2027) ou fora do ar nao derruba os outros.
-            log.warning("emendas %s: %s", ano, str(exc)[:80])
-            continue
-        if args.dry_run:
-            continue
-        linhas = ler(caminho, ano)
-        log.info("%s: %d linhas", ano, len(linhas))
-        todas.extend(linhas)
-
+    caminho = baixar(settings, force=args.force, dry_run=args.dry_run)
     if args.dry_run:
-        log.info("[dry-run] %d anos", len(anos))
+        log.info("[dry-run] baixaria %s/%s", BASE, ANO_NA_URL)
         return 0
+
+    todas = ler(caminho)
     if not todas:
         log.error("nenhuma linha lida")
         return 75  # EX_TEMPFAIL
+
+    anos = {e.ano_emenda for e in todas if e.ano_emenda}
+    log.info("%d linhas · emendas de %s a %s", len(todas), min(anos), max(anos))
 
     pessoas = sum(1 for e in todas if e.autor_e_pessoa)
     sem_autor = sum(1 for e in todas if not e.autor_normalizado
@@ -304,9 +316,16 @@ def cmd_verify(args: argparse.Namespace) -> int:
     """
     settings = get_settings()
     settings.ensure_dirs()
-    ano = args.ano or 2025
-    linhas = ler(baixar(ano, settings), ano)
-    print(f"\n  {len(linhas):,} linhas no arquivo de {ano}\n")
+    linhas = ler(baixar(settings))
+    anos = sorted({x.ano_emenda for x in linhas if x.ano_emenda})
+    print(f"\n  {len(linhas):,} linhas · emendas de {anos[0]} a {anos[-1]}\n")
+
+    print("  ── por ano da emenda ──")
+    for a in anos:
+        do_ano = [x for x in linhas if x.ano_emenda == a]
+        pago = sum(x.vl_pago for x in do_ano)
+        print(f"    {a}  {len(do_ano):>7,} linhas   R$ {pago / 1e9:>6.2f} bi pagos")
+
 
     print("  ── por tipo de emenda ──")
     for tipo, n in Counter(x.tipo for x in linhas).most_common():
@@ -336,14 +355,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     load = sub.add_parser("load", help="baixa e carrega as emendas")
-    load.add_argument("--ano", type=int, help="so' este ano (padrao: todos)")
     load.add_argument("--force", action="store_true", help="rebaixa mesmo em cache")
     load.add_argument("--dry-run", action="store_true")
     load.add_argument("--target", choices=("bq", "local"), default="bq")
     load.set_defaults(func=cmd_load)
 
     ver = sub.add_parser("verify", help="mostra a composicao de um ano")
-    ver.add_argument("--ano", type=int, default=2025)
     ver.add_argument("--dry-run", action="store_true")
     ver.set_defaults(func=cmd_verify)
     return p

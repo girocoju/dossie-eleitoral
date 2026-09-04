@@ -29,6 +29,7 @@ from scripts.gerar_site import (
     CLASSES_COMISSAO,
     GRUPOS_BEM,
     PROPORCIONAIS,
+    TIPOS_EMENDA,
     TODOS_CARGOS,
     VICES,
     Candidato,
@@ -1226,6 +1227,77 @@ def _comissoes(c: Candidato) -> str:
     </section>"""
 
 
+def _emendas(c: Candidato) -> str:
+    """Emendas parlamentares por ano (F-27).
+
+    ── UMA LINHA POR ANO, E NENHUM TOTAL ──
+
+    "Moveu R$ 300 milhoes" sem dizer em quantos anos e' um numero grande e sem
+    significado. O ano e' o que da' escala a' cifra, e por isso a tabela nao tem
+    linha de soma. E' menos impressionante e e' o unico jeito de ser verdadeiro.
+
+    ── EMPENHADO E PAGO SAO COISAS DIFERENTES ──
+
+    Empenhar e' reservar; pagar e' sair da conta. No arquivo inteiro sao
+    R$ 149,1 bi empenhados contra R$ 97,3 bi pagos entre os autores
+    identificados. Mostrar so' um dos dois esconderia metade da historia — e
+    seria sempre o numero maior que a campanha preferiria.
+
+    ── O QUE A TELA PRECISA DIZER QUE NAO ESTA' AQUI ──
+
+    17% das linhas do arquivo — 15.962, R$ 18,5 bi pagos — o Portal publica SEM
+    autor. Nao e' buraco do pipeline: e' orcamento cuja autoria a fonte nao
+    revela (L-29). Um bloco que nao diga isso sugere que a lista esta' completa.
+    """
+    if not c.emendas:
+        return ""
+
+    por_ano: dict[int, list[dict]] = {}
+    for x in c.emendas:
+        por_ano.setdefault(x["ano"], []).append(x)
+
+    linhas = []
+    for ano in sorted(por_ano, reverse=True):
+        do_ano = por_ano[ano]
+        for i, x in enumerate(sorted(do_ano, key=lambda y: -y["pago"])):
+            rotulo = TIPOS_EMENDA.get(x["tipo"], x["tipo"])
+            linhas.append(
+                f"<tr>"
+                f"<td class='num'>{ano if i == 0 else ''}</td>"
+                f"<td>{e(rotulo)}</td>"
+                f"<td class='num'>{x['qt']}</td>"
+                f"<td class='num'>{brl(x['empenhado'])}</td>"
+                f"<td class='num'>{brl(x['pago'])}</td>"
+                f"<td>{e(x['funcao']) or '—'}</td></tr>")
+
+    anos = sorted(por_ano)
+    return f"""<section class="bloco">
+      <h2>Emendas parlamentares</h2>
+      <p style="margin:0 0 10px;font-size:13px;color:var(--ink-3)">
+        Emendas de {anos[0]} a {anos[-1]} cuja autoria o Portal da Transparência
+        atribui a esta pessoa.</p>
+      <div class="rolagem"><table>
+        <thead><tr><th>Ano</th><th>Tipo</th><th>Emendas</th>
+        <th>Empenhado</th><th>Pago</th><th>Principal destino</th></tr></thead>
+        <tbody>{''.join(linhas)}</tbody></table></div>
+      <p class="aviso" style="margin:10px 0 0">
+        <b>Não há total, e a soma dos anos não seria um.</b> "Moveu R$ 300
+        milhões" sem dizer em quantos anos é um número grande e sem significado —
+        o ano é o que dá escala à cifra.
+        <b>Empenhado não é pago:</b> empenhar é reservar no orçamento, pagar é
+        sair da conta, e a distância entre os dois é parte do fato.
+        <b>Emenda é indicação de destino, não obra entregue</b> — quem executa é
+        o órgão que recebe.</p>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        O Portal da Transparência publica <b>17% das linhas sem autor</b> —
+        15.962 registros, R$ 18,5 bilhões pagos, que a fonte não atribui a
+        ninguém. Emendas de bancada, de comissão e de relator geral também não
+        entram aqui: são assinatura de colegiado, não de uma pessoa. E autor cujo
+        nome coincide com o de outro parlamentar fica de fora, para não atribuir
+        recurso a quem não propôs.</p>
+    </section>"""
+
+
 def _ficha(c: Candidato, quando: str) -> str:
     partes = [f"""
 <a href="{BASE_URL}/{c.cargo_chave}/" style="font-size:13.5px">← {e(c.cargo_nome)}</a>
@@ -1401,6 +1473,7 @@ def _ficha(c: Candidato, quando: str) -> str:
     partes.append(_atividade(c))
     partes.append(_atividade_senado(c))
     partes.append(_comissoes(c))
+    partes.append(_emendas(c))
     partes.append(_financiamento(c))
     partes.append(_indicadores(c))
     partes.append("</div></div>")
@@ -1954,7 +2027,7 @@ def _linha_catalogo(ind: dict) -> str:
         f"<td><small>{e(str(ind['fonte'] or '—'))}</small></td></tr>")
 
 
-def _metodologia(quando: str, catalogo: list[dict]) -> str:
+def _metodologia(quando: str, catalogo: list[dict], total_fichas: int = 0) -> str:
     """Pagina de metodologia e LIMITES — o rodape de toda pagina aponta para ca'.
 
     Existe para dizer o que os numeros NAO dizem. Um site que so' mostra dado e
@@ -2153,6 +2226,133 @@ def _metodologia(quando: str, catalogo: list[dict]) -> str:
           proponente, e uma contagem sem esse filtro pareceria comparável à da
           Câmara sem ser.</li>
       </ul>
+    </section>
+
+    <section class="bloco">
+      <h2>O que a ficha mostra sobre patrimônio</h2>
+      <p>A ficha mostra <b>de que</b> o patrimônio declarado é feito — imóveis,
+        veículos, participação em empresas, aplicações — agrupado pela tabela
+        oficial de Bens e Direitos da Receita Federal, que o TSE reusa. Onde há
+        mais de uma declaração da mesma pessoa, elas aparecem <b>lado a lado</b>,
+        uma por eleição.</p>
+      <p class="aviso"><b>Esses números não medem enriquecimento, e a diferença
+        entre eles não é um ganho.</b> Três razões, e cada uma sozinha bastaria:
+        o TSE pede o valor de <b>aquisição</b>, não o de mercado — um imóvel
+        comprado em 2005 é declarado pelo preço de 2005 em toda eleição seguinte;
+        os valores são <b>nominais</b>, então R$ 500 mil em 2022 e R$ 550 mil em
+        2026 é queda depois da inflação; e tudo ali é <b>declaração do próprio
+        candidato</b>, não apuração de ninguém.</p>
+      <p><b>A descrição de cada bem não é publicada aqui</b>, e a omissão é
+        deliberada. Ela é texto livre, e em 6,8% das declarações de 2026 contém o
+        <b>endereço residencial</b> da pessoa — além de placa de veículo, chassi,
+        CPF e CNPJ. O campo não existe nem no banco de dados deste projeto: o que
+        não chega lá não chega à tela por descuido.</p>
+      <p><b>Ano sem declaração não aparece</b>, e a linha ausente não é
+        patrimônio zero. O arquivo do TSE de 2006 é um caso à parte: ele publica
+        itens com valor zerado, e 34,8% das declarações daquele ano somam
+        exatamente zero, contra 0,1% em todos os outros. Isso é um fato sobre o
+        arquivo, não sobre as pessoas, e por isso essas declarações ficam de
+        fora.</p>
+      <p><b>Conferido</b> contra o DivulgaCandContas, que é outro sistema do TSE:
+        7 de 7 declarações de 2026 e 5 de 5 de 2022 batem ao centavo, incluindo
+        uma com 180 itens.</p>
+    </section>
+
+    <section class="bloco">
+      <h2>Mandatos, comissões e exercício</h2>
+      <p>A <b>trajetória eleitoral</b> lista candidaturas — as perdidas
+        inclusive. O bloco de <b>mandatos exercidos</b> responde outra pergunta:
+        se a pessoa chegou a exercer, de quando a quando. O período mostrado é o
+        do <b>mandato do cargo</b>, não a data de posse ou de saída de cada
+        pessoa: o TSE não publica saída antecipada, e por isso ela não aparece.</p>
+      <p>As <b>comissões na Câmara</b> aparecem com uma linha por colegiado, não
+        por designação: a Câmara renova a composição a cada ano, e o mesmo
+        deputado é redesignado várias vezes para a mesma comissão. O <b>papel</b>
+        mostrado é o de maior peso que a pessoa teve ali, pela hierarquia formal
+        do colegiado — quem presidiu num ano e foi suplente em outro aparece como
+        Presidente.</p>
+      <p><b>Filiação a partido, bloco e liderança não entram</b> nessa lista. A
+        fonte também as chama de "órgão", e estar num partido não é ter assento
+        numa comissão. Comissão de medida provisória também fica de fora: são
+        1.393 no catálogo, e participar delas é rotina.</p>
+      <p class="aviso"><b>O Senado não tem esse bloco.</b> A fonte existe, mas o
+        Senado não publica CPF, e a ligação entre um senador e a pessoa que se
+        candidata é feita por nome e data de nascimento — forte, não certa.
+        Exibir comissão com base nela arriscaria atribuir um assento ao homônimo
+        errado. É a mesma razão pela qual a atividade legislativa de senador
+        carrega ressalva própria.</p>
+      <p><b>Conferido</b> pela rota inversa da API da Câmara — a lista pelo órgão,
+        e não pelo deputado: 8 de 8 colegiados com composição idêntica, entre eles
+        a CCJC (130 = 130) e a Comissão de Saúde (99 = 99).</p>
+    </section>
+
+    <section class="bloco">
+      <h2>Emendas parlamentares</h2>
+      <p>Vêm do download em lote do <b>Portal da Transparência</b> (CGU). São
+        94.463 registros cobrindo emendas de 2014 a 2026, com o valor já
+        acumulado de empenho, liquidação e pagamento.</p>
+      <p class="aviso"><b>Não há total, e a soma dos anos não seria um.</b>
+        "Moveu R$ 300 milhões" sem dizer em quantos anos é um número grande e sem
+        significado — o ano é o que dá escala à cifra. Por isso a tabela mostra
+        uma linha por ano e nenhuma linha de soma.</p>
+      <p><b>Empenhado não é pago.</b> Empenhar é reservar no orçamento; pagar é
+        sair da conta. Entre os autores identificados são R$ 149,1 bilhões
+        empenhados contra R$ 97,3 bilhões pagos, e mostrar só um dos dois
+        esconderia metade da história. <b>Emenda também não é obra entregue</b>:
+        ela indica destino, e quem executa é o órgão que recebe.</p>
+      <p><b>17% das linhas o Portal publica sem autor</b> — 15.962 registros,
+        R$ 18,5 bilhões pagos, que a fonte não atribui a ninguém. Não é lacuna
+        deste projeto: é orçamento cuja autoria a fonte não revela. Emendas de
+        <b>bancada, de comissão e de relator geral</b> também não aparecem em
+        ficha nenhuma, porque são assinatura de colegiado, não de uma pessoa.</p>
+      <p>A ligação entre o autor publicado e a pessoa é feita por <b>nome
+        parlamentar</b> — o Portal não publica CPF nem o identificador da Câmara.
+        Dos 1.544 autores individuais, 1.302 resolvem para uma pessoa só; os
+        <b>7 casos de homônimo</b> — como pai e filho ambos deputados — ficam
+        <b>fora de qualquer ficha</b>. Atribuir milhões de reais à pessoa errada é
+        o pior erro possível nesta tela.</p>
+      <p><b>Conferido</b> contra a cota anual de emendas individuais, que é
+        pública: a mediana por parlamentar entre 2019 e 2022 fica em R$ 15,0,
+        15,8, 16,2 e 18,4 milhões, colada no teto da LDO de cada ano. De 2023 em
+        diante os valores são bem maiores, e a explicação disso ainda <b>não foi
+        verificada</b> por este projeto — está registrada como pergunta em aberto,
+        não como conclusão.</p>
+    </section>
+
+    <section class="bloco">
+      <h2>Cores da situação no TSE</h2>
+      <p>A situação do registro aparece com cor, e a cor diz <b>em que ponto do
+        rito</b> o pedido está — nada sobre a pessoa.</p>
+      <dl class="campos">
+        <div><dt>Verde</dt><dd>deferido: a Justiça Eleitoral aprovou.</dd></div>
+        <div><dt>Âmbar</dt><dd>ainda não está decidido — aguardando julgamento,
+          ou decidido com recurso em aberto.</dd></div>
+        <div><dt>Vermelho</dt><dd>indeferido, cancelado ou não conhecido.</dd></div>
+        <div><dt>Cinza</dt><dd>renúncia — ato do próprio candidato.</dd></div>
+      </dl>
+      <p>Duas escolhas merecem explicação. <b>"Em prazo recursal" é âmbar, não
+        vermelho</b>: a decisão ainda pode mudar, e pintá-la de vermelho
+        afirmaria um desfecho que a fonte não declara. <b>Renúncia é cinza, não
+        vermelho</b>: renunciar é ato do próprio candidato, não decisão contra
+        ele.</p>
+      <p>O rótulo continua <b>escrito</b> ao lado em todos os casos, e cada
+        situação traz uma explicação ao passar o cursor ou pelo leitor de tela.
+        Verde e vermelho é justamente o par que some para quem tem daltonismo: a
+        cor reforça, quem informa é o texto.</p>
+    </section>
+
+    <section class="bloco">
+      <h2>Como procurar uma candidatura</h2>
+      <p>A busca na página inicial cobre as <b>{_milhar(total_fichas)}</b> fichas por
+        nome de urna, nome completo declarado ao TSE ou número na urna.</p>
+      <p>Buscar só pelo nome de urna perderia a maior parte de quem se procura
+        pelo sobrenome: "SILVA" aparece em 301 nomes de urna e em <b>3.322 nomes
+        completos</b>. Por isso os dois entram.</p>
+      <p>Quando a busca diz que <b>não encontrou</b>, é porque não há mesmo
+        ninguém com aquele nome — a página sabe quais trechos existem no índice
+        antes de perguntar. Se o índice não carregar, ela diz que <b>não
+        conseguiu carregar</b>, e não que não achou. As duas frases parecem a
+        mesma coisa para quem lê rápido, e são opostas.</p>
     </section>
 
     <section class="bloco">
@@ -2417,6 +2617,7 @@ def escrever_site(destino: Path, fichas: list[Candidato],
               json.dumps(doadores, ensure_ascii=False, separators=(",", ":")))
         grava("doadores/index.html", _pagina_doadores(doadores, quando))
 
-    grava("metodologia/index.html", _metodologia(quando, catalogo))
+    grava("metodologia/index.html",
+          _metodologia(quando, catalogo, total_fichas=len(fichas)))
     for caminho, xml in sitemaps(fichas).items():
         grava(caminho, xml)

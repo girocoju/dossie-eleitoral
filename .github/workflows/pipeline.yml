@@ -291,6 +291,12 @@ jobs:
         if: steps.cred.outputs.temos == 'true'
         run: carga.sh "Atividade legislativa (F-16)" ingest.proposicoes load
 
+      # Arquivo unico de 32 MB, cumulativo. Nao ha' um por ano: o Portal ignora
+      # o ano no endereco e devolve sempre o mesmo (ADR-046).
+      - name: Emendas parlamentares (F-27)
+        if: steps.cred.outputs.temos == 'true'
+        run: carga.sh "Emendas (F-27)" ingest.emendas load
+
       # Uma requisicao por deputado (1.991) mais o catalogo de orgaos: ~20 min.
       # A composicao das comissoes muda durante o ano — CPI nova, troca de
       # titular por suplente — entao nao e' carga historica.

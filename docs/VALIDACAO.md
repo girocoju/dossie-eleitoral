@@ -255,3 +255,51 @@ com link `next`. A mesma armadilha, do outro lado. Paginando: 130 = 130.
 | Linhas com `classe_orgao = 'partidaria'` no mart | **0** de 48.467 |
 | Órgãos que ficaram sem tipo | **0** (67 fora do catálogo, todos resolvidos) |
 | Fichas de 2026 que recebem o bloco | 880 |
+
+---
+
+# Emendas parlamentares (F-27) — 04/09/2026
+
+## O CSV somado fora do BigQuery, contra o mart
+
+Somar o arquivo em Python e confrontar com o mart pega **erro de modelagem**, que
+é onde o risco está — não erro de leitura, que qualquer teste pegaria.
+
+| | CSV em Python | mart no BigQuery | |
+|---|---|---|---|
+| linhas de origem | 68.366 | 68.366 | OK |
+| valor pago | R$ 97,345 bi | R$ 97,345 bi | OK |
+| valor empenhado | R$ 149,082 bi | R$ 149,082 bi | OK |
+
+Autores coletivos que vazaram para o mart: **0**.
+
+## Contra a cota de emendas individuais, que é pública
+
+É o teste que vale: cada parlamentar tem um teto anual fixado na LDO. Se o
+casamento de autoria estivesse errado, a mediana por parlamentar sairia absurda.
+
+| ano | parlamentares | mediana empenhada | teto da LDO |
+|---|---|---|---|
+| 2019 | 532 | R$ 15,0 mi | ~R$ 15 mi |
+| 2020 | 555 | R$ 15,8 mi | R$ 16,2 mi |
+| 2021 | 557 | R$ 16,2 mi | R$ 17,5 mi |
+| 2022 | 559 | R$ 18,4 mi | R$ 18,3 mi |
+| 2023 | 563 | R$ 32,1 mi | **não verificado** |
+| 2024 | 553 | R$ 37,9 mi | **não verificado** |
+| 2025 | 553 | R$ 42,4 mi | **não verificado** |
+
+Quatro anos colados no teto publicado — o casamento de autoria está certo.
+
+**De 2023 em diante os valores são bem maiores, e este projeto não verificou a
+cota desses anos.** Está registrado como pergunta em aberto no SPEC §11. Não há
+explicação na tela, porque não há explicação conferida.
+
+## O erro que a conferência pegou antes de publicar
+
+O endereço do arquivo é `/emendas-parlamentares/{ano}`, e **o Portal ignora o
+ano**: os treze anos devolvem o mesmo sha256. A primeira carga somou 1.228.019
+linhas — treze cópias das 94.463.
+
+Nada teria falhado. A carga terminaria verde e toda soma por autor sairia
+multiplicada por treze. O que denunciou foi a contagem **idêntica** em todos os
+anos no log.

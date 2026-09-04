@@ -113,3 +113,120 @@ def test_sem_reconectar_o_erro_sobe_como_antes(tmp_path):
     """Quem chama sem `reconectar` (o dry-run, os testes antigos) nao muda."""
     with pytest.raises(ConnectionResetError):
         publicar.enviar(FTPFalso(quebrar_em=[1]), _site(tmp_path), "", seco=False)
+
+
+# ── residuo de envio interrompido (ADR-045) ────────────────────────────────
+
+class TestResiduoOculto:
+    """O servidor grava o upload num oculto `.in.<nome>.` e so' renomeia no fim.
+
+    Transferencia que morre no meio deixa o oculto, e o `STOR` seguinte no mesmo
+    caminho responde 550. Como 550 e' `error_perm`, a publicacao inteira morria —
+    foi o que aconteceu em 04/09/2026, depois de 6.200 arquivos.
+    """
+
+    ERRO = ("550 candidato/x-1/index.html: Temporary hidden file "
+            "/candidato/x-1/.in.index.html. already exists")
+    DESTINO = "candidato/x-1/index.html"
+
+    def test_reconhece_o_residuo_do_proprio_envio(self):
+        from scripts.publicar import _residuo_de
+        assert _residuo_de(ftplib.error_perm(self.ERRO), self.DESTINO) == \
+            "/candidato/x-1/.in.index.html"
+
+    def test_outro_550_continua_sendo_erro_de_verdade(self):
+        """Caminho errado e permissao negada tambem sao 550, e precisam subir."""
+        from scripts.publicar import _residuo_de
+        for msg in ("550 Permission denied",
+                    "550 /caminho/errado: No such file or directory",
+                    "550 Not a regular file"):
+            assert _residuo_de(ftplib.error_perm(msg), self.DESTINO) is None, msg
+
+    def test_nao_obedece_caminho_que_o_servidor_mandar(self):
+        """O caminho vem da mensagem, mas so' vale se for `.in.<basename>.` na
+        mesma pasta. Um servidor hostil nao consegue nos fazer apagar outra
+        coisa."""
+        from scripts.publicar import _residuo_de
+        for falso in ("/etc/passwd",
+                      "/candidato/x-1/.in.outro.html.",
+                      "/outra/pasta/.in.index.html."):
+            msg = f"550 x: Temporary hidden file {falso} already exists"
+            assert _residuo_de(ftplib.error_perm(msg), self.DESTINO) is None, falso
+
+    def test_remove_o_residuo_e_reenvia(self, tmp_path):
+        """O arquivo tem de chegar, nao so' o erro sumir."""
+        from scripts.publicar import enviar
+
+        class ComResiduo(FTPFalso):
+            def __init__(self):
+                super().__init__()
+                self.apagados = []
+                self.primeira = True
+
+            def storbinary(self, cmd, f, blocksize=8192):
+                alvo = cmd.removeprefix("STOR ")
+                if self.primeira and alvo.endswith("index.html"):
+                    self.primeira = False
+                    raise ftplib.error_perm(
+                        f"550 {alvo}: Temporary hidden file "
+                        f"/{alvo.rsplit('/', 1)[0]}/.in.index.html. already exists")
+                return super().storbinary(cmd, f, blocksize)
+
+            def delete(self, caminho):
+                self.apagados.append(caminho)
+
+        ftp = ComResiduo()
+        enviar(ftp, _site(tmp_path), "", seco=False)
+        assert ftp.apagados, "o oculto tinha de ser removido"
+        assert any(x.endswith("index.html") for x in ftp.enviados), \
+            "o arquivo tinha de chegar depois da limpeza"
+
+
+def test_reconectar_falhando_nao_derruba_a_publicacao(monkeypatch):
+    """Excecao levantada DENTRO de um `except` escapa do laco de retentativa.
+
+    Em 04/09/2026 a publicacao morreu assim: `conectar()` deu TimeoutError
+    (WinError 10060) enquanto tratava a queda anterior, e o erro passou por fora
+    do `for tentativa`. Depois de centenas de reconexoes o servidor recusa por um
+    tempo, e insistir com espera crescente atravessa isso.
+    """
+    from scripts import publicar
+
+    monkeypatch.setattr(publicar.time, "sleep", lambda _: None)
+    tentativas = {"n": 0}
+
+    def conectar_instavel(cfg):
+        tentativas["n"] += 1
+        if tentativas["n"] < 3:
+            raise TimeoutError("[WinError 10060] nao respondeu")
+        return FTPFalso()
+
+    monkeypatch.setattr(publicar, "conectar", conectar_instavel)
+
+    class ArgsFalsos:
+        origem = None
+
+    viva = {"sessao": FTPFalso()}
+
+    # Reproduz o `reconectar` de `main` com o mesmo contrato.
+    def reconectar():
+        for tentativa in range(1, publicar.TENTATIVAS_DE_RECONEXAO + 1):
+            try:
+                viva["sessao"] = publicar.conectar({})
+                return viva["sessao"]
+            except publicar.TRANSITORIAS:
+                if tentativa == publicar.TENTATIVAS_DE_RECONEXAO:
+                    raise
+                publicar.time.sleep(1)
+        raise AssertionError
+
+    assert reconectar() is not None
+    assert tentativas["n"] == 3, "tinha de insistir ate' conseguir"
+
+
+def test_a_paciencia_da_reconexao_e_de_alguns_minutos():
+    from scripts import publicar
+    assert publicar.TENTATIVAS_DE_RECONEXAO >= 4
+    espera = sum(publicar.ESPERA_BASE * 2 ** t
+                 for t in range(1, publicar.TENTATIVAS_DE_RECONEXAO))
+    assert espera >= 60, f"so' {espera}s de paciencia e' pouco para 20 mil arquivos"
