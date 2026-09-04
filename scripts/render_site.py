@@ -237,6 +237,88 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
 """
 
 
+# A SITUACAO NO TSE, EM QUATRO ESTADOS — E NENHUM DELES E' UM JUIZO.
+#
+# Sao nove valores em 2026, medidos em 03/09/2026 sobre as 20.838 candidaturas
+# exibidas. A cor diz apenas em que ponto do RITO o registro esta', que e' fato
+# publicado pelo TSE, e nunca se a pessoa "presta" — a Constituicao 0.1 proibe
+# ranquear candidato, e cor e' a forma mais rapida de ranquear sem escrever.
+#
+#   verde     DEFERIDO                                    15.598
+#   ambar     AGUARDANDO JULGAMENTO                        4.500
+#             DEFERIDO EM PRAZO RECURSAL OU COM RECURSO       23
+#             INDEFERIDO EM PRAZO RECURSAL OU COM RECURSO    147
+#             PENDENTE DE JULGAMENTO                           3
+#   vermelho  INDEFERIDO                                      93
+#             PEDIDO NAO CONHECIDO                              4
+#             CANCELADO                                         1
+#   cinza     RENUNCIA                                       469
+#
+# ── POR QUE "EM PRAZO RECURSAL" E' AMBAR, E NAO VERDE OU VERMELHO ──
+#
+# Porque a decisao ainda pode mudar. Pintar "INDEFERIDO EM PRAZO RECURSAL" de
+# vermelho afirmaria um desfecho que a fonte nao declara — e seria uma afirmacao
+# publicada sobre uma pessoa real, exatamente o erro que este projeto persegue.
+# O ambar diz "ainda nao esta' decidido", que e' o que o campo diz.
+#
+# ── POR QUE RENUNCIA E' CINZA ──
+#
+# Renunciar e' ato do proprio candidato, nao decisao contra ele. Vermelho ali
+# leria como recusa da Justica Eleitoral, que nao foi o que aconteceu.
+_SITUACAO = {
+    "DEFERIDO": (
+        "m-ok",
+        "Registro deferido: a Justiça Eleitoral aprovou a candidatura."),
+    "AGUARDANDO JULGAMENTO": (
+        "m-ausente",
+        "A Justiça Eleitoral ainda não julgou o pedido de registro."),
+    "PENDENTE DE JULGAMENTO": (
+        "m-ausente",
+        "A Justiça Eleitoral ainda não julgou o pedido de registro."),
+    "DEFERIDO EM PRAZO RECURSAL OU COM RECURSO": (
+        "m-ausente",
+        "Deferido, mas a decisão ainda cabe recurso ou já tem um em andamento: "
+        "não é desfecho final."),
+    "INDEFERIDO EM PRAZO RECURSAL OU COM RECURSO": (
+        "m-ausente",
+        "Indeferido, mas a decisão ainda cabe recurso ou já tem um em andamento: "
+        "não é desfecho final."),
+    "INDEFERIDO": (
+        "m-nao",
+        "Registro indeferido pela Justiça Eleitoral. O prazo de recurso já "
+        "passou ou não houve recurso."),
+    "PEDIDO NÃO CONHECIDO": (
+        "m-nao",
+        "O pedido de registro não foi conhecido — não chegou a ser julgado no "
+        "mérito."),
+    "CANCELADO": (
+        "m-nao",
+        "Registro cancelado. O TSE não publica o motivo neste campo — pode ser "
+        "pedido do partido, decisão judicial ou ato administrativo."),
+    "RENÚNCIA": (
+        "m-na",
+        "O próprio candidato renunciou à candidatura. Não é decisão da Justiça "
+        "Eleitoral."),
+}
+
+
+def _marca_situacao(situacao: str | None) -> str:
+    """A situacao como marca colorida, com o texto sempre visivel ao lado.
+
+    Situacao desconhecida cai em `m-na` e mantem o rotulo original: inventar uma
+    cor para um valor que o TSE passou a publicar e que este mapa ainda nao
+    conhece seria pior que nao colorir.
+    """
+    if not situacao:
+        return "—"
+    chave = situacao.strip().upper()
+    classe, explicacao = _SITUACAO.get(
+        chave, ("m-na", "Situação publicada pelo TSE."))
+    return (f'<span class="marca-dado situacao {classe}" tabindex="0" '
+            f'title="{e(explicacao)}" aria-label="{e(situacao)}. {e(explicacao)}">'
+            f'{e(situacao)}</span>')
+
+
 def _retrato(c: Candidato) -> str:
     if c.url_foto:
         return (f'<img src="{e(c.url_foto)}" alt="Foto de urna de {e(c.nome_urna)}" '
@@ -261,7 +343,7 @@ def _urna(c: Candidato) -> str:
       <div><dt>Concorre a</dt><dd>{e(c.cargo_nome)}</dd></div>
       <div><dt>{'Circunscrição' if c.cod_cargo == 1 else 'Estado'}</dt>
         <dd>{e(_UF_NOME.get(c.sg_uf, c.sg_uf))}</dd></div>
-      <div><dt>Situação no TSE</dt><dd>{e(c.situacao) or '—'}</dd></div>
+      <div><dt>Situação no TSE</dt><dd>{_marca_situacao(c.situacao)}</dd></div>
     </dl>"""
 
 
@@ -1354,7 +1436,8 @@ def _cartao(c: Candidato) -> str:
             f'<b>{e(c.nome_urna)}</b>'
             f'<small>{e(_UF_NOME.get(c.sg_uf, c.sg_uf))} · {e(c.sigla_partido) or "—"}'
             f' · nº {c.nr_candidato or "—"}</small>'
-            f'<small>{e(c.situacao) or ""}</small></span></a>')
+            f'<small>{_marca_situacao(c.situacao) if c.situacao else ""}</small>'
+            f'</span></a>')
 
 
 def _listagem_majoritaria(chave: str, nome: str, cands: list[Candidato], quando: str) -> str:
@@ -1406,6 +1489,7 @@ def _listagem_proporcional(chave: str, nome: str, por_uf: dict[str, list[dict]],
     estados para consultar um.
     """
     total = sum(len(v) for v in por_uf.values())
+    situacao_js = json.dumps(_SITUACAO, ensure_ascii=False, separators=(",", ":"))
     ufs = sorted(por_uf)
     opcoes = "".join(
         f'<option value="{u}">{u} ({len(por_uf[u])})</option>' for u in ufs
@@ -1438,8 +1522,17 @@ mandato — atividade legislativa.</p>
 <script>
 const BASE = "{BASE_URL}/dados/{chave}";
 const RAIZ = "{BASE_URL}";
+// O MESMO mapa do Python, serializado — nao uma segunda copia escrita a
+// mao. Duas listas de situacao divergiriam no dia em que o TSE criasse um
+// valor novo, e a listagem passaria a pintar diferente da ficha.
+const SITUACAO = {situacao_js};
 let dados = [];
 const $ = (id) => document.getElementById(id);
+function marcaSituacao(v) {{
+  if (!v) return "";
+  const [classe, ajuda] = SITUACAO[v] || ["m-na", "Situação publicada pelo TSE."];
+  return `<span class="marca-dado situacao ${{classe}}" title="${{ajuda}}">${{v}}</span>`;
+}}
 function desenhar() {{
   const pt = $("partido").value, q = $("busca").value.trim().toLowerCase();
   const vis = dados.filter(d => (!pt || d.partido === pt) &&
@@ -1453,7 +1546,7 @@ function desenhar() {{
     <td><a href="${{RAIZ}}/candidato/${{d.s}}-${{d.sq}}/">${{d.nome ?? ""}}</a></td>
     <td class="urna-lista">${{d.nr ?? "—"}}</td>
     <td>${{d.partido ?? ""}}</td><td>${{d.fed ?? ""}}</td>
-    <td>${{d.coligacao ?? ""}}</td><td>${{d.situacao ?? ""}}</td>
+    <td>${{d.coligacao ?? ""}}</td><td>${{marcaSituacao(d.situacao)}}</td>
     <td class="num">${{d.idade ?? "—"}}</td><td>${{d.ocupacao ?? ""}}</td>
     <td class="num">${{d.pl ?? "—"}}</td><td class="num">${{d.norma ?? "—"}}</td></tr>`).join("");
 }}

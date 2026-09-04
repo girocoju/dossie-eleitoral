@@ -1,10 +1,12 @@
 :root{--ground:#F6F8FB;--surface:#FFF;--surface-2:#F1F5FA;--ink:#0B1F3B;--ink-2:#43505F;
 --ink-3:#5A6577;--rule:#CDD9EA;--rule-2:#DCE7F5;--accent:#0E7D8B;--accent-soft:#CFEEF3;
 --ausente:#B45309;--ausente-soft:#FBEBD6;--na:#5A6577;--na-soft:#E4EAF3;
+--ok:#1F7A4D;--ok-soft:#D8F0E2;--nao:#A32B2B;--nao-soft:#F8DEDE;
 --font:Calibri,Carlito,"Segoe UI",Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ground:#07172C;--surface:#0B1F3B;
 --surface-2:#12294A;--ink:#EAF1FA;--ink-2:#AEBFD6;--ink-3:#9FB2CD;--rule:#1E3A5F;--rule-2:#16304F;
---accent:#19C3D6;--accent-soft:#0D3742;--ausente:#E0A45C;--ausente-soft:#3A2A14;--na:#9FB2CD;--na-soft:#152C4A}}
+--accent:#19C3D6;--accent-soft:#0D3742;--ausente:#E0A45C;--ausente-soft:#3A2A14;--na:#9FB2CD;--na-soft:#152C4A;
+--ok:#5FD39B;--ok-soft:#0E3324;--nao:#F09393;--nao-soft:#3A1717}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.55}
 a{color:var(--accent)}
@@ -46,6 +48,13 @@ color:var(--ink-3);border-bottom:1px solid var(--rule);padding-bottom:6px;margin
 .marca-dado{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:2px}
 .m-ausente{background:var(--ausente-soft);color:var(--ausente)}
 .m-na{background:var(--na-soft);color:var(--na)}
+.m-ok{background:var(--ok-soft);color:var(--ok)}
+.m-nao{background:var(--nao-soft);color:var(--nao)}
+/* A COR NUNCA CARREGA A INFORMACAO SOZINHA. O rotulo esta' sempre escrito
+   ao lado, e o `title` explica o que a situacao significa: cerca de 8% dos
+   homens tem alguma forma de daltonismo, e verde e vermelho e' justamente
+   o par que some. A cor reforca; quem informa e' o texto. */
+.situacao{white-space:normal;line-height:1.35}
 .rolagem{overflow-x:auto;max-height:340px;overflow-y:auto;border:1px solid var(--rule-2);border-radius:2px}
 table{border-collapse:collapse;width:100%;font-size:14px}
 thead th{position:sticky;top:0;background:var(--surface-2);font-family:var(--mono);font-size:10px;

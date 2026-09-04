@@ -255,6 +255,26 @@ registrados depois da última publicação em lote do TSE (L-23).
 
 ---
 
+**F-25 — A situação no TSE ganha cor** · P2 · **Implementada em 03/09/2026**
+
+> Ver [ADR-043](docs/adr/ADR-043-situacao-com-cor.md).
+
+**Por que entra.** São nove valores em 2026, e "DEFERIDO" ao lado de "INDEFERIDO
+EM PRAZO RECURSAL OU COM RECURSO" em texto puro obriga quem lê a decifrar. Numa
+listagem de 1.126 nomes, decifrar não acontece.
+
+**O limite.** Cor é a forma mais rápida de ranquear sem escrever nada. A cor diz
+em que ponto do **rito** o registro está — fato publicado pelo TSE — e nada
+sobre a pessoa (Constituição §0.1). "Em prazo recursal" é âmbar, não verde nem
+vermelho, porque a decisão ainda pode mudar; renúncia é cinza, porque é ato do
+próprio candidato e não decisão contra ele.
+
+**Acessibilidade.** O rótulo continua escrito ao lado em todos os casos, e cada
+situação traz `title` e `aria-label` explicando o que significa: verde e vermelho
+é justamente o par que some para quem tem daltonismo.
+
+---
+
 **F-24 — De que o patrimônio é feito, e o que a pessoa exerceu** · P1 · **Implementada em 03/09/2026**
 
 > Ver [ADR-042](docs/adr/ADR-042-o-que-o-patrimonio-e.md).
@@ -545,6 +565,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-043 | A situação no TSE ganha cor | Nove valores em texto puro numa lista de 1.126 nomes não são lidos; a cor diz o ponto do rito, nunca um juízo, e o rótulo continua escrito porque verde/vermelho é o par que some no daltonismo | Aceita |
 | ADR-042 | De que o patrimônio é feito | Um total e uma contagem não dizem se são vinte apartamentos ou uma fazenda; a descrição do bem fica fora do mart porque traz endereço residencial, e a série não calcula variação porque o valor é de aquisição e nominal | Aceita |
 | ADR-041 | Buscador na home, um arquivo por prefixo | 20 mil fichas sem busca só são alcançáveis por quem já sabe o cargo e a UF; índice único teria 10 MB, e um 404 não pode virar "nada encontrado" | Aceita |
 | ADR-040 | Ficha própria para toda candidatura | 19 mil páginas com poucos campos distintos são o padrão de conteúdo raso, mas o critério que decide é utilidade pública: quem enfrenta 1.126 nomes precisa de mais ajuda, e ficha sem URL não é compartilhável | Aceita |
