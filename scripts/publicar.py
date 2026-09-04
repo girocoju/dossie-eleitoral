@@ -358,6 +358,28 @@ VERSAO_MANIFESTO = 2
 TAMANHO_HASH = 16
 
 
+# O QUE AS PAGINAS DEPENDEM SOBE ANTES DELAS.
+#
+# `listar_arquivos` devolve em ordem alfabetica, e nessa ordem `dossie.css` vem
+# depois de `candidato/` — as 20 mil fichas. Na publicacao da F-18 isso deixou o
+# site no ar com fichas novas apontando para uma folha de estilo que ainda nao
+# existia: 404 no CSS e paginas sem estilo nenhum, por horas, num site publico
+# prestes a ser divulgado.
+#
+# Nao e' caso raro nem unico da F-18: acontece em TODA primeira publicacao de um
+# arquivo que as paginas referenciam, e o sintoma nao e' erro — e' o site feio.
+#
+# A regra vale nos dois sentidos: quem depende sobe depois. Por isso a limpeza de
+# orfas nao pode remover o CSS antigo antes de o novo chegar — e nao remove,
+# porque `remover_orfas` roda depois do envio inteiro.
+SOBEM_PRIMEIRO = ("dossie.css",)
+
+
+def ordem_de_envio(relativos: list[str]) -> list[str]:
+    primeiro = [r for r in SOBEM_PRIMEIRO if r in relativos]
+    return primeiro + [r for r in relativos if r not in set(primeiro)]
+
+
 def hash_de(caminho: Path) -> str:
     h = hashlib.sha256()
     with caminho.open("rb") as f:
@@ -666,6 +688,7 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
     if not relativos:
         raise SystemExit(f"{origem} esta' vazio — nada a publicar. "
                          "Rode `python -m scripts.gerar_site` antes.")
+    relativos = ordem_de_envio(relativos)
     arquivos = [origem / rel for rel in relativos]
     if ja_no_servidor is not None and hashes is None:
         hashes = hashes_locais(origem, relativos)

@@ -46,6 +46,22 @@ site já subiu inteiro; perder o manifesto custa um envio completo na próxima v
 
 Nenhum desses é um erro: reenviar é sempre seguro.
 
+## O que as páginas dependem sobe antes delas
+
+`listar_arquivos` devolve em ordem alfabética, e nessa ordem `dossie.css` vem
+depois de `candidato/` — as 20 mil fichas. Na publicação da F-18 isso deixou o
+site no ar com fichas novas apontando para uma folha de estilo que ainda não
+existia: **404 no CSS e páginas sem estilo nenhum**, por horas, num site público
+prestes a ser divulgado à imprensa.
+
+Não é caso raro nem exclusivo da F-18: acontece em toda primeira publicação de um
+arquivo que as páginas referenciam. E o sintoma não é erro — é o site feio, que
+nenhum código percebe.
+
+`SOBEM_PRIMEIRO` resolve na origem. A regra vale no outro sentido também: a
+limpeza de órfãs não pode remover o arquivo antigo antes de o novo chegar — e não
+remove, porque `remover_orfas` roda depois do envio inteiro.
+
 ## Consequências
 
 - A publicação diária passa de 1.013 arquivos para a ordem de algumas centenas.

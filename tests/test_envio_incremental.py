@@ -27,6 +27,7 @@ from scripts.publicar import (
     enviar_manifesto,
     hashes_locais,
     listar_arquivos,
+    ordem_de_envio,
 )
 
 
@@ -162,3 +163,23 @@ def test_orcamento_de_reconexao_acompanha_o_tamanho_do_site():
 def test_pasta_vazia_continua_falhando(tmp_path, seco):
     with pytest.raises(SystemExit):
         enviar(FTPFalso(), tmp_path, "", seco=seco)
+
+
+# ── ordem de envio ─────────────────────────────────────────────────────────
+
+def test_o_css_sobe_antes_das_paginas_que_dependem_dele(tmp_path):
+    """Em ordem alfabetica `dossie.css` vem DEPOIS de `candidato/`. Na
+    publicacao da F-18 isso deixou 20 mil fichas novas no ar apontando para uma
+    folha que ainda nao existia: 404 no CSS, site sem estilo, por horas."""
+    origem = _site(tmp_path, {**PAGINAS, "dossie.css": "body{}"})
+    ftp = FTPFalso()
+    enviar(ftp, origem, "", seco=False)
+    assert ftp.enviados[0] == "dossie.css"
+    assert set(ftp.enviados) == set(PAGINAS) | {"dossie.css"}
+
+
+def test_a_ordem_nao_perde_nem_duplica_arquivo():
+    assert ordem_de_envio(["b.html", "dossie.css", "a.html"]) == [
+        "dossie.css", "b.html", "a.html"]
+    assert ordem_de_envio(["b.html", "a.html"]) == ["b.html", "a.html"]
+    assert ordem_de_envio([]) == []
