@@ -614,6 +614,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-047 | Um publicador por vez | O workflow publicava a cada push e o `atualizar.bat` publica da máquina: nove pushes numa noite produziram nove publicações canceladas no meio do envio, e foi isso que encheu o servidor de arquivos ocultos | Aceita |
 | ADR-046 | Emendas: uma linha por ano, e nenhum total | O Portal ignora o ano no endereço e devolve sempre o mesmo arquivo — a primeira carga somou treze cópias; e um total de carreira seria um número grande sem significado, porque o ano é o que dá escala à cifra | Aceita |
 | ADR-045 | Resíduo de envio interrompido não mata a publicação | O servidor deixa um oculto `.in.<nome>.` quando a transferência morre, e o 550 seguinte derrubou uma publicação depois de 6.200 arquivos | Aceita |
 | ADR-044 | Comissões da Câmara | O endpoint sem data devolve um vínculo para quem presidiu a Casa; o catálogo padrão não tem a Mesa nem o Conselho de Ética; e o nome do tipo 15 chamaria a Bancada Negra de "Coordenadoria da Mulher" | Aceita |

@@ -7,13 +7,33 @@ name: pipeline
 # Windows. Ter os dois agendados duplicaria a carga e faria dois FTP simultaneos
 # no mesmo destino.
 #
-# Este workflow continua existindo, e continua sendo a rede de seguranca: roda a
-# cada push na `main` e por disparo manual (Actions -> pipeline -> Run workflow),
-# inclusive com `somente_publicar` para republicar o site sem reingerir nada.
+# PUSH NAO CARREGA NEM PUBLICA (ADR-047).
+#
+# Ate' 04/09/2026 todo push na `main` disparava o pipeline inteiro, publicacao
+# incluida. Numa noite de nove commits isso produziu nove publicacoes de 20 mil
+# arquivos, cada uma CANCELADA PELA SEGUINTE NO MEIO DO ENVIO — e uma delas
+# rodou 2h22 em paralelo com uma publicacao local, as duas escrevendo os mesmos
+# caminhos na mesma conta FTP.
+#
+# Foi isso que encheu o servidor de arquivos ocultos `.in.<nome>.` e produziu as
+# quedas que o ADR-045 tratou como se fossem instabilidade de rede.
+#
+# O aviso ja' estava escrito aqui, tres linhas abaixo, e so' considerava o
+# AGENDAMENTO: "ter os dois agendados duplicaria a carga e faria dois FTP
+# simultaneos no mesmo destino". Push faz exatamente a mesma coisa, e ninguem
+# tinha ligado uma coisa a' outra.
+#
+# Hoje: push roda `verificar` e para ali. Carga e publicacao so' por disparo
+# manual (Actions -> pipeline -> Run workflow), que continua sendo a rede de
+# seguranca de um clique — inclusive com `somente_publicar` para republicar o
+# site sem reingerir nada.
+#
+# A publicacao tambem trava o servidor enquanto roda (ADR-047), entao a colisao
+# nao volta nem por acidente nem por disparo manual em hora ruim.
 #
 # Dois jobs de proposito:
 #   `verificar` roda SEMPRE e nao precisa de nenhum segredo — e' o portao de merge.
-#   `pipeline`  roda so' quando ha' credenciais GCP (push na main, agendado ou manual).
+#   `pipeline`  roda so' por disparo MANUAL, e so' com credenciais GCP.
 # Assim um PR vindo de fork continua sendo verificado sem expor segredo nenhum.
 
 on:
@@ -75,12 +95,12 @@ jobs:
     name: ingestao + dbt build
     runs-on: ubuntu-latest
     needs: verificar
-    # Sem service account configurada o job e' pulado em vez de falhar vermelho.
+    # SO' POR DISPARO MANUAL. Push na `main` para em `verificar` — ver o
+    # cabecalho deste arquivo: push que carrega e publica produziu nove
+    # publicacoes concorrentes numa noite (ADR-047).
     if: >
-      github.event_name != 'pull_request' &&
-      !inputs.somente_publicar &&
-      (github.event_name == 'workflow_dispatch' ||
-       github.ref == 'refs/heads/main')
+      github.event_name == 'workflow_dispatch' &&
+      !inputs.somente_publicar
     # UMA execucao por vez, e o run NOVO cancela o antigo.
     #
     # Sem isso, dois runs simultaneos gravam nas MESMAS tabelas do BigQuery e o
@@ -382,7 +402,7 @@ jobs:
     # decisao para elas.
     if: >
       always() &&
-      github.event_name != 'pull_request' &&
+      github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/main' &&
       (needs.pipeline.result == 'success' ||
        (needs.pipeline.result == 'skipped' && inputs.somente_publicar))

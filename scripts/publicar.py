@@ -105,6 +105,7 @@ import subprocess  # noqa: S402 — o canal e' TLS; ver o cabecalho deste modulo
 import sys
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 
 from ingest.common.env import definida, env
@@ -345,6 +346,11 @@ def garantir_pasta(sessao: ftplib.FTP, caminho: str, ja_feitas: set[str]) -> Non
 # (ADR-027, e com razao: caminho errado e permissao negada tambem sao 550). Mas
 # ESTE 550 e' resto do nosso proprio envio, e a publicacao inteira morria por
 # causa dele — foi o que aconteceu em 04/09/2026, depois de 6.200 arquivos.
+# `550 ...: Not a regular file` e' o diretorio vazio ocupando o caminho de um
+# arquivo. Com o `RMD` preventivo fora da rotina, este e' o sinal que dispara o
+# reparo — ver `_liberar_caminho`.
+_NAO_E_ARQUIVO = re.compile(r"not a (regular )?file|is a directory", re.I)
+
 _TEMP_OCULTO = re.compile(
     r"Temporary hidden file\s+(?P<caminho>\S+?)\.?\s+already exists", re.I)
 
@@ -383,10 +389,21 @@ def _liberar_caminho(sessao: ftplib.FTP, destino: str) -> None:
     falha e a home do dossie fica quebrada — e nao ha' como consertar sem acesso
     manual ao FTP, que so' o dono da conta tem.
 
-    E' a UNICA remocao que este modulo faz, e ela nao consegue apagar conteudo:
-    `RMD` recusa diretorio nao-vazio. No pior caso a chamada falha e o envio
-    segue exatamente como antes. Nada e' removido por estar "sobrando" — so' o
-    que esta' impedindo um arquivo de existir.
+    ── CHAMADO NA RETENTATIVA, NAO ANTES DE CADA ARQUIVO ──
+
+    Ate' 04/09/2026 isto rodava antes de TODO `STOR`: um `RMD` por arquivo, que
+    quase sempre falha porque o caminho nao e' diretorio. Com 20.906 arquivos sao
+    20.906 idas ao servidor so' para ouvir "nao e' diretorio" — o dobro do
+    trafego de comandos numa publicacao que ja' levava 2h22 aqui e 4h33 no runner
+    do GitHub, onde o teto de 6h a mataria antes do fim.
+
+    O reparo continua existindo, e continua completo: ele passou a ser REACAO ao
+    550, e nao rotina. Quem paga o custo e' o caso raro, nao os outros 20.905.
+
+    E' a UNICA remocao que este modulo faz alem do oculto do ADR-045, e ela nao
+    consegue apagar conteudo: `RMD` recusa diretorio nao-vazio. No pior caso a
+    chamada falha e o envio segue exatamente como antes. Nada e' removido por
+    estar "sobrando" — so' o que esta' impedindo um arquivo de existir.
     """
     try:
         sessao.rmd(destino)
@@ -398,6 +415,32 @@ def _liberar_caminho(sessao: ftplib.FTP, destino: str) -> None:
 
 CARIMBO = ".publicacao.json"
 MANIFESTO = ".arquivos.json"
+TRAVA = ".publicando.json"
+
+# DOIS PUBLICADORES NA MESMA CONTA FTP (ADR-047).
+#
+# Em 03 e 04/09/2026 o workflow do GitHub publicava a CADA push em `main`, e o
+# `atualizar.bat` publica da maquina. Nove pushes numa noite produziram nove
+# publicacoes de 20 mil arquivos, cada uma cancelada pela seguinte NO MEIO DO
+# ENVIO — e uma delas rodou 2h22 em paralelo com uma publicacao local, as duas
+# escrevendo os mesmos caminhos.
+#
+# Foi isso que encheu o servidor de ocultos `.in.<nome>.` e produziu as quedas
+# que o ADR-045 tratou. As correcoes de la' eram necessarias e nenhuma delas era
+# a causa: a causa era haver dois publicadores.
+#
+# A trava e' um arquivo no servidor, escrito antes do primeiro `STOR` e removido
+# no fim. Quem chega e encontra trava viva PARA, dizendo de quem e' e ha' quanto
+# tempo.
+#
+# Ela nao e' atomica — FTP nao da' isso — e nao precisa ser. O caso real nao e'
+# corrida de milissegundos entre dois processos: e' uma publicacao de duas horas
+# comecando enquanto outra de duas horas esta' na metade.
+VALIDADE_TRAVA_H = 5
+
+# Publicacao que passe disto sem terminar deixou trava orfa. Cinco horas e' mais
+# que a mais longa ja' medida (2h22 local, 4h33 no runner do GitHub antes de ser
+# morta pelo teto de 6h) e menos que o intervalo entre duas atualizacoes diarias.
 
 # ENVIO INCREMENTAL (ADR-039).
 #
@@ -572,8 +615,99 @@ def listar_arquivos(origem: Path) -> list[str]:
         rel
         for p in origem.rglob("*")
         if p.is_file() and not any(parte in NUNCA_ENVIAR for parte in p.parts)
-        and (rel := p.relative_to(origem).as_posix()) != MANIFESTO
+        and (rel := p.relative_to(origem).as_posix()) not in (MANIFESTO, TRAVA)
     )
+
+
+def _quem_sou() -> dict[str, str]:
+    """Identifica a publicacao na trava, para a mensagem ser util."""
+    import os
+    import platform
+
+    if env("GITHUB_RUN_ID"):
+        onde = (f"GitHub Actions, run {env('GITHUB_RUN_ID')}"
+                f" ({env('GITHUB_WORKFLOW') or 'pipeline'})")
+    else:
+        onde = f"maquina {platform.node()}"
+    return {
+        "onde": onde,
+        "pid": str(os.getpid()),
+        "inicio": datetime.now(UTC).isoformat(timespec="seconds"),
+    }
+
+
+def ler_trava(sessao: ftplib.FTP, raiz: str) -> dict | None:
+    pedacos: list[bytes] = []
+    base = raiz.rstrip("/")
+    caminho = f"{base}/{TRAVA}" if base else TRAVA
+    try:
+        sessao.retrbinary(f"RETR {caminho}", pedacos.append)
+    except ftplib.all_errors:
+        return None
+    try:
+        return json.loads(b"".join(pedacos).decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        # Trava ilegivel e' trava: alguem estava escrevendo quando morreu.
+        return {"onde": "publicacao anterior (trava ilegivel)", "inicio": ""}
+
+
+def _idade_da_trava(trava: dict) -> float | None:
+    """Horas desde o inicio, ou None se a trava nao diz quando comecou."""
+    try:
+        inicio = datetime.fromisoformat(trava.get("inicio", ""))
+    except (TypeError, ValueError):
+        return None
+    if inicio.tzinfo is None:
+        inicio = inicio.replace(tzinfo=UTC)
+    return (datetime.now(UTC) - inicio).total_seconds() / 3600
+
+
+def travar(sessao: ftplib.FTP, raiz: str, *, forcar: bool = False) -> bool:
+    """Marca que uma publicacao comecou. Devolve False se outra esta' rodando.
+
+    Trava velha demais e' considerada ORFA e substituida: uma publicacao morta
+    nao pode bloquear o site para sempre. O limite e' `VALIDADE_TRAVA_H`.
+    """
+    base = raiz.rstrip("/")
+    caminho = f"{base}/{TRAVA}" if base else TRAVA
+
+    atual = ler_trava(sessao, raiz)
+    if atual and not forcar:
+        idade = _idade_da_trava(atual)
+        if idade is None or idade < VALIDADE_TRAVA_H:
+            quanto = f"ha' {idade:.1f}h" if idade is not None else "ha' tempo indeterminado"
+            log.error("JA' HA' UMA PUBLICACAO EM ANDAMENTO, iniciada %s por %s.",
+                      quanto, atual.get("onde", "origem desconhecida"))
+            log.error("  Duas publicacoes na mesma conta FTP escrevem os mesmos "
+                      "caminhos ao mesmo tempo — foi assim que o servidor encheu "
+                      "de arquivos ocultos em 04/09/2026 (ADR-047).")
+            log.error("  Espere ela terminar. Se tiver certeza de que morreu, "
+                      "use --forcar.")
+            return False
+        log.warning("trava orfa de %s (%.1fh, acima de %dh) — assumindo",
+                    atual.get("onde", "?"), idade, VALIDADE_TRAVA_H)
+
+    dados = json.dumps(_quem_sou(), ensure_ascii=False).encode("utf-8")
+    try:
+        sessao.storbinary(f"STOR {caminho}", io.BytesIO(dados), blocksize=BLOCO)
+    except ftplib.all_errors as exc:
+        # Nao conseguir travar NAO impede publicar: a trava e' protecao contra
+        # coincidencia, nao permissao de acesso. Seguir sem ela e' o que este
+        # projeto fez a vida toda.
+        log.warning("nao consegui gravar a trava (%s) — publicando sem ela",
+                    str(exc)[:60])
+    return True
+
+
+def destravar(sessao: ftplib.FTP, raiz: str) -> None:
+    base = raiz.rstrip("/")
+    caminho = f"{base}/{TRAVA}" if base else TRAVA
+    try:
+        sessao.delete(caminho)
+    except ftplib.all_errors as exc:
+        log.warning("nao removi a trava %s (%s) — a proxima publicacao vai "
+                    "considera-la orfa depois de %dh",
+                    caminho, str(exc)[:60], VALIDADE_TRAVA_H)
 
 
 def _manifesto_remoto(sessao: ftplib.FTP, raiz: str) -> dict[str, str | None] | None:
@@ -688,7 +822,7 @@ def remover_orfas(sessao: ftplib.FTP, raiz: str, atuais: list[str],
             return 0
         log.info("%d arquivos no servidor", len(anterior))
 
-    orfas = sorted(set(anterior) - set(atuais) - {MANIFESTO, CARIMBO})
+    orfas = sorted(set(anterior) - set(atuais) - {MANIFESTO, CARIMBO, TRAVA})
     if not orfas:
         return 0
 
@@ -817,13 +951,26 @@ def enviar(sessao: ftplib.FTP, origem: Path, raiz_remota: str,
         for tentativa in range(1, TENTATIVAS_POR_ARQUIVO + 1):
             try:
                 garantir_pasta(sessao, pasta, feitas)
-                _liberar_caminho(sessao, destino)
+                if tentativa > 1:
+                    # So' na retentativa: ver `_liberar_caminho`. Na primeira
+                    # passada isto era um `RMD` inutil por arquivo.
+                    _liberar_caminho(sessao, destino)
                 with caminho.open("rb") as f:
                     sessao.storbinary(f"STOR {destino}", f, blocksize=BLOCO)
                 break
             except ftplib.error_perm as erro:
-                # 550 continua sendo erro de verdade — exceto quando e' o
-                # oculto que a nossa propria transferencia interrompida deixou.
+                # 550 continua sendo erro de verdade — exceto em dois casos que
+                # a proxima tentativa resolve.
+                #
+                # `Not a regular file` e' o diretorio vazio ocupando o caminho:
+                # com `_liberar_caminho` fora do caminho comum, e' aqui que ele
+                # entra. Sem esta linha, tirar o `RMD` da rotina teria trocado
+                # um custo por uma regressao silenciosa.
+                if (_NAO_E_ARQUIVO.search(str(erro))
+                        and tentativa < TENTATIVAS_POR_ARQUIVO):
+                    log.warning("%s: caminho ocupado por diretorio — liberando", rel)
+                    _liberar_caminho(sessao, destino)
+                    continue
                 residuo = _residuo_de(erro, destino)
                 if residuo is None or tentativa == TENTATIVAS_POR_ARQUIVO:
                     raise
@@ -959,6 +1106,7 @@ def main(argv: list[str] | None = None) -> int:
     # A sessao viva fica num dicionario porque `enviar` pode troca-la no meio do
     # caminho; o `finally` precisa fechar a ATUAL, nao a que morreu.
     viva: dict[str, ftplib.FTP] = {"sessao": conectar(cfg)}
+    travou = False
 
     def reconectar() -> ftplib.FTP:
         """Reconecta com paciencia. Ver TENTATIVAS_DE_RECONEXAO.
@@ -987,6 +1135,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         raiz = str(cfg["raiz"])
         conferir_regressao(viva["sessao"], origem, raiz, forcar=args.forcar)
+
+        # ANTES DE QUALQUER ENVIO. Ver TRAVA: duas publicacoes na mesma conta
+        # escrevem os mesmos caminhos ao mesmo tempo.
+        if not travar(viva["sessao"], raiz, forcar=args.forcar):
+            return 1
+        travou = True
 
         # ANTES do envio: subir o manifesto novo sobrescreve o antigo, e sem o
         # antigo nao ha' como saber o que virou orfao.
@@ -1022,6 +1176,14 @@ def main(argv: list[str] | None = None) -> int:
         # de o envio incremental deixar uma pagina errada no ar.
         enviar_manifesto(viva["sessao"], raiz, locais, reconectar)
     finally:
+        if travou:
+            # Mesmo se o envio falhou: trava que sobra bloqueia a proxima
+            # tentativa, e tentar de novo e' justamente o que se quer depois de
+            # uma falha.
+            try:
+                destravar(viva["sessao"], str(cfg["raiz"]))
+            except Exception:  # noqa: BLE001, S110 — a sessao pode ter morrido
+                pass
         try:
             viva["sessao"].quit()
         except Exception:  # noqa: BLE001, S110 — desconexao suja nao invalida o envio

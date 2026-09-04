@@ -308,6 +308,9 @@ call :passo "Gerar o site" fatal || goto :abortar
 
 if not defined DOSSIE_FTP_HOST set "DOSSIE_FTP_HOST=!RADAR_FTP_HOST!"
 if defined DOSSIE_FTP_HOST (
+  rem Se houver outra publicacao em andamento - um disparo manual no GitHub,
+  rem por exemplo - esta etapa PARA com codigo 1 e diz de quem e a outra.
+  rem Nao e falha: e a trava do ADR-047 evitando dois FTP no mesmo destino.
   set "CMD="%PY%" -m scripts.publicar --origem site"
   call :passo "Publicar na Hostinger" tolerante
 ) else (

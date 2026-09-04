@@ -7,6 +7,7 @@ estivesse no caminho.
 
 from __future__ import annotations
 
+import ftplib
 import os
 from pathlib import Path
 
@@ -163,9 +164,43 @@ class TestCaminhosRemotos:
         assert ftp.pastas == ["/public_html/dossie/candidato",
                               "/public_html/dossie/candidato/fulano"]
 
-    def test_tenta_liberar_o_caminho_de_cada_arquivo(self, tmp_path: Path):
-        # Auto-reparo: se um diretorio vazio estiver ocupando o lugar do arquivo,
-        # ele sai. `RMD` recusa diretorio com conteudo, entao isso nao apaga dado.
+    def test_nao_gasta_um_RMD_por_arquivo_no_caminho_comum(self, tmp_path: Path):
+        """O auto-reparo saiu da rotina e virou reacao ao 550.
+
+        Ate' 04/09/2026 havia um `RMD` antes de TODO `STOR`, e ele quase sempre
+        falha porque o caminho nao e' diretorio. Com 20.906 arquivos sao 20.906
+        idas ao servidor so' para ouvir "nao e' diretorio" — o dobro do trafego
+        de comandos numa publicacao que ja' levava 2h22 aqui e 4h33 no runner do
+        GitHub, onde o teto de 6h a matava antes do fim.
+        """
         ftp = FTPFalso()
         enviar(ftp, self._site(tmp_path), "/", seco=False)
-        assert "index.html" in ftp.removidos
+        assert ftp.removidos == [], "RMD preventivo dobra o trafego a' toa"
+
+    def test_diretorio_ocupando_o_caminho_e_removido_na_retentativa(
+            self, tmp_path: Path):
+        """O reparo continua completo — so' passou a custar ao caso raro.
+
+        Sem isto, tirar o `RMD` da rotina teria trocado um custo por uma
+        regressao silenciosa: a home ficaria quebrada e nada no log diria por que
+        (foi o bug de 29/08/2026).
+        """
+        class ComDiretorioNoCaminho(FTPFalso):
+            def __init__(self):
+                super().__init__()
+                self.bloqueado = True
+
+            def rmd(self, caminho):
+                self.removidos.append(caminho)
+                self.bloqueado = False   # o diretorio saiu
+
+            def storbinary(self, cmd, f, blocksize=None):
+                alvo = cmd.removeprefix("STOR ")
+                if alvo == "index.html" and self.bloqueado:
+                    raise ftplib.error_perm(f"550 {alvo}: Not a regular file")
+                return super().storbinary(cmd, f, blocksize)
+
+        ftp = ComDiretorioNoCaminho()
+        enviar(ftp, self._site(tmp_path), "/", seco=False)
+        assert "index.html" in ftp.removidos, "o reparo tinha de acontecer"
+        assert "index.html" in ftp.arquivos, "e o arquivo tinha de chegar"
