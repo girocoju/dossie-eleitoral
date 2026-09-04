@@ -259,6 +259,12 @@ call :passo "Parlamentares em exercicio" tolerante || goto :abortar
 set "CMD="%PY%" -m ingest.proposicoes load"
 call :passo "Atividade legislativa da Camara" tolerante || goto :abortar
 
+rem Comissoes da Camara. Uma requisicao por deputado (1.991) mais o catalogo:
+rem cerca de vinte minutos. A composicao muda durante o ano - CPI nova, troca
+rem de titular por suplente - entao nao da' para tratar como carga historica.
+set "CMD="%PY%" -m ingest.comissoes load"
+call :passo "Comissoes da Camara" tolerante || goto :abortar
+
 set "CMD="%PY%" -m ingest.plenario load --ano-inicio 2025 --ano-fim 2026"
 call :passo "Votos e presenca em plenario" tolerante || goto :abortar
 

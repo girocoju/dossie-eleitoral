@@ -291,6 +291,13 @@ jobs:
         if: steps.cred.outputs.temos == 'true'
         run: carga.sh "Atividade legislativa (F-16)" ingest.proposicoes load
 
+      # Uma requisicao por deputado (1.991) mais o catalogo de orgaos: ~20 min.
+      # A composicao das comissoes muda durante o ano — CPI nova, troca de
+      # titular por suplente — entao nao e' carga historica.
+      - name: Comissoes da Camara (F-26)
+        if: steps.cred.outputs.temos == 'true'
+        run: carga.sh "Comissoes (F-26)" ingest.comissoes load
+
       # Votos e presenca do ano corrente. Os anos historicos (2003-2025) sao
       # carga separada e manual: ano encerrado nao muda, e `load_intervalo`
       # substitui APENAS a particao do ano, entao o diario nao os apaga.

@@ -273,6 +273,7 @@ class Candidato:
     patrimonio: list[dict] = field(default_factory=list)
     mandatos: list[dict] = field(default_factory=list)
     exercicio: dict | None = None
+    comissoes: list[dict] = field(default_factory=list)
 
     @property
     def partido_completo(self) -> str:
@@ -515,6 +516,7 @@ def carregar_fichas(cliente, cargos: tuple[int, ...],
     _anexar_patrimonio(cliente, ids)
     _anexar_mandatos(cliente, ids)
     _anexar_exercicio(cliente, ids)
+    _anexar_comissoes(cliente, ids)
     _anexar_data_do_dado(cliente, {c.sk: c for c in saida})
     _anexar_planos(cliente, {c.sk: c for c in saida})
     _anexar_financiamento(cliente, {c.sk: c for c in saida})
@@ -949,6 +951,56 @@ def _anexar_exercicio(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
             c.exercicio = {"casa": r.casa, "url": r.url_perfil}
             n += 1
     log.info("%d candidaturas de quem esta' em exercicio", n)
+
+
+# Rotulo curto por classe, para o subtitulo do bloco. O nome longo do tipo ja'
+# viaja em `tipo_orgao`; aqui e' so' o agrupador da tela.
+CLASSES_COMISSAO = {
+    "mesa": "Mesa Diretora",
+    "permanente": "Comissões permanentes",
+    "conselho": "Conselhos e corregedoria",
+    "temporaria": "Comissões temporárias, especiais e CPIs",
+    "mista": "Comissões mistas e do Congresso",
+}
+
+
+def _anexar_comissoes(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """Onde o deputado sentou, com que papel (F-26).
+
+    A ficha ja' dizia quanto ele propos e quantas vezes votou. Nao dizia ONDE ele
+    trabalha — e comissao permanente e' onde a maior parte do trabalho
+    legislativo acontece.
+
+    So' aparece para quem tem casamento confiavel na Camara: sem ele, um assento
+    na CCJ poderia ser atribuido a um homonimo (ADR-014).
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    try:
+        linhas = list(cliente.query(f"""
+            select id_pessoa, classe_orgao, sigla_orgao, nome_orgao, tipo_orgao,
+                   papel_principal, qt_periodos, em_curso,
+                   extract(year from primeiro_inicio) as a1,
+                   extract(year from ultimo_fim)      as a2
+            from `{p}.marts.fct_comissao_deputado`
+            where {_filtro(por_pessoa)}
+            order by em_curso desc, ultimo_fim desc, sigla_orgao
+        """).result())
+    except Exception as exc:  # noqa: BLE001 — sem o mart a ficha sai sem o bloco
+        log.warning("fct_comissao_deputado indisponivel (%s)", str(exc)[:90])
+        return
+    n = 0
+    for r in linhas:
+        for c in por_pessoa.get(r.id_pessoa, []):
+            c.comissoes.append({
+                "classe": r.classe_orgao, "sigla": r.sigla_orgao,
+                "nome": r.nome_orgao, "tipo": r.tipo_orgao,
+                "papel": r.papel_principal, "vezes": r.qt_periodos,
+                "em_curso": bool(r.em_curso), "a1": r.a1, "a2": r.a2,
+            })
+            n += 1
+    log.info("%d assentos em comissao anexados", n)
 
 
 def _anexar_atividade_senado(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:

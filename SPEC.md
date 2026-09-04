@@ -255,6 +255,30 @@ registrados depois da última publicação em lote do TSE (L-23).
 
 ---
 
+**F-26 — Comissões na Câmara** · P1 · **Implementada em 04/09/2026**
+
+> Fonte nova (S17). Ver [ADR-044](docs/adr/ADR-044-comissoes-da-camara.md).
+
+**Por que entra.** A ficha dizia quanto o deputado propôs e quantas vezes votou.
+Não dizia **onde** ele trabalha. Comissão permanente é onde a maior parte do
+trabalho legislativo acontece, e assento no Conselho de Ética ou na Mesa Diretora
+é fato público que muda como se lê o resto da ficha.
+
+**Alcance.** 892 das candidaturas exibidas de 2026 são de gente com casamento
+confiável na Câmara e podem receber o bloco.
+
+**O que a fonte fez e quase virou dado errado:** o endpoint sem parâmetro de data
+devolve um vínculo para quem presidiu a Casa; o catálogo padrão de órgãos não tem
+a Mesa nem o Conselho de Ética; e o nome do tipo 15 diz "Coordenadoria da Mulher"
+para a Bancada Negra. Os três estão documentados no ADR.
+
+**O que fica de fora.** Filiação a partido, bloco e liderança — a API também as
+chama de "órgão", e estar no PT não é ter assento na CCJ. Comissão de medida
+provisória, porque são 1.393 e participar delas é rotina. E o **Senado**, porque
+nenhum senador tem casamento confiável ([L-28](docs/LACUNAS.md)).
+
+---
+
 **F-25 — A situação no TSE ganha cor** · P2 · **Implementada em 03/09/2026**
 
 > Ver [ADR-043](docs/adr/ADR-043-situacao-com-cor.md).
@@ -565,6 +589,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-044 | Comissões da Câmara | O endpoint sem data devolve um vínculo para quem presidiu a Casa; o catálogo padrão não tem a Mesa nem o Conselho de Ética; e o nome do tipo 15 chamaria a Bancada Negra de "Coordenadoria da Mulher" | Aceita |
 | ADR-043 | A situação no TSE ganha cor | Nove valores em texto puro numa lista de 1.126 nomes não são lidos; a cor diz o ponto do rito, nunca um juízo, e o rótulo continua escrito porque verde/vermelho é o par que some no daltonismo | Aceita |
 | ADR-042 | De que o patrimônio é feito | Um total e uma contagem não dizem se são vinte apartamentos ou uma fazenda; a descrição do bem fica fora do mart porque traz endereço residencial, e a série não calcula variação porque o valor é de aquisição e nominal | Aceita |
 | ADR-041 | Buscador na home, um arquivo por prefixo | 20 mil fichas sem busca só são alcançáveis por quem já sabe o cargo e a UF; índice único teria 10 MB, e um 404 não pode virar "nada encontrado" | Aceita |

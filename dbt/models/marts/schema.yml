@@ -547,6 +547,47 @@ models:
         description: "Recurso proprio do candidato, isolado do que veio de terceiros."
         tests: [not_null]
 
+  - name: fct_comissao_deputado
+    description: >
+      Onde cada deputado sentou, com que papel e por quanto tempo. Um colegiado
+      por linha, com os periodos somados: a Camara renova a composicao todo ano e
+      o mesmo deputado reaparece na mesma comissao a cada renovacao — 25
+      deputados produziram 490 assentos em comissao permanente, quase todos
+      repetindo o mesmo colegiado.
+      Filiacao partidaria e comissao de medida provisoria NAO entram: estar no PT
+      nao e' ter assento na CCJ, e sao 1.393 comissoes de MPV no catalogo.
+      So' entra quem tem `casamento_confiavel` — na Camara isso e' CPF (ADR-014).
+      Sem ele, um assento na CCJ poderia ser atribuido a um homonimo.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [id_pessoa, id_orgao]
+    columns:
+      - name: id_pessoa
+        tests: [not_null]
+      - name: classe_orgao
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [mesa, permanente, temporaria, conselho, mista]
+      - name: papel_principal
+        description: >
+          O papel de MAIOR PESO que a pessoa teve naquele colegiado, pela
+          hierarquia formal (Presidente > Vice > Relator > Titular > Suplente).
+          Nao e' juizo sobre a pessoa: e' escolher, entre fatos igualmente
+          verdadeiros, o mais informativo — como a trajetoria mostra o resultado
+          do turno decisivo e nao a soma dos turnos.
+      - name: qt_periodos
+        description: "Quantas vezes a pessoa foi designada para aquele colegiado."
+        tests: [not_null]
+      - name: em_curso
+        description: >
+          Ao menos um periodo sem data de fim. Vinculo sem fim esta' em curso;
+          preencher com a data de hoje faria a tela dizer que terminou hoje,
+          todo dia.
+        tests: [not_null]
+
   - name: fct_bem_candidatura
     description: >
       Bens declarados por candidatura e TIPO, agrupados pela tabela oficial de

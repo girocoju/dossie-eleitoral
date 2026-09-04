@@ -215,6 +215,26 @@ sources:
               de siglas do Senado — nao do formato da sigla. `RQI` parece
               "Requerimento de Informacao" e e' "Requerimento da Comissao de
               Servicos de Infraestrutura".
+      - name: camara_comissoes
+        description: >
+          F-26 — uma linha por (deputado, orgao, periodo): onde cada deputado
+          sentou, com que papel e quando. Cobre 2003 em diante.
+          O endpoint `/deputados/{id}/orgaos` SEM parametro de data devolve quase
+          nada — Arthur Lira, que presidiu a Casa, volta com um vinculo so'. A
+          ingestao pede a janela explicita.
+        columns:
+          - name: classe_orgao
+            description: >
+              Derivada do `codTipoOrgao` OFICIAL, nunca do nome do tipo. O tipo 15
+              chama-se "COORDENADORIA DA MULHER" e agrupa a Bancada Negra, a
+              Secretaria de Comunicacao e mais onze orgaos: renderizar o nome
+              como veio diria que a Bancada Negra e' a Coordenadoria da Mulher.
+              `partidaria` (partido, bloco, lideranca) fica gravada e NAO e'
+              promovida a colegiado — estar no PT nao e' ter assento na CCJ.
+          - name: papel
+            description: >
+              Titular, Suplente, Presidente, Vice-Presidente, Relator. Vem do
+              campo `titulo` da API.
       - name: proposicoes
         description: >
           Proposicoes da legislatura 2023-2026 em que um deputado e PROPONENTE.

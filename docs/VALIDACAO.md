@@ -204,3 +204,54 @@ além de placa, chassi, CPF e CNPJ. O campo foi mantido fora do mart
 **O arquivo de bens de 2006 publica valores zerados** — 34,8% das declarações
 daquele ano somam exatamente zero, contra 0,0–0,1% em todos os outros. Virou a
 [L-27](LACUNAS.md), e o modelo corta essas linhas: zero ali não quer dizer zero.
+
+---
+
+# Comissões da Câmara (F-26) — 04/09/2026
+
+O pipeline lê `/deputados/{id}/orgaos` — a lista **pelo deputado**. A conferência
+lê `/orgaos/{id}/membros` — a lista **pelo órgão**. Duas rotas diferentes da mesma
+API; concordar tem valor.
+
+## Composição atual dos colegiados
+
+| Colegiado | Na API | No pipeline | Faltando | A mais |
+|---|---|---|---|---|
+| CCJC | 130 | 130 | 0 | 0 |
+| CSAUDE | 99 | 99 | 0 | 0 |
+| CAPADR | 94 | 94 | 0 | 0 |
+| CE | 73 | 73 | 0 | 0 |
+| CFT | 72 | 72 | 0 | 0 |
+| CME | 65 | 65 | 0 | 0 |
+| CVT | 53 | 53 | 0 | 0 |
+| CCTI | 49 | 49 | 0 | 0 |
+
+**8 de 8 com composição idêntica.**
+
+## A conferência pegou um bug — e depois pegou outro, meu
+
+**Na coleta.** A primeira rodada tinha `itens=200` **sem paginação**. A conferência
+mostrou membros **atuais** faltando na CCJC, CSAUDE, CFT e CAPADR — cada uma com
+exatamente um nome, e todos veteranos:
+
+```
+Hugo Leal        página 1 = 200   total real = 242   perdia 42
+Erika Kokay      página 1 = 200   total real = 224   perdia 24
+José Rocha       página 1 = 200   total real = 217   perdia 17
+Alice Portugal   página 1 = 200   total real = 205   perdia  5
+```
+
+O corte caía em cima de quem mais trabalhou. Corrigido; a recoleta trouxe 215
+vínculos a mais, e 7 deputados passam de 200.
+
+**Na própria conferência.** A segunda tentativa acusava "30 a mais na CCJC". O
+problema era do script: `/orgaos/{id}/membros` **ignora `itens` e corta em 100**,
+com link `next`. A mesma armadilha, do outro lado. Paginando: 130 = 130.
+
+## Outras travas conferidas
+
+| | |
+|---|---|
+| Linhas com `classe_orgao = 'partidaria'` no mart | **0** de 48.467 |
+| Órgãos que ficaram sem tipo | **0** (67 fora do catálogo, todos resolvidos) |
+| Fichas de 2026 que recebem o bloco | 880 |

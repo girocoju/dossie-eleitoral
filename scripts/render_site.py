@@ -26,6 +26,7 @@ from scripts.gerar_site import (
     _LIGACOES,
     BASE_URL,
     CARGOS,
+    CLASSES_COMISSAO,
     GRUPOS_BEM,
     PROPORCIONAIS,
     TODOS_CARGOS,
@@ -1153,6 +1154,78 @@ def _em_exercicio(c: Candidato) -> str:
             f'plenário abaixo são desse mandato.</p>')
 
 
+def _periodo(a1: int | None, a2: int | None) -> str:
+    if not a1:
+        return "—"
+    return str(a1) if a1 == a2 or not a2 else f"{a1}–{a2}"
+
+
+def _linha_comissao(x: dict) -> str:
+    return (f"<tr><td><b>{e(x['sigla'])}</b>"
+            f"<div class='nc'>{e(x['nome'])}</div></td>"
+            f"<td>{e(x['papel']) or '—'}</td>"
+            f"<td class='num'>{_periodo(x['a1'], x['a2'])}</td>"
+            f"<td>{'<b>em curso</b>' if x['em_curso'] else ''}</td></tr>")
+
+
+def _comissoes(c: Candidato) -> str:
+    """Onde a pessoa sentou na Camara, agrupado por natureza do colegiado (F-26).
+
+    ── POR QUE AGRUPADO, E NAO EM ORDEM DE DATA ──
+
+    Um deputado de tres mandatos acumula dezenas de assentos, e a maioria e'
+    renovacao anual da mesma comissao. Em ordem cronologica, "Conselho de Etica"
+    fica perdido entre quinze linhas de subcomissao. Agrupado por natureza, o que
+    tem peso aparece primeiro.
+
+    ── O PAPEL E' O DE MAIOR PESO, E A TELA DIZ ISSO ──
+
+    Quem presidiu num ano e foi suplente noutro aparece como Presidente. Nao e'
+    juizo: e' escolher, entre fatos igualmente verdadeiros, o mais informativo —
+    e a nota explica o criterio para ninguem entender que foi Presidente o tempo
+    todo.
+
+    ── O QUE NAO ESTA' AQUI ──
+
+    Filiacao a partido, bloco e lideranca — que a API tambem chama de "orgao" —
+    nao entra: estar no PT nao e' ter assento na CCJ. Comissao de medida
+    provisoria tambem nao: sao 1.393 no catalogo e participar delas e' rotina.
+    """
+    if not c.comissoes:
+        return ""
+
+    por_classe: dict[str, list[dict]] = {}
+    for x in c.comissoes:
+        por_classe.setdefault(x["classe"], []).append(x)
+
+    partes = []
+    for chave, rotulo in CLASSES_COMISSAO.items():
+        do_grupo = por_classe.get(chave)
+        if not do_grupo:
+            continue
+        linhas = "".join(_linha_comissao(x) for x in do_grupo)
+        partes.append(
+            f"<h3 style='font-size:14px;margin:16px 0 6px'>{e(rotulo)} "
+            f"<span style='font-weight:400;color:var(--ink-3)'>"
+            f"({len(do_grupo)})</span></h3>"
+            f"<div class='rolagem'><table><thead><tr><th>Colegiado</th>"
+            f"<th>Papel</th><th>Período</th><th></th></tr></thead>"
+            f"<tbody>{linhas}</tbody></table></div>")
+
+    return f"""<section class="bloco">
+      <h2>Comissões na Câmara — {len(c.comissoes)} colegiados</h2>
+      {''.join(partes)}
+      <p style="font-size:12.5px;color:var(--ink-3);margin:12px 0 0">
+        Uma linha por colegiado, não por designação: a Câmara renova a composição
+        das comissões a cada ano, e o mesmo deputado é redesignado várias vezes
+        para a mesma. O <b>papel</b> mostrado é o de maior peso que a pessoa teve
+        ali — quem presidiu num ano e foi suplente em outro aparece como
+        Presidente. <b>Filiação a partido, bloco e liderança não entram</b>: a
+        fonte também as chama de "órgão", e estar num partido não é ter assento
+        numa comissão.</p>
+    </section>"""
+
+
 def _ficha(c: Candidato, quando: str) -> str:
     partes = [f"""
 <a href="{BASE_URL}/{c.cargo_chave}/" style="font-size:13.5px">← {e(c.cargo_nome)}</a>
@@ -1327,6 +1400,7 @@ def _ficha(c: Candidato, quando: str) -> str:
     partes.append(_chapa_titular(c))
     partes.append(_atividade(c))
     partes.append(_atividade_senado(c))
+    partes.append(_comissoes(c))
     partes.append(_financiamento(c))
     partes.append(_indicadores(c))
     partes.append("</div></div>")

@@ -5,7 +5,7 @@
 > Nenhum item desta lista e' contornado por interpolacao, media ou estimativa.
 > Enquanto estiver aqui, o dado simplesmente nao existe no produto — e a tela diz isso.
 
-Ultima revisao: **2026-09-03**
+Ultima revisao: **2026-09-04**
 
 ---
 
@@ -684,3 +684,37 @@ afirmacao, sobre uma pessoa real, exatamente o que a Regra 5 proibe.
 
 **Como fechar:** ler o `leiame` do pacote de 2006 e conferir se o valor esta' em
 outra coluna naquele ano, como ja' aconteceu com o layout de candidaturas (L-01).
+
+---
+
+## L-28 · Comissões do Senado não têm em quem aparecer
+
+**Situacao:** ABERTA · registrada em 04/09/2026
+
+**O que falta:** o bloco de comissoes (F-26) cobre so' a Camara. A API do Senado
+tem `/senador/{codigo}/comissoes` e o dado existe — o que falta nao e' a fonte, e'
+a IDENTIDADE.
+
+Medido em 04/09/2026 em `dim_parlamentar`:
+
+| casa | parlamentares | com `id_pessoa` | com `casamento_confiavel` |
+|---|---|---|---|
+| camara | 1.991 | 1.991 | **1.991** |
+| senado | 81 | 80 | **0** |
+
+O Senado nao publica CPF, entao o casamento e' por nome + data de nascimento
+(ADR-014) e nenhum senador chega a `casamento_confiavel`. Coletar as comissoes
+deles produziria um bloco que nao poderia ser exibido em ficha nenhuma sem risco
+de atribuir um assento a um homonimo.
+
+**Impacto:** a ficha de senador nao mostra comissao. A de deputado mostra. A
+diferenca e' visivel e nao esta' explicada na tela para o leitor — este e' o
+custo aberto.
+
+**Como fechar:** a mesma sondagem que fechou a L-20. Se o Senado publicar CPF em
+algum endpoint, ou se houver outra chave forte (titulo de eleitor nao serve —
+LGPD), o casamento passa a ser confiavel e o bloco vem junto.
+
+**O que NAO fazer:** exibir com casamento por nome. Homonimia com mesma data de
+nascimento e' improvavel, nao impossivel, e o custo do erro aqui e' atribuir a
+uma pessoa o assento de outra.
