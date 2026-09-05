@@ -181,6 +181,33 @@ CSS_ARQUIVO = "dossie.css"
 
 
 
+def _acessivel(html: str) -> str:
+    """Duas marcas que TODA tabela e TODA area rolavel deste site precisam ter.
+
+    Sao aplicadas aqui, no HTML pronto, e nao escritas em cada um dos dezessete
+    lugares que montam tabela. Nao e' economia de digitacao: escrever a mao em
+    dezessete f-strings garante que a decima oitava saia sem — e o defeito
+    resultante e' invisivel para quem enxerga.
+
+    ── `scope="col"` (WCAG 1.3.1) ──
+
+    Toda tabela deste site tem cabecalho apenas na primeira linha, entao
+    `scope="col"` vale para todas. Sem ele, o leitor de tela nao consegue dizer,
+    na celula 7 da linha 12, a que coluna aquele numero pertence — e a tabela de
+    bens declarados tem oito colunas.
+
+    ── `tabindex="0"` na area que rola (WCAG 2.1.1) ──
+
+    `.rolagem` tem `overflow:auto`. O Firefox da' foco a uma area assim; o Chrome
+    nao. Sem `tabindex`, o conteudo que passa da altura visivel fica inalcancavel
+    por teclado: a pessoa tabula pela pagina inteira e nunca chega as linhas de
+    baixo da tabela.
+    """
+    html = re.sub(r'<th(?![a-z])(?![^>]*\bscope=)', '<th scope="col"', html)
+    html = re.sub(r'<div class=([\'"])rolagem\1', r'<div tabindex="0" class=\1rolagem\1', html)
+    return html
+
+
 def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
             canonical: str, ativo: str = "", fonte_data: str | None = None) -> str:
     # A home passa "Dossie Eleitoral 2026" como titulo, e o sufixo fixo fazia
@@ -194,18 +221,21 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
     marca = "Dossiê Eleitoral"
     titulo_aba = titulo if titulo.startswith(marca) else f"{titulo} — {marca}"
 
-    nav = "".join(
-        f'<a href="{BASE_URL}/{s}/" class="{"on" if s == ativo else ""}">{n}</a>'
-        for s, n, _ in CARGOS.values()
-    ) + "".join(
-        f'<a href="{BASE_URL}/{s}/" class="{"on" if s == ativo else ""}">{n}</a>'
-        for s, n in PROPORCIONAIS.values()
-    ) + (
-        # Por ULTIMO: os cargos vem em ordem de eleicao, e "Doadores" no meio
-        # partia essa sequencia.
-        f'<a href="{BASE_URL}/doadores/" '
-        f'class="{"on" if ativo == "doadores" else ""}">Doadores</a>'
-    )
+    def _item(slug: str, rotulo: str) -> str:
+        """Um link da barra.
+
+        `aria-current` e nao apenas a classe: a cor de fundo diz ao olho
+        qual pagina esta' aberta e nao diz nada a quem usa leitor de tela,
+        que ouviria dez links iguais (WCAG 1.3.1).
+        """
+        marca = ' class="on" aria-current="page"' if slug == ativo else ""
+        return f'<a href="{BASE_URL}/{slug}/"{marca}>{rotulo}</a>'
+
+    # "Doadores" por ULTIMO: os cargos vem em ordem de eleicao, e ele no
+    # meio partia essa sequencia.
+    nav = ("".join(_item(s, n) for s, n, _ in CARGOS.values())
+           + "".join(_item(s, n) for s, n in PROPORCIONAIS.values())
+           + _item("doadores", "Doadores"))
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -223,12 +253,14 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
 <link rel="stylesheet" href="{BASE_URL}/{CSS_ARQUIVO}?v={CSS_VERSAO}">
 </head>
 <body>
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
 <header class="topo"><div class="wrap">
   <a class="marca" href="{BASE_URL}/">Dossiê Eleitoral<span>Data Duba Intelligence</span></a>
-  <nav class="cargos">{nav}</nav>
+  <nav class="cargos" aria-label="Cargos e listagens">{nav}</nav>
 </div></header>
-<main class="wrap">
-{corpo}
+<main class="wrap" id="conteudo" tabindex="-1">
+{_acessivel(corpo)}
+</main>
 <footer class="rodape">
   <span>Fonte: {FONTE} · {fonte_data or f"extraído em {e(quando)} UTC"}</span>
   <span>Dados declarados pelo candidato ao TSE. Este site registra o que foi
@@ -236,7 +268,6 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
   <span><a href="https://datadubaintel.com/">Data Duba Intelligence</a>
     · <a href="{BASE_URL}/metodologia/">Metodologia e fontes</a></span>
 </footer>
-</main>
 </body>
 </html>
 """
