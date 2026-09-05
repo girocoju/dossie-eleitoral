@@ -1292,13 +1292,15 @@ def _comissoes_senado(c: Candidato) -> str:
     ressalva e' a mesma: quem le' precisa saber com que grau de certeza o assento
     foi atribuido aquela pessoa.
 
-    ── O PAPEL E' MAIS POBRE QUE O DA CAMARA ──
+    ── O PAPEL VEM DE DUAS ROTAS, E O DE AGORA NAO E' O DE SEMPRE ──
 
-    A fonte devolve Titular, Suplente e Nato. Nao ha' Presidente nem Relator, e
-    nao ha' Mesa Diretora nenhuma. A tela NAO afirma quem presidiu um colegiado —
-    inclusive de quem preside a propria Casa. E' ausencia da fonte, e dizer isso
-    e' mais honesto que deixar o leitor supor que o silencio significa que a
-    pessoa nunca presidiu nada (Regra 5, L-30).
+    `/comissoes` da' quem sentou e `/cargos` da' quem comandou — presidencia,
+    vice, relatoria, secretaria — mais os colegiados que a primeira nao conhece,
+    a Mesa Diretora inclusive (ADR-049, fecha a L-30).
+
+    O papel exibido e' o VIGENTE quando ha' periodo aberto. Sem essa distincao,
+    quem presidiu a CDH em 2015 e segue titular dela apareceria como "Presidente,
+    em curso" — e a CDH teria cinco presidentes simultaneos.
     """
     if not c.comissoes_senado:
         return ""
@@ -2474,10 +2476,25 @@ def _metodologia(quando: str, catalogo: list[dict], total_fichas: int = 0) -> st
         de nascimento — forte, não certa. Esse é o mesmo critério que a atividade
         legislativa de senador já usava desde o início, e ele viaja com a
         ressalva ao lado do dado, em vez de o bloco simplesmente não existir.</p>
-      <p>O segundo é o <b>papel</b>: a fonte do Senado devolve apenas Titular,
-        Suplente e Nato. Não há Presidente, não há Relator e não há Mesa
-        Diretora. A ficha de senador, por isso, <b>não afirma quem presidiu um
-        colegiado</b> — nem de quem preside a própria Casa. Registrado como L-30.</p>
+      <p>O segundo é o <b>papel</b>, e ele vem de <b>duas consultas</b>. A lista
+        de comissões de um senador devolve apenas Titular, Suplente e Nato — nem
+        presidência, nem a Mesa Diretora. Chegamos a registrar isso como
+        limitação da fonte; estava errado. Presidência, vice, relatoria e
+        secretaria estão em outra rota da mesma API, e é dela que saem também a
+        <b>Mesa Diretora do Congresso</b> e a Comissão Diretora do Senado.</p>
+      <p>Fica o método, que vale para qualquer trabalho com dado público:
+        <b>medir a ausência numa rota não prova a ausência na fonte</b>.</p>
+      <p>O papel mostrado é o <b>vigente</b> quando o vínculo está em curso, e o
+        de maior peso da trajetória quando já terminou. Presidir um colegiado em
+        2015 e seguir titular dele hoje são dois fatos: tratados como um só, a
+        Comissão de Direitos Humanos apareceria com <b>cinco presidentes
+        simultâneos</b>, que foi o que a primeira versão deste modelo produziu.</p>
+      <p>Colegiado que aparece só na consulta de cargos fica <b>sem contagem de
+        designações</b> — a fonte publica o cargo e não publica a designação, e o
+        número não é inventado para preencher. E uma presidência em curso não
+        aparece: a da Comissão de Agricultura, cujo titular casa de forma
+        <b>ambígua</b> com o cadastro eleitoral. Atribuí-la ao homônimo errado
+        seria pior que a ausência. Registrado como L-31.</p>
       <p>O catálogo de colegiados do Senado só lista o que está <b>em
         atividade</b>, e não existe rota que devolva o tipo de um colegiado
         encerrado. Medido em 05/09/2026: 292 colegiados citados pelos senadores
