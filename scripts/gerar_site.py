@@ -1067,9 +1067,13 @@ def _anexar_comissoes_senado(cliente, por_pessoa: dict[str, list[Candidato]]) ->
     Senado ja' usa desde a F-22 (ADR-034). `casamento_confiavel` viaja junto para
     que a ressalva possa ser escrita ao lado do dado.
 
-    O PAPEL E' MAIS POBRE. A rota do Senado devolve so' Titular, Suplente e Nato:
-    nao ha' Presidente nem Relator. A ficha de senador NAO afirma quem presidiu um
-    colegiado, e nao ha' Mesa Diretora nenhuma no dado (L-30).
+    O PAPEL VEM DE DUAS ROTAS. `/comissoes` da' quem sentou e `/cargos` da' quem
+    comandou — presidencia, vice, relatoria, secretaria — mais os colegiados que
+    a primeira nao conhece, a Mesa Diretora inclusive (ADR-049, fecha a L-30).
+
+    E O PAPEL DE AGORA NAO E' O DE SEMPRE. `papel_atual` e' nulo quando nenhum
+    periodo esta' aberto; sem essa distincao, quem presidiu a CDH em 2015 e segue
+    titular dela apareceria como "Presidente, em curso".
     """
     if not por_pessoa:
         return
@@ -1077,8 +1081,9 @@ def _anexar_comissoes_senado(cliente, por_pessoa: dict[str, list[Candidato]]) ->
     try:
         linhas = list(cliente.query(f"""
             select id_pessoa, classe_colegiado, sigla_colegiado, nome_colegiado,
-                   tipo_colegiado, papel_principal, qt_periodos, em_curso,
-                   origem_da_classe, casamento_confiavel,
+                   tipo_colegiado, papel_principal, papel_atual, qt_periodos,
+                   qt_cargos, em_curso, comanda_agora, origem_da_classe,
+                   casamento_confiavel,
                    extract(year from primeiro_inicio) as a1,
                    extract(year from ultimo_fim)      as a2
             from `{p}.marts.fct_comissao_senador`
@@ -1094,8 +1099,15 @@ def _anexar_comissoes_senado(cliente, por_pessoa: dict[str, list[Candidato]]) ->
             c.comissoes_senado.append({
                 "classe": r.classe_colegiado, "sigla": r.sigla_colegiado,
                 "nome": r.nome_colegiado, "tipo": r.tipo_colegiado,
-                "papel": r.papel_principal, "vezes": r.qt_periodos,
-                "em_curso": bool(r.em_curso), "a1": r.a1, "a2": r.a2,
+                # O papel EXIBIDO e' o de agora quando ha' periodo aberto, e o
+                # de maior peso da trajetoria quando nao ha'. Usar sempre o
+                # segundo faria a CDH aparecer com cinco presidentes.
+                "papel": r.papel_atual or r.papel_principal,
+                "papel_maximo": r.papel_principal,
+                "vezes": r.qt_periodos, "cargos": r.qt_cargos,
+                "em_curso": bool(r.em_curso),
+                "comanda": bool(r.comanda_agora),
+                "a1": r.a1, "a2": r.a2,
                 "deduzido": r.origem_da_classe == "nome",
                 "confiavel": bool(r.casamento_confiavel),
             })

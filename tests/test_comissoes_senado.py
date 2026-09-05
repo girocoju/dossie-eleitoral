@@ -23,7 +23,7 @@ from ingest.comissoes_senado import (
     _classificar,
 )
 from scripts.gerar_site import CLASSES_COMISSAO, Candidato
-from scripts.render_site import _comissoes_senado
+from scripts.render_site import _comissoes_senado, _papel_legivel
 from tests.conftest import contem_frase, texto_visivel
 
 
@@ -46,12 +46,25 @@ COLEGIADOS = [
      "nome": "Comissão de Direitos Humanos e Legislação Participativa",
      "tipo": "Comissão permanente", "papel": "Titular", "vezes": 12,
      "em_curso": True, "a1": 2005, "a2": 2026,
+     "papel_maximo": "Titular", "cargos": 0, "comanda": False,
      "deduzido": False, "confiavel": False},
     {"classe": "temporaria", "sigla": "CPMIINSS",
      "nome": "CPMI - INSS", "tipo": "Comissão parlamentar mista de inquérito",
      "papel": "Titular", "vezes": 1, "em_curso": True, "a1": 2025, "a2": 2026,
+     "papel_maximo": "Titular", "cargos": 0, "comanda": False,
      "deduzido": True, "confiavel": False},
 ]
+
+# Vem da rota de cargos: papel de comando, e um colegiado que a lista de
+# comissoes nao conhece. `vezes` = 0 de proposito — a fonte publica o cargo sem
+# publicar a designacao.
+PRESIDENCIA = {
+    "classe": "mesa", "sigla": "Mesa",
+    "nome": "Mesa Diretora do Congresso Nacional", "tipo": "Mesa",
+    "papel": "PRESIDENTE", "papel_maximo": "PRESIDENTE", "vezes": 0, "cargos": 2,
+    "em_curso": True, "comanda": True, "a1": 2025, "a2": 2026,
+    "deduzido": False, "confiavel": False,
+}
 
 
 # ── a natureza vem do CODIGO, e o nome so' quando nao ha' codigo ──────────
@@ -137,12 +150,47 @@ def test_a_tela_diz_que_a_identidade_e_inferida():
     assert contem_frase(t, "nome e data de nascimento")
 
 
-def test_a_tela_diz_que_presidencia_nao_aparece_e_por_que():
-    """A fonte devolve zero Presidente em 7.226 vinculos. Sem dizer isso, o
-    silencio vira a afirmacao de que a pessoa nunca presidiu nada."""
+def test_a_presidencia_aparece_e_vem_destacada():
+    """Ate' 05/09/2026 a fonte parecia nao publicar papel de comando — era a
+    L-30. Publica, por outra rota: `/senador/{cod}/cargos` (ADR-049).
+
+    Presidir a CCJ e ser suplente dela nao sao a mesma informacao, e a tabela
+    ficaria plana se as duas linhas pesassem igual."""
+    html = _comissoes_senado(_cand(comissoes_senado=COLEGIADOS + [PRESIDENCIA]))
+    assert "<b>Presidente</b>" in html
+    assert "Mesa Diretora do Congresso Nacional" in texto_visivel(html)
+
+
+def test_a_tela_explica_que_o_papel_e_o_de_agora():
+    """Quem presidiu a CDH em 2015 e segue titular dela hoje tem os dois fatos.
+    A tabela nao pode transformar o primeiro em "presidente, em curso"."""
     t = texto_visivel(_comissoes_senado(_cand(comissoes_senado=COLEGIADOS)))
-    assert contem_frase(t, "não quer dizer que não houve")
-    assert "L-30" in t
+    assert contem_frase(t, "O papel mostrado é o de agora")
+
+
+def test_a_tela_explica_a_segunda_rota_e_a_falta_de_designacao():
+    t = texto_visivel(_comissoes_senado(_cand(comissoes_senado=COLEGIADOS)))
+    assert contem_frase(t, "Mesa Diretora do Congresso")
+    assert contem_frase(t, "sem contagem de designações")
+
+
+def test_o_papel_em_caixa_alta_e_normalizado():
+    """A rota de comissoes escreve "Titular"; a de cargos escreve "PRESIDENTE".
+    Sem normalizar, a mesma coluna alterna de caixa linha a linha e o leitor le'
+    a caixa alta como enfase — que nao existe no dado."""
+    assert _papel_legivel("PRESIDENTE") == "Presidente"
+    assert _papel_legivel("1º VICE-PRESIDENTE") == "1º vice-presidente"
+    assert _papel_legivel("PRESIDENTE DO CONSELHO CONSULTIVO") == \
+        "Presidente do conselho consultivo"
+
+
+def test_o_que_a_fonte_ja_escreveu_bem_nao_e_mexido():
+    """"Titular" e "Relator da Receita" vem certos. Passa-los pela normalizacao
+    quebraria o que estava bom."""
+    assert _papel_legivel("Titular") == "Titular"
+    assert _papel_legivel("Relator da Receita") == "Relator da Receita"
+    assert _papel_legivel("") == ""
+    assert _papel_legivel(None) == ""
 
 
 def test_a_tela_diz_que_frente_e_grupo_ficam_de_fora():
@@ -174,3 +222,37 @@ def test_o_bloco_agrupa_por_natureza_do_colegiado():
 
 def test_sem_colegiado_nao_ha_bloco():
     assert _comissoes_senado(_cand()) == ""
+
+
+# ── a segunda rota, que fechou a L-30 (ADR-049) ───────────────────────────
+
+def test_a_medida_provisoria_nao_vira_comissao_mista():
+    """A rota de cargos escreve "Comissao Mista da Medida Provisoria n 1154",
+    que CONTEM "Comissao Mista". Sem a regra da MPV testada antes, toda comissao
+    de MPV viraria mista comum e afogaria a ficha — sao rotina, como na Camara."""
+    classe, _ = _classe_por_nome("Comissão Mista da Medida Provisória n° 1154, de 2023")
+    assert classe == "medida_provisoria"
+    assert classe not in CLASSES_DE_COLEGIADO
+
+
+def test_a_comissao_mista_comum_continua_mista():
+    """A regra da MPV nao pode ter engolido a classe que ela protege."""
+    assert _classe_por_nome("Comissão Mista de Planos e Orçamentos")[0] == "mista"
+
+
+def test_a_mesa_e_colegiado_exibivel():
+    """A Mesa Diretora e' o assento mais visivel do pais e so' existe na rota de
+    cargos. Se ela nao for exibivel, a L-30 nao fechou."""
+    assert "mesa" in CLASSES_DE_COLEGIADO
+    assert "mesa" in CLASSES_COMISSAO
+
+
+def test_o_vinculo_carrega_de_qual_rota_veio():
+    """Sem `origem_do_vinculo` o mart nao consegue separar designacao de cargo, e
+    "designado 4 vezes" apareceria onde houve duas designacoes e duas
+    presidencias."""
+    from dataclasses import fields
+
+    from ingest.comissoes_senado import Vinculo
+
+    assert "origem_do_vinculo" in {f.name for f in fields(Vinculo)}

@@ -9,6 +9,17 @@
   Uma linha por (senador, colegiado, periodo). O mesmo senador reaparece no mesmo
   colegiado a cada renovacao, e isso e' fato: sao mandatos distintos ali.
 
+  ── SAO DUAS ROTAS DA FONTE, JA' UNIDAS NA INGESTAO ──
+
+  `origem_do_vinculo` diz de qual:
+
+      comissoes   quem SENTOU — Titular, Suplente, Nato
+      cargos      quem COMANDOU — Presidente, Vice, Relator, Secretario
+
+  A segunda traz colegiado que a primeira nao conhece, a Mesa Diretora inclusive.
+  Por isso as duas sao unidas e nao cruzadas: juntar por chave perderia o assento
+  mais visivel do pais. Ver ADR-049, que fecha a L-30.
+
   ── A CLASSE NAO E' CALCULADA AQUI, E VEM DE DUAS PROCEDENCIAS ──
 
   Como na Camara (ADR-044), ela chega pronta da ingestao. A diferenca e' que o
@@ -35,6 +46,7 @@ select
     classe_colegiado,
     tipo_colegiado,
     origem_da_classe,
+    origem_do_vinculo,
     nullif(papel, '')                                   as papel,
 
     safe_cast(nullif(data_inicio, '') as date)          as data_inicio,

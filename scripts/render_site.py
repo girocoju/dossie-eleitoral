@@ -1164,6 +1164,36 @@ def _periodo(a1: int | None, a2: int | None) -> str:
     return str(a1) if a1 == a2 or not a2 else f"{a1}–{a2}"
 
 
+def _papel_legivel(papel: str | None) -> str:
+    """"1º VICE-PRESIDENTE" -> "1º Vice-presidente".
+
+    A rota de comissoes escreve "Titular"; a de cargos escreve "PRESIDENTE". Sem
+    normalizar, a mesma coluna da ficha alterna entre as duas caixas linha a
+    linha, e o leitor le' a caixa alta como enfase — que nao existe no dado.
+    """
+    if not papel:
+        return ""
+    # So' mexe no que veio TODO em caixa alta. "Titular" e "Relator da Receita"
+    # a fonte ja' escreveu bem, e passa-los por aqui quebraria o que estava certo.
+    # O teste olha so' letras COM caixa. O indicador ordinal de "1o" e "2a"
+    # responde `islower() == True` em Python sem ser minuscula de nada, e por
+    # causa dele "1o VICE-PRESIDENTE" passava batido.
+    def tem_caixa(c: str) -> bool:
+        return c.upper() != c.lower()
+
+    if any(c.islower() for c in papel if tem_caixa(c)):
+        return papel
+    if not any(c.isupper() for c in papel if tem_caixa(c)):
+        return papel
+    minusculo = papel.lower()
+    # Maiuscula APENAS na primeira letra da frase, nunca em cada palavra —
+    # caixa por palavra produz "Presidente Do Conselho Consultivo".
+    for i, c in enumerate(minusculo):
+        if c.isalpha():
+            return minusculo[:i] + c.upper() + minusculo[i + 1:]
+    return minusculo
+
+
 def _linha_comissao(x: dict) -> str:
     return (f"<tr><td><b>{e(x['sigla'])}</b>"
             f"<div class='nc'>{e(x['nome'])}</div></td>"
@@ -1230,6 +1260,25 @@ def _comissoes(c: Candidato) -> str:
     </section>"""
 
 
+def _linha_colegiado_senado(x: dict) -> str:
+    """Como a da Camara, com duas diferencas.
+
+    O papel sai normalizado (a fonte manda "PRESIDENTE" em caixa alta), e cargo
+    de comando ganha destaque — presidir a CCJ e ser suplente dela nao sao a
+    mesma informacao, e a tabela ficaria plana se as duas linhas pesassem igual.
+    """
+    papel = _papel_legivel(x["papel"])
+    if x.get("comanda"):
+        papel = f"<b>{e(papel)}</b>"
+    else:
+        papel = e(papel) or "—"
+    return (f"<tr><td><b>{e(x['sigla'])}</b>"
+            f"<div class='nc'>{e(x['nome'])}</div></td>"
+            f"<td>{papel}</td>"
+            f"<td class='num'>{_periodo(x['a1'], x['a2'])}</td>"
+            f"<td>{'<b>em curso</b>' if x['em_curso'] else ''}</td></tr>")
+
+
 def _comissoes_senado(c: Candidato) -> str:
     """Onde a pessoa sentou no Senado (F-29, fecha a L-28).
 
@@ -1263,7 +1312,7 @@ def _comissoes_senado(c: Candidato) -> str:
         do_grupo = por_classe.get(chave)
         if not do_grupo:
             continue
-        linhas = "".join(_linha_comissao(x) for x in do_grupo)
+        linhas = "".join(_linha_colegiado_senado(x) for x in do_grupo)
         partes.append(
             f"<h3 style='font-size:14px;margin:16px 0 6px'>{e(rotulo)} "
             f"<span style='font-weight:400;color:var(--ink-3)'>"
@@ -1301,12 +1350,17 @@ def _comissoes_senado(c: Candidato) -> str:
         para o mesmo colegiado. <b>Frentes e grupos parlamentares não entram</b>:
         são adesão aberta, não assento.</p>
       <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
-        <b>Presidência e relatoria não aparecem, e isso não quer dizer que não
-        houve.</b> A fonte devolve apenas Titular, Suplente e Nato — não há papel
-        de comando no dado, nem a Mesa Diretora. Esta tabela não diz quem presidiu
-        um colegiado, nem mesmo de quem preside a própria Casa. Registrado em
-        <a href="https://github.com/girocoju/dossie-eleitoral/blob/main/docs/LACUNAS.md">
-        LACUNAS.md</a> como L-30.</p>
+        <b>O papel mostrado é o de agora</b> quando o vínculo está em curso, e o
+        de maior peso da trajetória quando já terminou. Presidir um colegiado em
+        2015 e seguir titular dele hoje são dois fatos, e a tabela não transforma
+        o primeiro em "presidente, em curso".</p>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        Presidência, vice, relatoria e secretaria vêm de <b>outra consulta</b> da
+        mesma fonte, e é dela que saem também a <b>Mesa Diretora do Congresso</b>
+        e a Comissão Diretora do Senado — colegiados que a lista de comissões não
+        conhece. Colegiado que aparece só ali fica <b>sem contagem de
+        designações</b>: a fonte publica o cargo e não publica a designação, e o
+        número não é inventado para preencher.</p>
       {nota_deduzida}
     </section>"""
 
@@ -2717,6 +2771,72 @@ fetch("{BASE_URL}/dados/doadores.json").then(r => r.json()).then(d => {{
                    corpo, quando, f"{BASE_URL}/doadores/", "doadores")
 
 
+def _redirecionar_enderecos_antigos(destino: Path, fichas: list[Candidato]) -> int:
+    """Quem corrigiu o nome de urna no TSE ganhou um endereco novo. O antigo
+    continua no ar — e continua servindo o nome errado.
+
+    ── O QUE ACONTECE ──
+
+    O endereco da ficha e' `slug(nome_urna)-sq`. O `sq` identifica a candidatura
+    e nao muda; o slug muda toda vez que a pessoa corrige o nome. Medido em
+    05/09/2026: 7 candidaturas com dois enderecos, e as correcoes eram
+    justamente de grafia — "RAFAEL DULTRA" virou "RAFAEL DUTRA", "CAPITAO
+    RODOLDO" virou "CAPITAO RODOLFO", "NEUMARA" virou "NEMAURA".
+
+    O gerador escreve e nunca apaga, entao o endereco velho sobrevive a cada
+    publicacao com a grafia que a propria pessoa pediu para corrigir.
+
+    ── POR QUE REDIRECIONAR, E NAO APAGAR ──
+
+    Apagar transforma em 404 todo link ja' compartilhado — e este site existe
+    para ser citado. O endereco antigo passa a ser uma pagina de encaminhamento:
+    `canonical` para o buscador nao indexar duas vezes, `refresh` para o
+    navegador seguir, e um link visivel para quem tem JavaScript desligado.
+
+    Nao ha' nome nenhum na pagina de encaminhamento. Repetir ali a grafia antiga
+    seria continuar publicando exatamente o que se quer parar de publicar.
+    """
+    pasta = destino / "candidato"
+    if not pasta.is_dir():
+        return 0
+
+    # `sq` -> caminho canonico de agora
+    atual = {c.sq: c.caminho for c in fichas}
+    n = 0
+    for dir_antigo in sorted(pasta.iterdir()):
+        if not dir_antigo.is_dir():
+            continue
+        sq = dir_antigo.name.rsplit("-", 1)[-1]
+        canonico = atual.get(sq)
+        if not canonico or canonico == f"candidato/{dir_antigo.name}":
+            continue
+        alvo = f"{BASE_URL}/{canonico}/"
+        (dir_antigo / "index.html").write_text(
+            "<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\">"
+            f"<link rel=\"canonical\" href=\"{alvo}\">"
+            f"<meta http-equiv=\"refresh\" content=\"0; url={alvo}\">"
+            "<meta name=\"robots\" content=\"noindex, follow\">"
+            "<title>Esta ficha mudou de endereço</title></head><body>"
+            "<p>O nome de urna foi corrigido no TSE, e o endereço desta ficha "
+            f"mudou. <a href=\"{alvo}\">Ir para a ficha atual</a>.</p>"
+            "</body></html>", encoding="utf-8")
+        # A pagina do plano tambem tinha endereco proprio.
+        plano = dir_antigo / "plano" / "index.html"
+        if plano.exists():
+            plano.write_text(
+                "<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\">"
+                f"<link rel=\"canonical\" href=\"{alvo}plano/\">"
+                f"<meta http-equiv=\"refresh\" content=\"0; url={alvo}plano/\">"
+                "<meta name=\"robots\" content=\"noindex, follow\">"
+                "<title>Esta página mudou de endereço</title></head><body>"
+                f"<p><a href=\"{alvo}plano/\">Ir para a página atual</a>.</p>"
+                "</body></html>", encoding="utf-8")
+        n += 1
+    if n:
+        log.info("%d fichas mudaram de endereco; o antigo virou encaminhamento", n)
+    return n
+
+
 def escrever_site(destino: Path, fichas: list[Candidato],
                   proporcionais: dict[str, list[dict]], quando: str,
                   catalogo: list[dict], doadores: list[list] | None = None) -> None:
@@ -2785,3 +2905,7 @@ def escrever_site(destino: Path, fichas: list[Candidato],
           _metodologia(quando, catalogo, total_fichas=len(fichas)))
     for caminho, xml in sitemaps(fichas).items():
         grava(caminho, xml)
+
+    # Por ultimo: ele reescreve diretorios que os passos acima acabaram de
+    # gravar, e precisa ver o estado final.
+    _redirecionar_enderecos_antigos(destino, fichas)

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -146,6 +147,13 @@ TOTAL = int(total["n"])
 # candidatura' de ser falsa.
 COM_FICHA = sum(int(r["n"]) for r in D["por_cargo"] if int(r["cod_cargo"]) <= 8)
 SUPLENTES = TOTAL - COM_FICHA
+
+# As lacunas sao contadas do proprio LACUNAS.md. Escritas a mao, envelhecem
+# calado — foi o que aconteceu com "29 lacunas" numa edicao anterior.
+_LAC = (RAIZ / "docs" / "LACUNAS.md").read_text(encoding="utf-8")
+_BLOCOS = re.split(r"(?m)^(?=## L-)", _LAC)[1:]
+N_LACUNAS = len(_BLOCOS)
+N_FECHADAS = sum(1 for b in _BLOCOS if "FECHADA" in b[:400])
 PC = {int(r["cod_cargo"]): int(r["n"]) for r in D["por_cargo"]}
 INSTR = {r["grau_instrucao"]: int(r["n"]) for r in D["instrucao"]}
 # "Fundamental ou menos" junta as tres faixas abaixo do ensino medio. O
@@ -660,7 +668,12 @@ com_sen = [(CLASSE_C.get(r["classe"], r["classe"]), int(r["assentos"]))
            for r in D["comissoes_senado_classe"]]
 ALC = {r["bloco"]: int(r["fichas"]) for r in D["alcance_blocos"]}
 ORIG = {r["origem"]: int(r["assentos"]) for r in D["comissoes_senado_origem"]}
-PAPEL = {r["papel"]: int(r["vinculos"]) for r in D["comissoes_senado_papel"]}
+PAPEL = {r["papel"]: int(r["vinculos"]) for r in D["comissoes_senado_papel"]
+         if r["origem"] == "comissoes"}
+# Cargos de comando: presidencia, vice, relatoria, secretaria. Vem da
+# segunda rota, e sao eles que fecharam a L-30.
+CMD = sum(int(r["vinculos"]) for r in D["comissoes_senado_papel"]
+          if r["origem"] == "cargos")
 
 pag(f"""
 <h2>9 · O que os parlamentares em exercício produzem</h2>
@@ -699,14 +712,25 @@ pag(f"""
   de nascimento — forte, não certa. O dado aparece na ficha <b>com essa ressalva
   escrita ao lado</b>, que é diferente tanto de omiti-lo quanto de afirmá-lo com
   a mesma confiança do bloco da Câmara.</p>
-<p class="aviso"><b>Presidência e relatoria não aparecem — e isso não quer dizer
-  que não houve.</b> A fonte do Senado devolve
-  {num(PAPEL.get("Titular", 0))} vínculos de Titular,
-  {num(PAPEL.get("Suplente", 0))} de Suplente e {num(PAPEL.get("Nato", 0))} de
-  membro nato. Zero presidências, zero relatorias, e nenhuma Mesa Diretora: a
-  Mesa não é "comissão" no modelo de dados da Casa. O efeito é concreto — <b>quem
-  preside o Senado aparece apenas no Conselho de Ética</b>. Na Câmara o mesmo
-  dado existe, e por isso lá a tabela diz quem presidiu a CCJC.</p>
+<p class="aviso"><b>Quem comandou vem de outra consulta, e por pouco não veio.</b>
+  A lista de comissões do Senado devolve {num(PAPEL.get("Titular", 0))} vínculos
+  de Titular, {num(PAPEL.get("Suplente", 0))} de Suplente e
+  {num(PAPEL.get("Nato", 0))} de membro nato — e <b>nenhuma presidência</b>. Este
+  relatório chegou a registrar isso como limitação da fonte.<br><br>
+  Estava errado. A presidência existe em <b>outra rota da mesma API</b>, que
+  devolve também vice, relatoria, secretaria e os colegiados que a primeira não
+  conhece — a <b>Mesa Diretora do Congresso</b> entre eles. São
+  {num(CMD)} cargos de comando, e é assim que a ficha passa a dizer que Davi
+  Alcolumbre preside o Senado em vez de mostrá-lo apenas no Conselho de Ética.
+  <br><br>
+  Fica o método, que vale para qualquer trabalho com dado público: <b>medir a
+  ausência numa rota não prova a ausência na fonte</b>.</p>
+<p class="obs"><b>O papel de agora não é o de sempre.</b> Um senador que presidiu
+  a Comissão de Direitos Humanos em 2015 e segue titular dela hoje tem os dois
+  fatos. Tratados como um só, a comissão apareceria com <b>cinco presidentes
+  simultâneos</b> — foi o que a primeira versão deste levantamento produziu, e o
+  que a conferência pegou. A tabela mostra o papel <b>vigente</b> ao lado de "em
+  curso", e guarda o de maior peso para a linha histórica.</p>
 <p class="obs"><b>De onde veio a natureza de cada colegiado.</b> O catálogo do
   Senado só lista o que está em atividade, e 292 colegiados citados pelos
   senadores estavam fora dele — entre eles a CPMI do INSS e a CPI da Pandemia.
@@ -933,17 +957,18 @@ pag("""
         <td>A Casa não publica. A ligação com o cadastro eleitoral passa a ser
         por nome e data de nascimento — forte, não certa. A ficha de senador
         traz o dado <b>com a ressalva escrita ao lado</b>, e não sem ela</td></tr>
-    <tr><td><b>Presidência e relatoria de comissão no Senado</b><br>
+    <tr><td><b>Presidência de comissão do Senado, ausente na rota óbvia</b><br>
         <span class="s">Senado Federal</span></td>
         <td class="num">0<br><span class="s">de 7.226 vínculos</span></td>
-        <td>A fonte devolve Titular, Suplente e Nato — e mais nada. Não há
-        sequer a Mesa Diretora: <b>quem preside o Senado aparece apenas no
-        Conselho de Ética</b>. A tabela diz que não afirma quem presidiu, para
-        que o silêncio não seja lido como ausência do fato</td></tr>
+        <td>A lista de comissões de um senador devolve Titular, Suplente e Nato,
+        e nada mais — nem a Mesa Diretora. O dado <b>existe</b>, em outra rota da
+        mesma API. É a incongruência mais instrutiva desta lista: medir a
+        ausência num endpoint não prova a ausência na fonte, e este relatório
+        chegou a publicar a conclusão errada</td></tr>
   </tbody>
 </table>""")
 
-pag("""
+pag(f"""
 <h3>Dados que existem, mas induzem ao erro se lidos literalmente</h3>
 <table class="t incong">
   <thead><tr><th>A armadilha</th><th>O que acontece</th></tr></thead>
@@ -1035,10 +1060,10 @@ pag("""
   não tem como avaliar: o de tomar por completo um retrato que não é. A lista
   acima é o que permite a quem lê discordar deste documento com base — e
   discordar com base é o que distingue dado público de número solto.</p>
-<p class="obs">São <b>30 lacunas</b> registradas até aqui, das quais 7 já foram
-  fechadas por trabalho posterior — a mais recente delas, a de comissões do
-  Senado, fechou porque a <i>premissa</i> da lacuna estava errada, e não porque
-  a fonte melhorou. A lista viva está em
+<p class="obs">São <b>{num(N_LACUNAS)} lacunas</b> registradas até aqui, das
+  quais {num(N_FECHADAS)} já foram fechadas por trabalho posterior — e as duas
+  mais recentes fecharam porque a <i>premissa</i> da lacuna estava errada, não
+  porque a fonte melhorou. A lista viva está em
   <span class="url">github.com/girocoju/dossie-eleitoral</span>, no arquivo
   <code>docs/LACUNAS.md</code>.</p>""")
 

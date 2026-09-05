@@ -783,6 +783,35 @@ por rateio ou por qualquer criterio. Seria inventar autoria de dinheiro publico.
 
 ## L-30 · O Senado não publica presidência de comissão, nem a Mesa Diretora
 
+**Situacao:** FECHADA em 05/09/2026, no mesmo dia em que foi aberta · ADR-049 · F-31
+
+**A medicao estava certa e a conclusao estava errada.** Em 7.226 vinculos de
+`/senador/{codigo}/comissoes` ha' mesmo zero presidencias e nenhuma Mesa. O que
+nao se seguia dali e' que o Senado nao publique o dado — ele publica, em outra
+rota da mesma API:
+
+    /senador/{codigo}/cargos.json
+
+Ela devolve PRESIDENTE, VICE-PRESIDENTE, RELATOR, SECRETARIO e CORREGEDOR, com
+colegiado e periodo, e traz junto os colegiados que a outra rota nao conhece —
+Mesa Diretora do Congresso Nacional e Comissao Diretora do Senado Federal.
+
+O erro foi de metodo: procurei a Mesa por rotas plausiveis (`composicao/mesa`,
+`plenario/lista/mesa`, `composicaoMesa`, `senador/lista/mesa`, todas vazias) e
+nao pelo caminho que a propria API ja' usava para todo o resto, que e' pendurar o
+recurso no parlamentar.
+
+Fechada com 804 cargos de comando e 61 vinculos de Mesa onde havia zero.
+Conferida pela invariante mais forte que o dado admite: **uma presidencia por
+colegiado em cada momento** — 18 permanentes e a Mesa, um presidente cada, zero
+duplicados.
+
+**O que fica como aprendizado, e nao como lacuna:** medir a ausencia numa rota
+nao prova a ausencia na fonte. Esta lacuna sobreviveu um dia porque a medicao
+parecia conclusiva demais para ser questionada.
+
+<details><summary>Registro original, de 05/09/2026</summary>
+
 **Situacao:** ABERTA · registrada em 05/09/2026 · **nao e' lacuna deste projeto**
 
 **O que falta:** duas coisas que a ficha de deputado tem e a de senador nao pode
@@ -827,3 +856,38 @@ composicao carregada depois. Fica fora do custo quase-zero do projeto por ora.
 contrario. E nao inferir a Mesa a partir do cargo declarado no perfil do senador:
 o cargo e' do presente e o assento tem periodo, e cruza-los produziria a
 afirmacao de que ele presidiu a Casa durante todos os mandatos.
+
+</details>
+
+---
+
+## L-31 · A presidência de um colegiado pode existir e não poder ser exibida
+
+**Situacao:** ABERTA · registrada em 05/09/2026 · **e' o residuo honesto da L-28**
+
+**O que falta:** identidade. A rota de cargos publica quem preside cada
+colegiado, mas exibir isso exige ligar o senador a' pessoa que se candidata — e
+essa ligacao e' por nome + data de nascimento, sem CPF (ADR-034).
+
+Quando o nome casa com mais de uma pessoa do cadastro eleitoral,
+`metodo_id_pessoa` fica `ambiguo`, `id_pessoa` fica nulo, e o vinculo NAO entra
+no mart.
+
+Medido em 05/09/2026: das 19 presidencias em curso de comissao permanente e
+Mesa, **uma** nao pode ser exibida — a da Comissao de Agricultura e Reforma
+Agraria, de Zequinha Marinho.
+
+**Impacto:** a CRA aparece na ficha sem presidencia atual, e nao ha' nada na tela
+dizendo que ha' uma e que ela e' de outra pessoa. O leitor que compare a ficha
+com a pagina do Senado encontra a diferenca sem explicacao.
+
+**Como esta' tratado:** o vinculo fica de fora. Atribuir a presidencia da CRA a
+um homonimo seria o pior erro possivel nesta tela — pior que a ausencia.
+
+**Como fechar:** a UF esta' disponivel dos dois lados do casamento e ainda nao e'
+usada como criterio de desempate. Um senador do Para e um candidato de outro
+estado com o mesmo nome e nascimento deixariam de ser ambiguos. E' trabalho no
+`dim_parlamentar`, nao nesta feature.
+
+**O que NAO fazer:** escolher "o mais provavel" entre os homonimos por votacao,
+partido ou qualquer heuristica. Ou a ligacao e' segura ou o dado nao aparece.

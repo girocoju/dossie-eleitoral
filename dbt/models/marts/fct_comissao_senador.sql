@@ -34,12 +34,37 @@
   `desconhecida` fica de fora por outro motivo: nao sabemos o que e'. Ver a
   secao seguinte.
 
-  ── O PAPEL AQUI E' MAIS POBRE QUE O DA CAMARA, E DE PROPOSITO ──
+  ── O PAPEL VEM DE DUAS ROTAS, E ISSO MUDA A CONTAGEM ──
 
-  A rota do Senado devolve apenas Titular, Suplente e Nato. Nao ha' Presidente
-  nem Relator, entao a ficha de senador NAO afirma quem presidiu um colegiado —
-  ao contrario da de deputado. E' ausencia da fonte, nao escolha nossa, e a
-  alternativa (deduzir presidencia de outra rota) inventaria o dado (Regra 5).
+  `/comissoes` devolve quem SENTOU (Titular, Suplente, Nato) e `/cargos` devolve
+  quem COMANDOU (Presidente, Vice, Relator, Secretario). A ingestao une as duas,
+  e `origem_do_vinculo` distingue.
+
+  A consequencia esta' nas contagens: `qt_periodos` conta apenas DESIGNACOES —
+  somar as linhas de cargo faria "designado 4 vezes" onde houve duas designacoes
+  e duas presidencias. O comando tem contador proprio, `qt_cargos`.
+
+  Colegiado que so' aparece em `/cargos` — a Mesa Diretora e' o caso — fica com
+  `qt_periodos = 0`. Nao e' buraco: e' a fonte publicando o cargo sem publicar a
+  designacao, e a tela diz isso em vez de inventar um numero (Regra 5).
+
+  ── O PAPEL DE AGORA NAO E' O PAPEL DE MAIOR PESO DE SEMPRE ──
+
+  Sao DOIS campos, e confundi-los publica uma afirmacao falsa sobre gente real.
+
+  `em_curso` e' verdadeiro quando ALGUM periodo esta' aberto. Um senador que
+  preside a CDH em 2015 e segue titular dela hoje tem os dois: presidencia
+  encerrada, titularidade aberta. Um unico `papel_principal` combinado com
+  `em_curso` diria "Presidente da CDH, em curso" — e a CDH apareceria com CINCO
+  presidentes simultaneos, que foi o que a primeira versao deste modelo produziu.
+
+      papel_atual       o de maior peso entre os periodos ABERTOS; nulo se
+                        nenhum esta' aberto
+      papel_principal   o de maior peso de toda a trajetoria ali
+
+  A tela mostra `papel_atual` ao lado de "em curso" e guarda `papel_principal`
+  para a linha historica. Conferido: presidencia em curso e' UMA por colegiado,
+  nas 19 comissoes permanentes e na Mesa.
 */
 
 with assentos as (
@@ -80,11 +105,23 @@ pesado as (
     select
         *,
         -- Hierarquia FORMAL do colegiado, nao merito. Numero menor = mais peso.
+        --
+        -- A fonte escreve o ordinal junto ("1o VICE-PRESIDENTE", "2a
+        -- SECRETARIA"), entao o teste e' por CONTEUDO e nao por prefixo. E o
+        -- vice e' testado antes do presidente: "VICE-PRESIDENTE" contem
+        -- "PRESIDENTE", e a ordem inversa promoveria todo vice a presidente.
         case
-            when {{ sem_acento('papel') }} like 'TITULAR%'  then 1
-            when {{ sem_acento('papel') }} like 'NATO%'     then 2
-            when {{ sem_acento('papel') }} like 'SUPLENTE%' then 3
-            else 4
+            when {{ sem_acento('papel') }} like '%VICE-PRESIDENTE%' then 2
+            when {{ sem_acento('papel') }} like '%PRESIDENTE%'      then 1
+            when {{ sem_acento('papel') }} like '%SECRETARI%'       then 3
+            when {{ sem_acento('papel') }} like '%CORREGEDOR%'      then 3
+            when {{ sem_acento('papel') }} like '%OUVIDOR%'         then 3
+            when {{ sem_acento('papel') }} like '%RELATOR%'         then 4
+            when {{ sem_acento('papel') }} like '%COORDENADOR%'     then 5
+            when {{ sem_acento('papel') }} like 'TITULAR%'          then 6
+            when {{ sem_acento('papel') }} like 'NATO%'             then 7
+            when {{ sem_acento('papel') }} like '%SUPLENTE%'        then 8
+            else 9
         end                                             as peso_papel
     from com_pessoa
 
@@ -108,13 +145,28 @@ select
     any_value(metodo_id_pessoa)                         as metodo_id_pessoa,
     logical_or(casamento_confiavel)                     as casamento_confiavel,
 
+    -- O de maior peso de toda a trajetoria ali.
     array_agg(papel order by peso_papel limit 1)[offset(0)] as papel_principal,
+
+    -- O de maior peso entre os periodos ABERTOS. Nulo quando nenhum esta'
+    -- aberto — e e' esse nulo que impede a tela de dizer "Presidente, em curso"
+    -- de quem presidiu ha' dez anos e hoje so' e' titular.
+    array_agg(if(em_curso, papel, null) ignore nulls
+              order by peso_papel limit 1)[safe_offset(0)] as papel_atual,
+    min(if(em_curso, peso_papel, null))                 as peso_atual,
+
     count(distinct papel)                               as qt_papeis,
+
+    -- Conta DESIGNACAO, nao cargo: as duas rotas descrevem o mesmo periodo por
+    -- angulos diferentes, e somar produziria o dobro.
+    countif(origem_do_vinculo = 'comissoes')            as qt_periodos,
+    countif(origem_do_vinculo = 'cargos')               as qt_cargos,
+    logical_or(peso_papel <= 5)                         as teve_comando,
+    logical_or(em_curso and peso_papel <= 5)            as comanda_agora,
 
     min(data_inicio)                                    as primeiro_inicio,
     max(coalesce(data_fim, data_inicio))                as ultimo_fim,
     logical_or(em_curso)                                as em_curso,
-    count(*)                                            as qt_periodos,
 
     max(_extracted_at)                                  as _extracted_at
 

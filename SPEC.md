@@ -255,6 +255,63 @@ registrados depois da última publicação em lote do TSE (L-23).
 
 ---
 
+**F-31 — Presidência e Mesa no Senado** · P1 · **Implementada em 05/09/2026**
+
+> Ver [ADR-049](docs/adr/ADR-049-cargos-de-comando-no-senado.md). Fecha a
+> [L-30](docs/LACUNAS.md), abre a [L-31](docs/LACUNAS.md).
+
+**Por que entra.** A F-29 exibiu onde o senador sentou, e a L-30 registrou que a
+fonte não publicava quem comandou: zero presidências em 7.226 vínculos, nenhuma
+Mesa Diretora. A medição estava certa e a conclusão estava errada — o dado existe
+em `/senador/{codigo}/cargos`, outra rota da mesma API.
+
+**Alcance.** 804 cargos de comando, 61 vínculos de Mesa onde havia zero, e os
+colegiados exibíveis de 5.514 para 5.960.
+
+**As duas rotas são unidas, não cruzadas.** `/comissoes` dá quem sentou;
+`/cargos` dá quem comandou **e** os colegiados que a primeira não conhece — a
+Mesa Diretora do Congresso e a Comissão Diretora do Senado só existem lá. Juntar
+por chave perderia o assento mais visível do país.
+
+**O papel de agora não é o de sempre.** Um senador que presidiu a CDH em 2015 e
+segue titular dela hoje tem os dois fatos. A primeira versão do modelo combinou
+`papel_principal` com `em_curso` e produziu **cinco presidentes simultâneos na
+CDH**. São agora dois campos: `papel_atual` (nulo quando nenhum período está
+aberto) e `papel_principal` (toda a trajetória).
+
+**O que fica de fora.** Comissão de medida provisória, pela mesma razão da
+Câmara: são rotina. A rota de cargos escreve "Comissão Mista da Medida Provisória
+nº 1154", que contém "Comissão Mista" — sem a regra da MPV testada antes, 154
+vínculos de rotina afogariam a ficha.
+
+**Conferido:** pela invariante mais forte que o dado admite — em cada colegiado,
+num dado momento, há **exatamente uma** presidência. 18 comissões permanentes e a
+Mesa, um presidente cada, zero duplicados, com nomes públicos e conferíveis.
+
+---
+
+**F-30 — Ficha que mudou de endereço** · P2 · **Implementada em 05/09/2026**
+
+**Por que entra.** O endereço da ficha é `slug(nome_urna)-sq`. O `sq` identifica
+a candidatura e não muda; o slug muda toda vez que a pessoa **corrige o nome no
+TSE**. Como o gerador escreve e nunca apaga, o endereço antigo sobrevivia a cada
+publicação servindo a grafia que a própria pessoa pediu para corrigir.
+
+**Alcance.** 7 candidaturas com dois endereços, medidas em 05/09/2026 — e as
+correções eram justamente de grafia: "RAFAEL DULTRA" virou "RAFAEL DUTRA",
+"CAPITÃO RODOLDO" virou "CAPITÃO RODOLFO", "NEUMARA" virou "NEMAURA".
+
+**Redireciona, não apaga.** Apagar transforma em 404 todo link já compartilhado,
+e este site existe para ser citado. O endereço antigo vira encaminhamento —
+`canonical` para o buscador não indexar duas vezes, `refresh` para o navegador
+seguir, `noindex` para as duas URLs não competirem, e um link visível para quem
+tem JavaScript desligado.
+
+**Sem nome na página de encaminhamento.** Repetir ali a grafia antiga seria
+continuar publicando exatamente o que se quer parar de publicar.
+
+---
+
 **F-29 — Comissões no Senado** · P1 · **Implementada em 05/09/2026**
 
 > Ver [ADR-048](docs/adr/ADR-048-comissoes-do-senado.md). Fecha a
@@ -688,6 +745,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-049 | Presidência e Mesa no Senado saem de outra rota | A L-30 mediu zero presidências em 7.226 vínculos e concluiu que a fonte não publicava o dado; ela publica, em `/senador/{codigo}/cargos` — medir a ausência numa rota não prova a ausência na fonte | Aceita |
 | ADR-048 | Comissões do Senado, com identidade inferida e assumida | A L-28 exigia CPF para exibir comissão de senador, enquanto o bloco de atividade legislativa do Senado já estava no ar com a mesma identidade inferida e uma ressalva na tela — o critério mais duro não era prudência, era um bloco a menos por uma regra que o projeto não tinha | Aceita |
 | ADR-047 | Um publicador por vez | O workflow publicava a cada push e o `atualizar.bat` publica da máquina: nove pushes numa noite produziram nove publicações canceladas no meio do envio, e foi isso que encheu o servidor de arquivos ocultos | Aceita |
 | ADR-046 | Emendas: uma linha por ano, e nenhum total | O Portal ignora o ano no endereço e devolve sempre o mesmo arquivo — a primeira carga somou treze cópias; e um total de carreira seria um número grande sem significado, porque o ano é o que dá escala à cifra | Aceita |

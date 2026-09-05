@@ -41,6 +41,21 @@ ou frente tematica, a que qualquer parlamentar adere assinando uma lista. Contar
 isso como assento em colegiado inflaria a ficha de todo mundo com a mesma coisa,
 e a informacao viraria ruido.
 
+── SAO DUAS ROTAS, E UMA SO' NAO BASTA ──
+
+`/senador/{cod}/comissoes` devolve QUEM SENTOU: Titular, Suplente, Nato — e mais
+nada. Zero presidencias em 7.226 vinculos, e nenhuma Mesa Diretora, porque a Mesa
+nao e' "comissao" no modelo de dados da Casa. Era a L-30.
+
+`/senador/{cod}/cargos` devolve QUEM COMANDOU: Presidente, Vice, Relator,
+Secretario, Corregedor — e, junto, os colegiados que a outra rota nao conhece,
+inclusive a Mesa Diretora do Congresso e a Comissao Diretora do Senado.
+
+As duas sao unidas AQUI, com `origem_do_vinculo` dizendo de qual vieram. Nao e'
+enriquecimento de uma pela outra: ha' colegiado que so' existe em `cargos`, e
+juntar por chave perderia justamente o assento mais visivel do pais — quem
+preside o Senado.
+
 ── O CATALOGO SO' COBRE O PRESENTE, E O QUE FALTA E' O QUE MAIS IMPORTA ──
 
 O catalogo lista apenas colegiados EM ATIVIDADE. Medido em 05/09/2026: 292
@@ -145,6 +160,7 @@ class Vinculo:
     papel: str
     data_inicio: str
     data_fim: str
+    origem_do_vinculo: str
 
 
 def _json(url: str) -> dict[str, Any]:
@@ -196,6 +212,11 @@ POR_NOME: tuple[tuple[str, tuple[str, str]], ...] = (
      ("mista", "Comissão representativa do Congresso")),
     ("COMISSAO DE MEDIDA PROVISORIA",
      ("medida_provisoria", "Comissão de medida provisória")),
+    # A rota de cargos traz "Comissao Mista da Medida Provisoria n 1154", que
+    # CONTEM "Comissao Mista" — sem esta linha antes, toda comissao de MPV
+    # viraria comissao mista comum e afogaria a ficha. Sao rotina, como na
+    # Camara (ADR-044), e por isso nao sao promovidas a colegiado.
+    ("MEDIDA PROVISORIA", ("medida_provisoria", "Comissão de medida provisória")),
     ("COMISSAO MISTA", ("mista", "Comissão mista")),
     ("SUBCOMISSAO PERMANENTE", ("permanente", "Subcomissão permanente")),
     ("SUBCOMISSAO", ("temporaria", "Subcomissão temporária")),
@@ -309,6 +330,7 @@ def coletar(codigos: list[int], colegiados: dict[int, dict]) -> list[Vinculo]:
                 papel=(v.get("DescricaoParticipacao") or "").strip(),
                 data_inicio=(v.get("DataInicio") or "")[:10],
                 data_fim=(v.get("DataFim") or "")[:10],
+                origem_do_vinculo="comissoes",
             ))
         if i % 20 == 0:
             log.info("%d/%d senadores, %d vinculos", i, len(codigos), len(saida))
@@ -323,6 +345,62 @@ def coletar(codigos: list[int], colegiados: dict[int, dict]) -> list[Vinculo]:
     return saida
 
 
+def coletar_cargos(codigos: list[int],
+                   colegiados: dict[int, dict]) -> list[Vinculo]:
+    """Presidencia, vice, relatoria e Mesa — o que `/comissoes` nao devolve.
+
+    Mesma forma de `coletar`, de proposito: as duas listas viram uma so' antes de
+    subir, e quem consome nao precisa saber que houve duas rotas. `papel` aqui e'
+    o `DescricaoCargo` da fonte, em caixa alta e com ordinal ("1o VICE-PRESIDENTE"),
+    e e' o mart que resolve a hierarquia.
+    """
+    saida: list[Vinculo] = []
+    sem_tipo: set[int | None] = set()
+    for i, cod in enumerate(codigos, 1):
+        try:
+            d = _json(f"{API}/senador/{cod}/cargos.json")
+        except Exception as exc:  # noqa: BLE001
+            log.warning("cargos do senador %s: %s", cod, str(exc)[:70])
+            continue
+        par = d.get("CargoParlamentar", {}).get("Parlamentar", {})
+        for c in _lista(par, "Cargos"):
+            ident = c.get("IdentificacaoComissao") or {}
+            try:
+                id_col = int(ident.get("CodigoComissao"))
+            except (TypeError, ValueError):
+                id_col = None
+            tipo = (colegiados.get(id_col) or {}).get("CodigoTipoColegiado")
+            try:
+                tipo = int(tipo) if tipo is not None else None
+            except (TypeError, ValueError):
+                tipo = None
+            nome = (ident.get("NomeComissao") or "").strip()
+            classe, rotulo, origem = _classificar(tipo, nome)
+            if tipo is None:
+                sem_tipo.add(id_col)
+            saida.append(Vinculo(
+                codigo_parlamentar=cod,
+                codigo_colegiado=id_col,
+                sigla_colegiado=(ident.get("SiglaComissao") or "").strip(),
+                nome_colegiado=nome,
+                casa_colegiado=(ident.get("SiglaCasaComissao") or "").strip(),
+                cod_tipo_colegiado=tipo,
+                classe_colegiado=classe,
+                tipo_colegiado=rotulo,
+                origem_da_classe=origem,
+                papel=(c.get("DescricaoCargo") or "").strip(),
+                data_inicio=(c.get("DataInicio") or "")[:10],
+                data_fim=(c.get("DataFim") or "")[:10],
+                origem_do_vinculo="cargos",
+            ))
+        if i % 20 == 0:
+            log.info("cargos: %d/%d senadores, %d vinculos", i, len(codigos),
+                     len(saida))
+    log.info("%d cargos de comando; %d colegiados deles fora do catalogo",
+             len(saida), len(sem_tipo))
+    return saida
+
+
 def _schema():
     """Schema explicito, nunca autodetect (convencao do projeto)."""
     from google.cloud import bigquery
@@ -331,7 +409,7 @@ def _schema():
 
     textos = ["sigla_colegiado", "nome_colegiado", "casa_colegiado",
               "classe_colegiado", "tipo_colegiado", "origem_da_classe", "papel",
-              "data_inicio", "data_fim"]
+              "data_inicio", "data_fim", "origem_do_vinculo"]
     schema = build_schema(textos)
     corte = len(textos)
     tipados = [
@@ -362,6 +440,11 @@ def cmd_load(args: argparse.Namespace) -> int:
     if not vinculos:
         log.error("nenhum vinculo coletado")
         return 75
+
+    # Segunda rota: presidencia, relatoria e Mesa. Se ELA falhar, a carga segue
+    # com o que a primeira trouxe — a ficha perde o papel de comando e nao
+    # perde o assento. O contrario nao vale: sem `coletar` nao ha' bloco.
+    vinculos += coletar_cargos(codigos, colegiados)
 
     agora = utc_now()
     destino = settings.staging_dir / "senado_comissoes.ndjson.gz"

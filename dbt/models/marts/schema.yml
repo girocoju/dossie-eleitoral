@@ -596,8 +596,10 @@ models:
       `id_pessoa is not null` — casamento por nome + nascimento, o mesmo criterio
       que `fct_atividade_senado` ja' usa em producao (ADR-034). `casamento_confiavel`
       e `metodo_id_pessoa` seguem ate' o fim para a ressalva na ficha.
-      O papel e' mais pobre: a rota do Senado devolve so' Titular, Suplente e
-      Nato. A ficha de senador NAO afirma quem presidiu um colegiado.
+      O papel vem de DUAS rotas unidas na ingestao: `/comissoes` da' quem sentou
+      (Titular, Suplente, Nato) e `/cargos` da' quem comandou (Presidente, Vice,
+      Relator, Secretario) mais os colegiados que a primeira nao conhece — a
+      Mesa Diretora inclusive. Fecha a L-30. Ver ADR-049.
     tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -625,11 +627,43 @@ models:
                 values: [catalogo, nome]
       - name: papel_principal
         description: >
-          O papel de maior peso pela hierarquia formal (Titular > Nato >
-          Suplente). Nao e' juizo sobre a pessoa.
+          O papel de maior peso pela hierarquia FORMAL do colegiado — Presidente
+          > Vice > Secretario/Corregedor > Relator > Coordenador > Titular >
+          Nato > Suplente. Nao e' juizo sobre a pessoa: e' escolher, entre fatos
+          igualmente verdadeiros, o mais informativo.
+          A fonte escreve o ordinal junto ("1o VICE-PRESIDENTE"), e o vice e'
+          testado ANTES do presidente — "VICE-PRESIDENTE" contem "PRESIDENTE", e
+          a ordem inversa promoveria todo vice a presidente.
+          E' o papel de TODA a trajetoria ali, nao o de agora. Para o de agora,
+          `papel_atual` — combinar este com `em_curso` faria a CDH aparecer com
+          cinco presidentes simultaneos.
+        tests: [not_null]
+      - name: papel_atual
+        description: >
+          O papel de maior peso entre os periodos ABERTOS, e NULO quando nenhum
+          esta' aberto. E' esse nulo que impede a tela de dizer "Presidente, em
+          curso" de quem presidiu ha' dez anos e hoje e' apenas titular.
+      - name: comanda_agora
+        description: >
+          A pessoa ocupa AGORA um posto de direcao naquele colegiado. Diferente
+          de `teve_comando`, que vale para toda a trajetoria.
         tests: [not_null]
       - name: qt_periodos
-        description: "Quantas vezes a pessoa foi designada para aquele colegiado."
+        description: >
+          Quantas vezes a pessoa foi DESIGNADA para aquele colegiado. Cargo de
+          comando nao entra: as duas rotas descrevem o mesmo periodo por angulos
+          diferentes, e somar produziria o dobro.
+          Vale ZERO em colegiado que so' aparece em `/cargos` — a Mesa Diretora
+          e' o caso. Nao e' buraco: e' a fonte publicando o cargo sem publicar a
+          designacao.
+        tests: [not_null]
+      - name: qt_cargos
+        description: "Quantos cargos de comando a pessoa teve naquele colegiado."
+        tests: [not_null]
+      - name: teve_comando
+        description: >
+          A pessoa ocupou algum posto de direcao ali — presidencia, vice,
+          secretaria, corregedoria, relatoria ou coordenacao.
         tests: [not_null]
       - name: em_curso
         description: >

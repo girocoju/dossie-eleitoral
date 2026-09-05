@@ -314,9 +314,9 @@ def coletar() -> dict[str, list[dict]]:
       group by 1 order by assentos desc""")
 
     q("comissoes_senado_papel", f"""
-      select papel, count(*) vinculos
+      select papel, origem_do_vinculo origem, count(*) vinculos
       from `{p}.stg.stg_senado__comissoes`
-      group by 1 order by vinculos desc""")
+      group by 1, 2 order by vinculos desc""")
 
     # Quantas fichas de 2026 recebem cada bloco legislativo. Sem isto o leitor
     # nao sabe se "892 candidaturas" e "51 candidaturas" sao o mesmo universo.
