@@ -2491,10 +2491,24 @@ def _metodologia(quando: str, catalogo: list[dict], total_fichas: int = 0) -> st
         simultâneos</b>, que foi o que a primeira versão deste modelo produziu.</p>
       <p>Colegiado que aparece só na consulta de cargos fica <b>sem contagem de
         designações</b> — a fonte publica o cargo e não publica a designação, e o
-        número não é inventado para preencher. E uma presidência em curso não
-        aparece: a da Comissão de Agricultura, cujo titular casa de forma
-        <b>ambígua</b> com o cadastro eleitoral. Atribuí-la ao homônimo errado
-        seria pior que a ausência. Registrado como L-31.</p>
+        número não é inventado para preencher.</p>
+      <h3>Quando a mesma pessoa aparece duas vezes no cadastro</h3>
+      <p>A identidade que liga uma candidatura à outra é o <b>CPF</b> quando o ano
+        o publica, e o nome mais a data de nascimento quando não publica. O CPF
+        cobre 100% de 2006, 2010 e 2026 — mas <b>96,9% de 1998</b>. Quem tem
+        candidatura dos dois lados dessa fronteira acaba com <b>duas
+        identidades</b>, e contá-las como pessoas diferentes faz o cadastro
+        parecer ter homônimos que não tem.</p>
+      <p>De 131.567 combinações de nome e nascimento, 326 respondem por mais de
+        uma identidade: <b>210 são essa fronteira</b> — e em 204 delas os dois
+        registros não compartilham um único ano — e 116 são homonímia de verdade.
+        A contagem que decide se um nome é ambíguo passou a olhar só as
+        identidades <b>com CPF</b>.</p>
+      <p>Isso <b>não funde ninguém</b>: cada candidatura continua com a
+        identidade que tinha. E a regra que importa segue de pé — duas
+        identidades com CPF no mesmo nome e data de nascimento são duas pessoas,
+        e nenhuma das duas aparece, porque atribuir o mandato de uma à outra seria
+        pior que a ausência.</p>
       <p>O catálogo de colegiados do Senado só lista o que está <b>em
         atividade</b>, e não existe rota que devolva o tipo de um colegiado
         encerrado. Medido em 05/09/2026: 292 colegiados citados pelos senadores
