@@ -863,6 +863,29 @@ afirmacao de que ele presidiu a Casa durante todos os mandatos.
 
 ## L-31 · A presidência de um colegiado pode existir e não poder ser exibida
 
+**Situacao:** FECHADA em 05/09/2026, no mesmo dia em que foi aberta · ADR-050
+
+**O diagnostico estava errado, e a saida proposta nao teria funcionado.** Esta
+lacuna dizia que a presidencia da CRA nao aparecia por HOMONIMIA, e propunha usar
+a UF como desempate. As duas identidades que respondem pela chave de Zequinha
+Marinho sao ambas do PA — a UF nao desempataria nada.
+
+O que havia era outra coisa: `id_pessoa` e' o `cpf_hash` quando o ano publica CPF
+e a chave de nome quando nao publica (ADR-005). O CPF cobre 100% de 2006, 2010 e
+2026, mas **96,9% de 1998** — e a mesma pessoa fica com DOIS `id_pessoa` quando
+tem candidatura dos dois lados dessa fronteira. Contar identidades distintas leu
+isso como duas pessoas.
+
+Medido em 05/09/2026 sobre 131.567 chaves: das 326 com mais de um `id_pessoa`,
+**210 sao fronteira** (uma identidade com CPF e uma sem) e 116 sao homonimia de
+verdade. Das 210, 204 nao tem um unico ano em comum entre os dois ids.
+
+Fechada contando so' identidades COM CPF para decidir a ambiguidade. Nao funde
+ninguem: o `id_pessoa` de cada candidatura continua o que era. Duas identidades
+com CPF na mesma chave seguem sendo duas pessoas, e a chave segue recusada.
+
+<details><summary>Registro original, de 05/09/2026</summary>
+
 **Situacao:** ABERTA · registrada em 05/09/2026 · **e' o residuo honesto da L-28**
 
 **O que falta:** identidade. A rota de cargos publica quem preside cada
@@ -891,3 +914,5 @@ estado com o mesmo nome e nascimento deixariam de ser ambiguos. E' trabalho no
 
 **O que NAO fazer:** escolher "o mais provavel" entre os homonimos por votacao,
 partido ou qualquer heuristica. Ou a ligacao e' segura ou o dado nao aparece.
+
+</details>

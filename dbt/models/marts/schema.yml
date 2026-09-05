@@ -436,6 +436,20 @@ models:
           identidade de um senador foi inferida, e nao confirmada pela fonte.
         tests: [not_null]
       - name: id_ambiguo
+        description: >
+          A chave de nome responde por mais de uma identidade COM CPF — duas
+          pessoas de verdade com o mesmo nome e a mesma data de nascimento.
+          Registro sem CPF NAO conta aqui: `id_pessoa` e' o cpf_hash quando o ano
+          publica CPF e a chave de nome quando nao publica, entao a mesma pessoa
+          fica com dois ids quando tem candidatura dos dois lados dessa
+          fronteira. Medido em 05/09/2026: das 326 chaves com mais de um
+          `id_pessoa`, 210 eram fronteira e 116 homonimia. Ver ADR-050.
+        tests: [not_null]
+      - name: chave_partida
+        description: >
+          A chave tinha uma identidade com CPF e outra sem, e a resolucao ficou
+          com a primeira. Nao muda nada na tela; existe para que a medicao do
+          ADR-050 possa ser refeita.
         tests: [not_null]
 
   - name: fct_atividade_senado
