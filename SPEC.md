@@ -255,6 +255,29 @@ registrados depois da última publicação em lote do TSE (L-23).
 
 ---
 
+**F-28 — Relatório analítico em PDF na home** · P2 · **Implementada em 05/09/2026**
+
+**Por que entra.** A ficha responde sobre *uma* pessoa. Quem chega querendo a
+leitura agregada — quantos se candidatam, quanto declaram, de onde vem o dinheiro
+— não tinha para onde ir. O relatório é essa leitura, com os mesmos dados e a
+mesma data de extração das fichas.
+
+**Onde fica.** Na home, entre a busca por nome e a lista de cargos: quem chega
+procurando alguém não é interrompido, e quem lê a página inteira encontra.
+
+**O bloco só aparece se o arquivo existir.** O PDF é documento escrito, não saída
+do pipeline. `_bloco_analise()` devolve vazio quando o arquivo não está lá —
+anunciar um download que responde 404 é pior que não anunciar nada. Por isso o
+PDF **está versionado no repositório**: sem ele, uma publicação feita pelo GitHub
+Actions perderia o bloco em silêncio, e a home passaria a ter ou não ter o
+relatório conforme quem publicou.
+
+**Sem pedido de doação.** A ideia de chave Pix na home foi adiada para depois de
+04/10/2026, para que o site não peça dinheiro durante o período eleitoral que ele
+próprio descreve.
+
+---
+
 **F-27 — Emendas parlamentares** · P1 · **Implementada em 04/09/2026**
 
 > Fonte nova (S18). Ver [ADR-046](docs/adr/ADR-046-emendas-parlamentares.md).

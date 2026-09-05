@@ -230,3 +230,35 @@ def test_a_tela_diz_que_a_busca_cobre_os_dois_nomes():
     se a busca nao olha ali."""
     assert contem_frase(_busca(["zu"], 100), "o nome de urna")
     assert contem_frase(_busca(["zu"], 100), "o nome completo declarado ao TSE")
+
+
+# ── o relatorio em PDF na home (F-28) ──────────────────────────────────────
+
+def test_o_bloco_do_relatorio_so_aparece_se_o_pdf_existir(monkeypatch, tmp_path):
+    """Anunciar um download que devolve 404 e' pior que nao anunciar nada.
+
+    O PDF nao e' produzido pelo pipeline — e' um documento escrito. Uma geracao
+    feita antes de alguem rodar o relatorio nao pode publicar link quebrado.
+    """
+    from scripts import render_site
+
+    monkeypatch.setattr(render_site, "ANALISE_ORIGEM", tmp_path / "nao-existe.pdf")
+    assert render_site._bloco_analise() == ""
+    assert "Baixar o relatório" not in _home([], {}, "x", prefixos=["jo"])
+
+    falso = tmp_path / "analise.pdf"
+    falso.write_bytes(b"%PDF-1.4" + b"0" * 400_000)
+    monkeypatch.setattr(render_site, "ANALISE_ORIGEM", falso)
+    html = render_site._bloco_analise()
+    assert "Baixar o relatório" in html
+    assert "0,4 MB" in html.replace(".", ",")
+    assert 'download' in html
+
+
+def test_o_link_do_relatorio_usa_o_endereco_publico(monkeypatch, tmp_path):
+    from scripts import render_site
+
+    falso = tmp_path / "analise.pdf"
+    falso.write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(render_site, "ANALISE_ORIGEM", falso)
+    assert f"{render_site.BASE_URL}/{render_site.ANALISE_PDF}" in render_site._bloco_analise()

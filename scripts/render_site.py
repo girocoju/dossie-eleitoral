@@ -20,6 +20,7 @@ import json
 import re
 from pathlib import Path
 
+from ingest.common.log import get_logger
 from ingest.common.textnorm import strip_accents
 from scripts.gerar_site import (
     _CARGO_NA_NOTA,
@@ -38,6 +39,8 @@ from scripts.gerar_site import (
     e,
     indice_de_busca,
 )
+
+log = get_logger("site")
 
 FONTE = "TSE — Divulgação de Candidaturas"
 
@@ -1849,6 +1852,37 @@ $("q").addEventListener("input", () => {{
 </script>"""
 
 
+# O relatorio analitico em PDF, se estiver gerado. Ele NAO e' produzido pelo
+# pipeline — e' um documento escrito, e vive na raiz do repositorio.
+#
+# O bloco na home so' aparece quando o arquivo existe. Anunciar um download que
+# devolve 404 e' pior que nao anunciar nada, e uma geracao feita antes de alguem
+# rodar o relatorio nao pode publicar um link quebrado.
+ANALISE_PDF = "analise-2026.pdf"
+ANALISE_ORIGEM = Path(__file__).resolve().parents[1] / "Dossie-Eleitoral-2026-analise.pdf"
+
+
+def _bloco_analise() -> str:
+    """Chamada para o relatorio analitico. Vazio se o PDF nao existe."""
+    if not ANALISE_ORIGEM.exists():
+        return ""
+    mb = ANALISE_ORIGEM.stat().st_size / 1e6
+    return f"""
+<div class="analise">
+  <div>
+    <h2 style="margin:0 0 6px;border:0;padding:0">O retrato das candidaturas de 2026</h2>
+    <p style="margin:0 0 10px">Um relatório de 27 páginas com a leitura agregada
+      dos mesmos dados que estão nas fichas: quem se candidata, quanto declara,
+      de onde vem o dinheiro de campanha, para onde vão as emendas — e uma seção
+      sobre <b>o que as fontes oficiais não entregam</b>.</p>
+    <p style="margin:0;font-size:12.5px;color:var(--ink-3)">
+      PDF, {mb:.1f} MB · gráficos e tabelas · mesmas fontes, mesma data de
+      extração</p>
+  </div>
+  <a class="cta" href="{BASE_URL}/{ANALISE_PDF}" download>Baixar o relatório &darr;</a>
+</div>"""
+
+
 def _home(majoritarios: list[Candidato], prop: dict[str, list[dict]], quando: str,
           prefixos: list[str] | None = None, total_fichas: int = 0) -> str:
     linhas = []
@@ -1870,6 +1904,7 @@ ranking e sem cor de partido — o que está aqui é registro público, não ava
 Onde o dado não existe, o site diz que não existe — nunca preenche a lacuna.</p>
 <h2 style="margin:28px 0 10px">Procurar uma candidatura</h2>
 {busca}
+{_bloco_analise()}
 <h2 style="margin:28px 0 10px">Por cargo</h2>
 <ul style="line-height:2;padding-left:20px">{''.join(linhas)}</ul>
 <h2 style="margin:28px 0 10px">O que este site não faz</h2>
@@ -2421,6 +2456,8 @@ def sitemaps(fichas: list[Candidato]) -> dict[str, str]:
     saida: dict[str, str] = {}
 
     fixas = [f"{BASE_URL}/", f"{BASE_URL}/metodologia/", f"{BASE_URL}/doadores/"]
+    if ANALISE_ORIGEM.exists():
+        fixas.append(f"{BASE_URL}/{ANALISE_PDF}")
     fixas += [f"{BASE_URL}/{k}/" for k, _, _ in CARGOS.values()]
     fixas += [f"{BASE_URL}/{k}/" for k, _ in PROPORCIONAIS.values()]
     saida["sitemaps/paginas.xml"] = _urlset(fixas)
@@ -2583,6 +2620,11 @@ def escrever_site(destino: Path, fichas: list[Candidato],
               json.dumps(registros, ensure_ascii=False, separators=(",", ":")))
 
     grava(CSS_ARQUIVO, CSS)
+    if ANALISE_ORIGEM.exists():
+        # `write_bytes` e nao `grava`: e' binario. A pasta ja' existe.
+        (destino / ANALISE_PDF).write_bytes(ANALISE_ORIGEM.read_bytes())
+        log.info("relatorio analitico incluido (%.1f MB)",
+                 ANALISE_ORIGEM.stat().st_size / 1e6)
     grava("index.html", _home(majoritarios, proporcionais, quando,
                               prefixos=sorted(indice), total_fichas=len(fichas)))
 
