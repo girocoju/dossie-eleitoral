@@ -551,6 +551,91 @@ def coletar() -> dict[str, list[dict]]:
       qualify row_number() over (
         partition by d.sq_candidato order by b.valor_bem desc) <= 2""")
 
+    # ── as medicoes da secao "o que as fontes nao entregam" ──────────────
+    # Elas estavam escritas no texto. Sete foram conferidas em 05/09/2026 e
+    # quatro tinham envelhecido — 79.140 virou 79.138, 94.463 virou 94.482,
+    # 73.856 virou 73.875, 402.446 virou 402.548. Drift pequeno e silencioso,
+    # que e' justamente o defeito que este relatorio denuncia nas fontes.
+    q("fonte_senado", f"""
+      select
+        countif(origem_do_vinculo = 'comissoes')            as via_comissoes,
+        countif(origem_do_vinculo = 'cargos')               as via_cargos,
+        count(*)                                            as total,
+        countif(origem_do_vinculo = 'comissoes'
+                and origem_da_classe != 'catalogo')         as fora_do_catalogo,
+        count(distinct if(origem_da_classe != 'catalogo',
+                          codigo_colegiado, null))          as colegiados_fora
+      from `{p}.stg.stg_senado__comissoes`""")
+
+    q("fonte_camara", f"""
+      select count(*) vinculos, count(distinct id_orgao) orgaos
+      from `{p}.stg.stg_camara__comissoes`""")
+
+    q("fonte_emendas", f"""
+      select count(*) linhas,
+             countif(autoria_nao_publicada) sem_autor,
+             countif(autor_e_pessoa) autor_pessoa,
+             sum(if(autoria_nao_publicada, vl_pago, 0)) pago_sem_autor
+      from `{p}.stg.stg_transparencia__emendas`""")
+
+    q("fonte_proposicoes", f"""
+      select count(*) linhas, countif(situacao is null) sem_situacao
+      from `{p}.stg.stg_camara__proposicoes`""")
+
+    # O arquivo de bens de 2006 tem duas anomalias, e a segunda quase passou:
+    # um terco das declaracoes soma zero E todas as candidaturas aparecem com
+    # declaracao, contra 60-70% nos outros anos.
+    q("fonte_bens", f"""
+      select d.ano_eleicao ano, count(*) candidaturas,
+             countif(f.declarou_algum_bem) com_bem,
+             countif(f.declarou_algum_bem and f.total_bens_declarados = 0) zeradas
+      from `{p}.marts.dim_candidato` d
+      join `{p}.marts.fct_candidatura` f using (sk_candidatura)
+      where f.e_registro_exibido
+      group by 1 order by 1""")
+
+    q("fonte_desfecho", f"""
+      select count(*) linhas, countif(f.resultado_final is null) sem_desfecho
+      from `{p}.marts.dim_candidato` d
+      join `{p}.marts.fct_candidatura` f using (sk_candidatura)
+      where d.ano_eleicao < 2026 and f.e_registro_exibido""")
+
+    q("fonte_fim_mandato", f"""
+      select count(*) linhas,
+             countif(motivo_fim is null
+                     or upper(motivo_fim) like '%NAO INFORMADO%'
+                     or upper(motivo_fim) like '%NÃO INFORMADO%') sem_motivo
+      from `{p}.marts.fct_mandato`""")
+
+    # A fronteira do CPF (ADR-050): a mesma pessoa com dois `id_pessoa` porque o
+    # ano antigo nao publicou CPF. E' a incongruencia menos obvia da lista e a
+    # que mais atrapalha quem cruza anos.
+    q("fonte_identidade", f"""
+      with por_chave as (
+        select chave_nome_nascimento,
+               count(distinct if(cpf_hash is not null, id_pessoa, null)) com_cpf,
+               count(distinct if(cpf_hash is null, id_pessoa, null))     sem_cpf
+        from `{p}.marts.dim_candidato`
+        where id_pessoa is not null and chave_nome_nascimento is not null
+        group by 1)
+      select count(*) chaves,
+             countif(com_cpf + sem_cpf > 1) com_mais_de_uma,
+             countif(com_cpf = 1 and sem_cpf = 1) fronteira,
+             countif(com_cpf > 1) homonimia
+      from por_chave""")
+
+    # O TSE publica apenas o ESTADO ATUAL, sem historico. Este mart existe
+    # porque o projeto tira uma foto diaria — e' a unica forma de saber que algo
+    # mudou, e o que mudou.
+    q("fonte_mudancas", f"""
+      select count(*) mudancas,
+             count(distinct sq_candidato) candidaturas,
+             countif(mudou_nome_urna) nome_urna,
+             countif(mudou_julgamento) julgamento,
+             countif(mudou_partido) partido,
+             countif(mudou_coligacao) coligacao
+      from `{p}.marts.fct_mudanca_candidatura`""")
+
     q("emendas_salto_tipo", f"""
       select ano_emenda ano, tipo, sum(vl_empenhado) emp
       from `{p}.marts.fct_emenda_autor`

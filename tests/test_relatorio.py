@@ -17,7 +17,11 @@ import re
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
-GERADOR = (RAIZ / "scripts" / "gerar_relatorio.py").read_text(encoding="utf-8")
+_GER_BRUTO = (RAIZ / "scripts" / "gerar_relatorio.py").read_text(encoding="utf-8")
+# Sem comentarios: eles CITAM os numeros que envelheceram ("79.140 virou
+# 79.138"), e documentar o drift e' o oposto de come-lo de novo.
+GERADOR = chr(10).join(ln for ln in _GER_BRUTO.splitlines()
+                       if not ln.lstrip().startswith("#"))
 COLETOR = (RAIZ / "scripts" / "dados_relatorio.py").read_text(encoding="utf-8")
 
 
@@ -47,11 +51,11 @@ def test_o_gerador_nao_tem_numero_de_candidatura_escrito_a_mao():
     """
     ancorados = {
         # medicoes ja' publicadas num ADR ou numa lacuna, com data
-        "1.393", "79.140", "1.228.019", "402.446", "829.989", "15.962",
-        "11.771", "11.778", "13.731", "19.263", "6.699", "1.649", "1.060",
-        "1.483", "7.226", "4.645", "73.856",
+        # Sao os que NAO vem deste pipeline, ou que descrevem uma medicao
+        # pontual e datada que o texto identifica como tal.
+        "1.393", "1.228.019", "1.649", "1.060",
         # conferencias contra fonte externa, citadas no proprio texto
-        "94.463", "68.366",
+        "68.366",
         # o caso: a hipotese do separador decimal, e o item redondo
         "1.109.124", "1.109.124.020", "3.000.000",
         # Lei 9.504/97
@@ -96,5 +100,7 @@ def test_o_json_de_dados_cobre_o_que_o_gerador_le():
     if not dados.exists():
         return  # sem coleta local, nao ha' o que conferir
     tem = set(json.loads(dados.read_text(encoding="utf-8")))
-    lidas = set(re.findall(r'D\["(\w+)"\]', GERADOR))
+    # A ancora de inicio de palavra e' o que impede o regex de casar o "D"
+    # final de `FEMD["sem_autor"]` e cobrar da coleta uma chave que nao e' dela.
+    lidas = set(re.findall(r'(?<![A-Za-z_])D\["(\w+)"\]', GERADOR))
     assert lidas <= tem, f"o gerador le' o que a coleta nao grava: {sorted(lidas - tem)}"

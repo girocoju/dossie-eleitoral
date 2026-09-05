@@ -2031,6 +2031,25 @@ ANALISE_PDF = "analise-2026.pdf"
 ANALISE_ORIGEM = Path(__file__).resolve().parents[1] / "Dossie-Eleitoral-2026-analise.pdf"
 
 
+def _testes_de_dado() -> int | None:
+    """Quantas verificacoes automaticas o dbt tem, lidas do manifesto dele.
+
+    A pagina dizia "240" desde que foi escrita, e hoje sao mais de trezentas. Um
+    numero que so' cresce e nunca e' relido vira, com o tempo, uma afirmacao
+    modesta demais — e uma afirmacao errada, ainda que a favor.
+
+    Devolve None se o manifesto nao existe (ninguem rodou o dbt nesta maquina):
+    nesse caso a frase sai sem o numero, que e' melhor que sair com um chute.
+    """
+    alvo = Path(__file__).resolve().parents[1] / "dbt" / "target" / "manifest.json"
+    try:
+        nos = json.loads(alvo.read_text(encoding="utf-8")).get("nodes", {})
+    except (OSError, ValueError):
+        return None
+    n = sum(1 for v in nos.values() if v.get("resource_type") == "test")
+    return n or None
+
+
 def _paginas_do_pdf(caminho: Path) -> int | None:
     """Quantas paginas o PDF tem, lidas DELE.
 
@@ -2253,7 +2272,8 @@ def _linha_catalogo(ind: dict) -> str:
         f"<td><small>{e(str(ind['fonte'] or '—'))}</small></td></tr>")
 
 
-def _metodologia(quando: str, catalogo: list[dict], total_fichas: int = 0) -> str:
+def _metodologia(quando: str, catalogo: list[dict], total_fichas: int = 0,
+                 trocas_de_nome: int | None = None) -> str:
     """Pagina de metodologia e LIMITES — o rodape de toda pagina aponta para ca'.
 
     Existe para dizer o que os numeros NAO dizem. Um site que so' mostra dado e
@@ -2261,6 +2281,14 @@ def _metodologia(quando: str, catalogo: list[dict], total_fichas: int = 0) -> st
     como avaliar.
     """
     linhas_catalogo = "".join(_linha_catalogo(i) for i in catalogo)
+    # Os dois numeros sao lidos das proprias coisas que descrevem. Escritos a
+    # mao, envelhecem calados: a pagina dizia "240 verificacoes" desde que foi
+    # escrita, e ja' eram mais de trezentas.
+    _n = _testes_de_dado()
+    _qt_testes = f" {_n}" if _n else ""
+    _n_pag = _paginas_do_pdf(ANALISE_ORIGEM)
+    _trocas = (f"<b>{_milhar(trocas_de_nome)} candidaturas</b> já o fizeram"
+               if trocas_de_nome else "várias já o fizeram")
     corpo = f"""
     <div class="capa">
       <h1>Metodologia, fontes e limites</h1>
@@ -2649,10 +2677,56 @@ def _metodologia(quando: str, catalogo: list[dict], total_fichas: int = 0) -> st
     </section>
 
     <section class="bloco">
+      <h2>O endereço de uma ficha pode mudar</h2>
+      <p>O endereço de cada ficha é feito do <b>nome de urna</b> mais o número do
+        registro. O número não muda; o nome, sim — o TSE permite corrigi-lo depois
+        de publicado, e {_trocas} nesta eleição, quase todas para consertar a
+        grafia.</p>
+      <p>Quando isso acontece, a ficha ganha endereço novo e <b>o antigo continua
+        funcionando</b>, encaminhando para ele. Link que você guardou ou citou não
+        quebra. O endereço velho deixa de ser indexado pelos buscadores, para que
+        os dois não disputem entre si, e não repete a grafia antiga em lugar
+        nenhum — republicá-la seria continuar publicando exatamente o que a
+        pessoa pediu para corrigir.</p>
+
+      <h2>Acessibilidade</h2>
+      <p>O site é medido contra a <b>WCAG 2.2, nível AA</b>, e a medição roda a
+        cada geração — não é uma revisão que foi feita uma vez.</p>
+      <p>Os <b>dezessete pares de cor</b> que a folha de estilo usa são calculados
+        nos dois temas, claro e escuro, e um par que caia abaixo do mínimo
+        interrompe a construção do site. Três reprovavam no tema claro quando a
+        medição começou a rodar.</p>
+      <p><b>Tema claro e tema escuro não são duas versões.</b> O padrão é claro; o
+        escuro entra quando o seu sistema declara essa preferência. Um celular no
+        claro ao lado de um monitor no escuro mostram a mesma página com paletas
+        diferentes — as duas medidas pelo mesmo critério.</p>
+      <p>Para quem não usa mouse: há um atalho para <b>pular a navegação</b> logo
+        no início de cada página, o foco do teclado é sempre visível, e toda
+        tabela que rola pode ser percorrida por teclado. Toda coluna de tabela é
+        declarada como cabeçalho, para que o leitor de tela consiga dizer a que
+        coluna pertence cada célula.</p>
+      <p class="aviso"><b>A cor nunca carrega a informação sozinha.</b> A situação
+        no TSE tem cor e tem o rótulo escrito ao lado, sempre. Cerca de 8% dos
+        homens têm alguma forma de daltonismo, e verde e vermelho é justamente o
+        par que some.</p>
+
+      <h2>O relatório em PDF</h2>
+      <p>A leitura agregada dos mesmos dados está num relatório de
+        {_n_pag or "algumas dezenas de"} páginas, com gráficos, ligado na página
+        inicial. Ele não é escrito à mão: uma rotina consulta os
+        <b>mesmos <i>marts</i></b> que alimentam as fichas e outra formata o
+        documento, e as duas estão no repositório junto com o resto.</p>
+      <p>Isso importa por um motivo prático. Um documento que afirma coisas sobre
+        pessoas reais e não pode ser refeito não tem como ser conferido — e
+        qualquer número que envelhecesse precisaria ser corrigido à mão dentro de
+        um arquivo binário. Rodando as duas rotinas, o relatório inteiro se
+        reconstrói a partir das fontes.</p>
+
       <h2>Erros</h2>
-      <p>Este site é gerado por um pipeline aberto, com 240 verificações
-        automáticas sobre os dados. Elas não pegam tudo — o erro de 2006 descrito
-        acima passou por todas elas e foi encontrado por um leitor.</p>
+      <p>Este site é gerado por um pipeline aberto, com{_qt_testes}
+        verificações automáticas sobre os dados. Elas não pegam tudo — o erro de
+        2006 descrito acima passou por todas elas e foi encontrado por um
+        leitor.</p>
       <p>O código, os testes e o registro de cada decisão estão públicos em
         <a href="https://github.com/girocoju/dossie-eleitoral">github.com/girocoju/dossie-eleitoral</a>.
         Encontrou um número errado? Abra uma issue — a correção e o motivo dela
@@ -2901,7 +2975,8 @@ def _redirecionar_enderecos_antigos(destino: Path, fichas: list[Candidato]) -> i
 
 def escrever_site(destino: Path, fichas: list[Candidato],
                   proporcionais: dict[str, list[dict]], quando: str,
-                  catalogo: list[dict], doadores: list[list] | None = None) -> None:
+                  catalogo: list[dict], doadores: list[list] | None = None,
+                  trocas_de_nome: int | None = None) -> None:
     """Grava o site inteiro.
 
     `fichas` sao TODAS as candidaturas com pagina propria — os cinco cargos
@@ -2964,7 +3039,8 @@ def escrever_site(destino: Path, fichas: list[Candidato],
         grava("doadores/index.html", _pagina_doadores(doadores, quando))
 
     grava("metodologia/index.html",
-          _metodologia(quando, catalogo, total_fichas=len(fichas)))
+          _metodologia(quando, catalogo, total_fichas=len(fichas),
+                       trocas_de_nome=trocas_de_nome))
     for caminho, xml in sitemaps(fichas).items():
         grava(caminho, xml)
 

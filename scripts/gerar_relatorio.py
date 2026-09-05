@@ -154,6 +154,34 @@ _LAC = (RAIZ / "docs" / "LACUNAS.md").read_text(encoding="utf-8")
 _BLOCOS = re.split(r"(?m)^(?=## L-)", _LAC)[1:]
 N_LACUNAS = len(_BLOCOS)
 N_FECHADAS = sum(1 for b in _BLOCOS if "FECHADA" in b[:400])
+
+# ── as medicoes da secao 14 ────────────────────────────────────────────
+# Estavam escritas no texto. Sete foram conferidas em 05/09/2026 e quatro haviam
+# envelhecido: 79.140 virou 79.138, 94.463 virou 94.482, 73.856 virou 73.875 e
+# 402.446 virou 402.548. Drift pequeno e silencioso — o mesmo defeito que esta
+# secao denuncia nas fontes, e que seria constrangedor cometer justo aqui.
+FSEN = D["fonte_senado"][0]
+FCAM = D["fonte_camara"][0]
+FEMD = D["fonte_emendas"][0]
+FPRO = D["fonte_proposicoes"][0]
+FDES = D["fonte_desfecho"][0]
+FMAN = D["fonte_fim_mandato"][0]
+FIDE = D["fonte_identidade"][0]
+FMUD = D["fonte_mudancas"][0]
+_BENS = {int(r["ano"]): r for r in D["fonte_bens"]}
+B06 = _BENS[2006]
+# Quanto o resto dos anos zera, para dar escala ao numero de 2006.
+_outros = [r for a, r in _BENS.items() if a != 2006 and int(r["com_bem"])]
+# Emenda de bancada, comissao ou relator: o que sobra depois do autor
+# individual e do que o Portal nao atribui a ninguem.
+# Quanto do arquivo de emendas o Portal publica SEM autor. Aparece em quatro
+# lugares do relatorio, entao vive aqui.
+PCT_SEM_AUTOR = pct(100 * int(FEMD["sem_autor"]) / int(FEMD["linhas"]), 0)
+VAL_SEM_AUTOR = bi(float(FEMD["pago_sem_autor"]))
+COLEGIADO_EMD = (int(FEMD["linhas"]) - int(FEMD["autor_pessoa"])
+                 - int(FEMD["sem_autor"]))
+PCT_ZERO_OUTROS = (100 * sum(int(r["zeradas"]) for r in _outros)
+                   / sum(int(r["com_bem"]) for r in _outros))
 PC = {int(r["cod_cargo"]): int(r["n"]) for r in D["por_cargo"]}
 INSTR = {r["grau_instrucao"]: int(r["n"]) for r in D["instrucao"]}
 # "Fundamental ou menos" junta as tres faixas abaixo do ensino medio. O
@@ -229,8 +257,8 @@ SUMARIO = [
      "Média ou mediana, cinco limites que mudam a leitura, e o que este "
      "levantamento deliberadamente não faz."),
     ("14", "O que as fontes oficiais não entregam",
-     "Vinte e uma incongruências encontradas nas fontes ao longo do projeto — "
-     "o que falta, o que engana, e o que se faz com isso."),
+     "Vinte e três incongruências encontradas nas fontes ao longo do "
+     "projeto — o que falta, o que engana, e o que se faz com isso."),
     ("15", "Fontes",
      "Cada número, sua origem exata, e como refazer a conta."),
 ]
@@ -574,7 +602,8 @@ fn = [(str(r["funcao"])[:30], float(r["pago"])) for r in D["emendas_funcao"][:10
 
 pag(f"""
 <h2>7 · Emendas parlamentares</h2>
-<p>São 94.463 registros de emendas de 2014 a 2026, com valor acumulado de empenho
+<p>São {num(FEMD["linhas"])} registros de emendas de 2014 a 2026, com valor
+  acumulado de empenho
   e pagamento, publicados pelo Portal da Transparência.</p>
 {linhas({"Empenhado": serie_emp, "Pago": serie_pago}, anos,
         {"Empenhado": ACENTO, "Pago": OK}, area=True,
@@ -641,11 +670,11 @@ pag(f"""
   contas do município ou estado que recebeu, e não do dado federal.</p>
 <h3>E há o que a fonte não atribui a ninguém</h3>
 <div class="escada">
-  <div><b>73.856</b><span>linhas com autor individual</span></div>
-  <div><b>15.962</b><span>sem autor publicado</span></div>
-  <div><b>4.645</b><span>bancada, comissão ou relator</span></div>
+  <div><b>{num(FEMD["autor_pessoa"])}</b><span>linhas com autor individual</span></div>
+  <div><b>{num(FEMD["sem_autor"])}</b><span>sem autor publicado</span></div>
+  <div><b>{num(COLEGIADO_EMD)}</b><span>bancada, comissão ou relator</span></div>
 </div>
-<p class="aviso"><b>17% dos registros — R$ 18,5 bilhões pagos — são publicados
+<p class="aviso"><b>{PCT_SEM_AUTOR} dos registros — {VAL_SEM_AUTOR} pagos — são publicados
   pelo Portal sem autor.</b> Não é lacuna deste levantamento: é orçamento cuja
   autoria a fonte oficial não revela. Qualquer soma "por parlamentar" no Brasil,
   inclusive esta, exclui esse bloco por impossibilidade.</p>""")
@@ -700,8 +729,8 @@ pag(f"""
 <p class="obs">A tabela de tipos da API também declara <b>partido, bloco e
   liderança</b> como espécies de "órgão". O pipeline os classifica e os mantém
   fora deste bloco por precaução — estar num partido não é ter assento numa
-  comissão. Registre-se, porém, que <b>nenhum apareceu</b> entre os 79.140
-  vínculos coletados: a salvaguarda existe e não precisou agir.</p>""")
+  comissão. Registre-se, porém, que <b>nenhum apareceu</b> entre os
+  {num(FCAM["vinculos"])} vínculos coletados: a salvaguarda existe e não precisou agir.</p>""")
 
 pag(f"""
 <h3>O Senado, e por que ele exige duas ressalvas que a Câmara não exige</h3>
@@ -884,8 +913,8 @@ pag(f"""
     declarações de anos diferentes mede compra e venda tanto quanto valorização.</li>
   <li><b>Prestação de contas parcial não é omissão.</b> Quatro em cada dez
     candidaturas ainda não constam porque o prazo não fechou.</li>
-  <li><b>17% das emendas não têm autor publicado.</b> Toda soma por parlamentar
-    exclui R$ 18,5 bilhões por impossibilidade, não por escolha.</li>
+  <li><b>{PCT_SEM_AUTOR} das emendas não têm autor publicado.</b> Toda soma por
+    parlamentar exclui {VAL_SEM_AUTOR} por impossibilidade, não por escolha.</li>
   <li><b>Emenda é indicação de destino, não obra entregue.</b> Quem executa é o
     órgão que recebe, e a execução não está neste dado.</li>
   <li><b>Média e mediana discordam onde há dinheiro.</b> Uma única declaração
@@ -902,7 +931,7 @@ pag(f"""
   seguinte.</p>""")
 
 # ══ 14. O QUE AS FONTES NÃO ENTREGAM ══════════════════════════════════
-pag("""
+pag(f"""
 <h2>14 · O que as fontes oficiais não entregam</h2>
 <p>Esta seção existe porque quase nenhum trabalho sobre dados eleitorais a
   publica. Ela lista o que as fontes <b>não</b> fornecem, o que fornecem de forma
@@ -919,7 +948,8 @@ pag("""
   <tbody>
     <tr><td><b>Desfecho da eleição no cadastro de candidaturas</b><br>
         <span class="s">TSE · 1998 a 2022</span></td>
-        <td class="num">13.731<br><span class="s">candidaturas</span></td>
+        <td class="num">{num(FDES["sem_desfecho"])}<br>
+            <span class="s">de {num(FDES["linhas"])}</span></td>
         <td>O campo vem vazio. Tratar vazio como "não eleito" é afirmação falsa —
         e este projeto já cometeu esse erro, publicado, numa ficha que dizia
         "2006 · Presidente · Não eleito" sobre alguém que foi eleito com 58,3
@@ -938,18 +968,22 @@ pag("""
         ali</td></tr>
     <tr><td><b>Motivo do fim de mandato</b><br>
         <span class="s">TSE</span></td>
-        <td class="num">11.771<br><span class="s">de 11.778</span></td>
+        <td class="num">{num(FMAN["sem_motivo"])}<br>
+            <span class="s">de {num(FMAN["linhas"])}</span></td>
         <td>"Não informado" em 99,9% dos casos. Renúncia, cassação e morte no
         exercício não aparecem — por isso a ficha mostra o período do
         <b>cargo</b>, e não o da pessoa</td></tr>
     <tr><td><b>Autor da emenda parlamentar</b><br>
         <span class="s">Portal da Transparência</span></td>
-        <td class="num">15.962<br><span class="s">R$ 18,5 bi pagos</span></td>
-        <td>17% dos registros vêm com "Sem informação". Toda soma por parlamentar
+        <td class="num">{num(FEMD["sem_autor"])}<br>
+            <span class="s">{VAL_SEM_AUTOR} pagos</span></td>
+        <td>{PCT_SEM_AUTOR} dos
+        registros vêm com "Sem informação". Toda soma por parlamentar
         no Brasil exclui esse bloco por impossibilidade</td></tr>
     <tr><td><b>Situação da proposição</b><br>
         <span class="s">Câmara dos Deputados</span></td>
-        <td class="num">402.446<br><span class="s">de 829.989</span></td>
+        <td class="num">{num(FPRO["sem_situacao"])}<br>
+            <span class="s">de {num(FPRO["linhas"])}</span></td>
         <td>Quase metade sem situação publicada. Por isso a ficha conta o que foi
         <b>apresentado</b>, e não o que foi aprovado</td></tr>
     <tr><td><b>CPF de senador</b><br><span class="s">Senado Federal</span></td>
@@ -959,7 +993,7 @@ pag("""
         traz o dado <b>com a ressalva escrita ao lado</b>, e não sem ela</td></tr>
     <tr><td><b>Presidência de comissão do Senado, ausente na rota óbvia</b><br>
         <span class="s">Senado Federal</span></td>
-        <td class="num">0<br><span class="s">de 7.226 vínculos</span></td>
+        <td class="num">0<br><span class="s">de {num(FSEN["via_comissoes"])} vínculos</span></td>
         <td>A lista de comissões de um senador devolve Titular, Suplente e Nato,
         e nada mais — nem a Mesa Diretora. O dado <b>existe</b>, em outra rota da
         mesma API. É a incongruência mais instrutiva desta lista: medir a
@@ -975,15 +1009,17 @@ pag(f"""
   <tbody>
     <tr><td><b>O arquivo de bens de 2006 publica valores zerados</b><br>
         <span class="s">TSE</span></td>
-        <td><b>6.699 das 19.263</b> declarações daquele ano somam exatamente
-        zero — 34,8%, contra 0,1% em todos os outros anos. Sem tratar, a ficha
+        <td><b>{num(B06["zeradas"])} das {num(B06["com_bem"])}</b> declarações
+        daquele ano somam exatamente zero —
+        {pct(100 * int(B06["zeradas"]) / int(B06["com_bem"]))}, contra
+        {pct(PCT_ZERO_OUTROS, 2)} em todos os outros anos. Sem tratar, a ficha
         poria "R$ 0 em 2006" ao lado de "R$ 500 mil em 2026" e desenharia uma
         queda a pico que nunca houve</td></tr>
     <tr><td><b>O endereço do arquivo de emendas ignora o ano</b><br>
         <span class="s">Portal da Transparência</span></td>
         <td>Pedir 2014 e pedir 2026 devolve o <b>mesmo arquivo</b>, byte a byte.
         Treze downloads, um único sha256. Uma carga ingênua somaria 1.228.019
-        linhas que são treze cópias de 94.463 — e nada falharia: toda soma por
+        linhas que são treze cópias de {num(FEMD["linhas"])} — e nada falharia: toda soma por
         autor sairia multiplicada por treze</td></tr>
     <tr><td><b>Um endpoint devolve quase nada sem parâmetro de data</b><br>
         <span class="s">Câmara dos Deputados</span></td>
@@ -1008,8 +1044,11 @@ pag(f"""
         Bancada Negra é a Coordenadoria da Mulher</td></tr>
     <tr><td><b>O catálogo de colegiados só lista o que está em atividade</b><br>
         <span class="s">Senado Federal</span></td>
-        <td><b>292 colegiados</b> citados pelos próprios senadores não constam
-        do catálogo — 1.483 vínculos, 21% do total. E o que fica de fora é
+        <td><b>{num(FSEN["colegiados_fora"])} colegiados</b> citados pelos próprios
+        senadores não constam do catálogo — {num(FSEN["fora_do_catalogo"])}
+        vínculos,
+        {pct(100 * int(FSEN["fora_do_catalogo"]) / int(FSEN["via_comissoes"]), 0)}
+        do total. E o que fica de fora é
         justamente o de maior peso público: <b>CPMI do INSS</b> (173 vínculos),
         Comissão Representativa do Congresso (110), CPI do Crime Organizado, CPMI
         das Fake News, do 8 de Janeiro, CPI da Pandemia. É o mesmo padrão da
@@ -1042,7 +1081,29 @@ pag(f"""
         <td>O portal publica apenas o <b>estado atual</b>, sem histórico. Uma
         candidatura que desaparece de um dia para o outro não deixa rastro na
         fonte — é irreproduzível depois. Por isso este projeto tira uma foto
-        diária</td></tr>
+        diária, e é só por causa dela que se sabe que houve
+        <b>{num(FMUD["mudancas"])} alterações</b> em
+        {num(FMUD["candidaturas"])} candidaturas</td></tr>
+    <tr><td><b>A mesma pessoa aparece com duas identidades</b><br>
+        <span class="s">TSE</span></td>
+        <td>A chave que liga uma candidatura à outra é o <b>CPF</b> quando o ano
+        o publica, e o nome mais a data de nascimento quando não publica. O CPF
+        cobre 100% de 2006, 2010 e 2026 — mas <b>96,9% de 1998</b>. Quem tem
+        candidatura dos dois lados dessa fronteira fica com <b>duas
+        identidades</b>, e contá-las como pessoas diferentes faz o cadastro
+        parecer ter homônimos que não tem: de {num(FIDE["chaves"])} combinações
+        de nome e nascimento, {num(FIDE["com_mais_de_uma"])} respondem por mais
+        de uma identidade — e <b>{num(FIDE["fronteira"])} delas são essa
+        fronteira</b>, contra {num(FIDE["homonimia"])} de homonímia real. É a
+        armadilha menos visível desta lista, e a que mais atrapalha quem cruza
+        anos</td></tr>
+    <tr><td><b>O nome de urna muda depois do registro</b><br>
+        <span class="s">TSE</span></td>
+        <td><b>{num(FMUD["nome_urna"])} candidaturas</b> tiveram o nome de urna
+        alterado depois de publicadas — quase todas correções de grafia
+        ("NEUMARA" para "NEMAURA", "CAPITÃO RODOLDO" para "CAPITÃO RODOLFO").
+        Quem guardou o nome antigo passa a mostrar a grafia que a própria pessoa
+        pediu para corrigir, e o portal não avisa que mudou</td></tr>
     <tr><td><b>O firewall recusa requisição bem-formada</b><br>
         <span class="s">TSE</span></td>
         <td>Requisições sem o conjunto completo de cabeçalhos de navegador são
@@ -1093,7 +1154,8 @@ pag(f"""
     </tr>
     <tr>
       <td><b>Portal da Transparência (CGU)</b></td>
-      <td>Emendas parlamentares: 94.463 registros de 2014 a 2026, com empenho,
+      <td>Emendas parlamentares: {num(FEMD["linhas"])} registros de 2014 a
+        2026, com empenho,
         liquidação e pagamento acumulados</td>
       <td class="url">portaldatransparencia.gov.br/<wbr>download-de-dados/
         <wbr>emendas-parlamentares</td>

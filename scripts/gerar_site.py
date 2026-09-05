@@ -529,6 +529,27 @@ def carregar_fichas(cliente, cargos: tuple[int, ...],
     return saida
 
 
+def quantas_trocas_de_nome(cliente) -> int | None:
+    """Quantas candidaturas tiveram o nome de urna alterado depois de publicadas.
+
+    So' se sabe disso porque o projeto tira uma foto diaria: o TSE publica o
+    estado atual e nao guarda historico. A metodologia cita o numero para
+    explicar por que o endereco de uma ficha pode mudar — e ele cresce, entao
+    escrito a mao envelheceria calado.
+
+    Devolve None se o mart nao existe; ai' a frase sai sem o numero.
+    """
+    try:
+        linhas = list(cliente.query(f"""
+            select countif(mudou_nome_urna) n
+            from `{cliente.project}.marts.fct_mudanca_candidatura`
+        """).result())
+    except Exception as exc:  # noqa: BLE001 — sem o mart, a frase sai sem numero
+        log.warning("fct_mudanca_candidatura indisponivel (%s)", str(exc)[:80])
+        return None
+    return int(linhas[0].n) if linhas else None
+
+
 def catalogo_indicadores(cliente) -> list[dict]:
     """Catalogo de indicadores COM a cobertura real, lida do lake.
 
@@ -1437,10 +1458,11 @@ def main(argv: list[str] | None = None) -> int:
     proporcionais = carregar_proporcionais(cliente)
     doadores = carregar_doadores(cliente)
     catalogo = catalogo_indicadores(cliente)
+    trocas_de_nome = quantas_trocas_de_nome(cliente)
 
     destino = Path(args.saida)
-    escrever_site(destino, fichas, proporcionais, quando, catalogo,
-                  doadores)
+    escrever_site(destino, fichas, proporcionais, quando, catalogo, doadores,
+                  trocas_de_nome=trocas_de_nome)
     n = sum(1 for _ in destino.rglob("*.html"))
     log.info("site em %s — %d paginas HTML", destino.resolve(), n)
     return 0
