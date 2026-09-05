@@ -305,6 +305,17 @@ mesma data de extração das fichas.
 **Onde fica.** Na home, entre a busca por nome e a lista de cargos: quem chega
 procurando alguém não é interrompido, e quem lê a página inteira encontra.
 
+**O relatório se refaz por comando.** `scripts/dados_relatorio.py` coleta contra
+os mesmos *marts* do site — não há caminho paralelo — e grava
+`data/relatorio/dados.json`; `scripts/gerar_relatorio.py` formata e imprime pelo
+Edge (`--headless=new --print-to-pdf`; o `--headless` antigo renderiza uma página
+só e o erro não parece erro). Nenhum número do documento é digitado à mão.
+
+A primeira edição foi montada fora do repositório, num diretório temporário. O
+PDF ficou bom e ficou órfão: ninguém conseguiria refazê-lo, e qualquer número que
+envelhecesse teria de ser corrigido dentro de um binário. Um documento que afirma
+coisas sobre pessoas reais e não se regenera não pode ser conferido.
+
 **O bloco só aparece se o arquivo existir.** O PDF é documento escrito, não saída
 do pipeline. `_bloco_analise()` devolve vazio quando o arquivo não está lá —
 anunciar um download que responde 404 é pior que não anunciar nada. Por isso o
