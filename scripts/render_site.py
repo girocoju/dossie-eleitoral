@@ -1230,6 +1230,87 @@ def _comissoes(c: Candidato) -> str:
     </section>"""
 
 
+def _comissoes_senado(c: Candidato) -> str:
+    """Onde a pessoa sentou no Senado (F-29, fecha a L-28).
+
+    Espelha o bloco da Camara, e traz DUAS ressalvas que aquele nao precisa ter.
+
+    ── A IDENTIDADE E' INFERIDA, E ISSO FICA ESCRITO ──
+
+    O Senado nao publica CPF. A ligacao entre o senador e a pessoa que se
+    candidata e' por nome + data de nascimento — forte, nao certa. E' o mesmo
+    criterio que o bloco de atividade legislativa do Senado ja' usava, e a
+    ressalva e' a mesma: quem le' precisa saber com que grau de certeza o assento
+    foi atribuido aquela pessoa.
+
+    ── O PAPEL E' MAIS POBRE QUE O DA CAMARA ──
+
+    A fonte devolve Titular, Suplente e Nato. Nao ha' Presidente nem Relator, e
+    nao ha' Mesa Diretora nenhuma. A tela NAO afirma quem presidiu um colegiado —
+    inclusive de quem preside a propria Casa. E' ausencia da fonte, e dizer isso
+    e' mais honesto que deixar o leitor supor que o silencio significa que a
+    pessoa nunca presidiu nada (Regra 5, L-30).
+    """
+    if not c.comissoes_senado:
+        return ""
+
+    por_classe: dict[str, list[dict]] = {}
+    for x in c.comissoes_senado:
+        por_classe.setdefault(x["classe"], []).append(x)
+
+    partes = []
+    for chave, rotulo in CLASSES_COMISSAO.items():
+        do_grupo = por_classe.get(chave)
+        if not do_grupo:
+            continue
+        linhas = "".join(_linha_comissao(x) for x in do_grupo)
+        partes.append(
+            f"<h3 style='font-size:14px;margin:16px 0 6px'>{e(rotulo)} "
+            f"<span style='font-weight:400;color:var(--ink-3)'>"
+            f"({len(do_grupo)})</span></h3>"
+            f"<div class='rolagem'><table><thead><tr><th>Colegiado</th>"
+            f"<th>Papel</th><th>Período</th><th></th></tr></thead>"
+            f"<tbody>{linhas}</tbody></table></div>")
+
+    # Quantos colegiados tiveram o tipo deduzido do nome oficial em vez de vir do
+    # catalogo. So' aparece a frase quando ha' algum — dizer "0 deduzidos" seria
+    # ruido numa ficha em que todos vieram da fonte.
+    deduzidos = sum(1 for x in c.comissoes_senado if x["deduzido"])
+    quantos = ("1 colegiado já encerrado" if deduzidos == 1
+               else f"{_milhar(deduzidos)} colegiados já encerrados")
+    nota_deduzida = (
+        f"<p style='font-size:12.5px;color:var(--ink-3);margin:8px 0 0'>"
+        f"O catálogo do Senado só lista colegiado <b>em atividade</b>. Para "
+        f"{quantos} "
+        f"desta lista, a natureza foi lida do <b>nome oficial por extenso</b> — "
+        f"\"Comissão Parlamentar Mista de Inquérito\", e nunca da sigla. O que "
+        f"não deu para determinar ficou de fora em vez de virar um palpite.</p>"
+    ) if deduzidos else ""
+
+    return f"""<section class="bloco">
+      <h2>Comissões no Senado — {len(c.comissoes_senado)} colegiados</h2>
+      <p class="aviso" style="margin:0 0 10px"><b>A identidade aqui é
+        inferida.</b> O Senado não publica CPF, então a ligação entre o senador e
+        a pessoa que se candidata é feita por <b>nome e data de nascimento</b> —
+        forte, não certa. É a mesma ressalva do bloco de atividade legislativa do
+        Senado, e vale para toda a tabela abaixo.</p>
+      {''.join(partes)}
+      <p style="font-size:12.5px;color:var(--ink-3);margin:12px 0 0">
+        Uma linha por colegiado, não por designação — o Senado renova a composição
+        a cada sessão legislativa, e a mesma pessoa é redesignada várias vezes
+        para o mesmo colegiado. <b>Frentes e grupos parlamentares não entram</b>:
+        são adesão aberta, não assento.</p>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:8px 0 0">
+        <b>Presidência e relatoria não aparecem, e isso não quer dizer que não
+        houve.</b> A fonte devolve apenas Titular, Suplente e Nato — não há papel
+        de comando no dado, nem a Mesa Diretora. Esta tabela não diz quem presidiu
+        um colegiado, nem mesmo de quem preside a própria Casa. Registrado em
+        <a href="https://github.com/girocoju/dossie-eleitoral/blob/main/docs/LACUNAS.md">
+        LACUNAS.md</a> como L-30.</p>
+      {nota_deduzida}
+    </section>"""
+
+
 def _emendas(c: Candidato) -> str:
     """Emendas parlamentares por ano (F-27).
 
@@ -1476,6 +1557,7 @@ def _ficha(c: Candidato, quando: str) -> str:
     partes.append(_atividade(c))
     partes.append(_atividade_senado(c))
     partes.append(_comissoes(c))
+    partes.append(_comissoes_senado(c))
     partes.append(_emendas(c))
     partes.append(_financiamento(c))
     partes.append(_indicadores(c))
@@ -2310,12 +2392,30 @@ def _metodologia(quando: str, catalogo: list[dict], total_fichas: int = 0) -> st
         fonte também as chama de "órgão", e estar num partido não é ter assento
         numa comissão. Comissão de medida provisória também fica de fora: são
         1.393 no catálogo, e participar delas é rotina.</p>
-      <p class="aviso"><b>O Senado não tem esse bloco.</b> A fonte existe, mas o
-        Senado não publica CPF, e a ligação entre um senador e a pessoa que se
-        candidata é feita por nome e data de nascimento — forte, não certa.
-        Exibir comissão com base nela arriscaria atribuir um assento ao homônimo
-        errado. É a mesma razão pela qual a atividade legislativa de senador
-        carrega ressalva própria.</p>
+      <p>O <b>Senado tem bloco próprio</b>, e ele é diferente em dois pontos que
+        aparecem escritos na ficha. O primeiro é a identidade: o Senado não
+        publica CPF, e a ligação com a pessoa que se candidata é por nome e data
+        de nascimento — forte, não certa. Esse é o mesmo critério que a atividade
+        legislativa de senador já usava desde o início, e ele viaja com a
+        ressalva ao lado do dado, em vez de o bloco simplesmente não existir.</p>
+      <p>O segundo é o <b>papel</b>: a fonte do Senado devolve apenas Titular,
+        Suplente e Nato. Não há Presidente, não há Relator e não há Mesa
+        Diretora. A ficha de senador, por isso, <b>não afirma quem presidiu um
+        colegiado</b> — nem de quem preside a própria Casa. Registrado como L-30.</p>
+      <p>O catálogo de colegiados do Senado só lista o que está <b>em
+        atividade</b>, e não existe rota que devolva o tipo de um colegiado
+        encerrado. Medido em 05/09/2026: 292 colegiados citados pelos senadores
+        estavam fora do catálogo, e entre eles a CPMI do INSS, a CPI da Pandemia e
+        a Comissão Representativa do Congresso — justamente o de maior peso
+        público. A natureza desses foi lida do <b>nome oficial por extenso</b>
+        ("Comissão Parlamentar Mista de Inquérito"), nunca da sigla, e a ficha
+        diz quantos vieram por esse caminho. Os 215 vínculos de 3,0% que nem
+        assim deram para determinar <b>ficaram de fora</b> em vez de virar
+        palpite.</p>
+      <p><b>Conferido</b> contra o Regimento Interno do Senado, que fixa o número
+        de cadeiras de cada comissão permanente: a CCJ bate exatamente (27
+        titulares para 27 previstos), e nenhuma das cinco maiores ultrapassa o
+        teto regimental — cadeira vaga existe, cadeira inventada não.</p>
       <p><b>Conferido</b> pela rota inversa da API da Câmara — a lista pelo órgão,
         e não pelo deputado: 8 de 8 colegiados com composição idêntica, entre eles
         a CCJC (130 = 130) e a Comissão de Saúde (99 = 99).</p>

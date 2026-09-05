@@ -252,6 +252,32 @@ sources:
             description: >
               Titular, Suplente, Presidente, Vice-Presidente, Relator. Vem do
               campo `titulo` da API.
+      - name: senado_comissoes
+        description: >
+          F-29 — uma linha por (senador, colegiado, periodo): onde cada senador
+          sentou, com que papel e quando. Fecha a L-28.
+          O catalogo de colegiados do Senado so' lista o que esta' EM ATIVIDADE,
+          e nao ha' rota de detalhe que resolva o encerrado — `/comissao/{codigo}`
+          responde vazio e os parametros de inativos sao ignorados.
+        columns:
+          - name: classe_colegiado
+            description: >
+              Derivada do `CodigoTipoColegiado` OFICIAL quando o colegiado esta'
+              no catalogo; da forma oficial do nome por extenso quando nao esta'.
+              Nunca da sigla — e' ali que mora a armadilha do ADR-034.
+              `frente` e `grupo_amizade` ficam gravadas e NAO sao promovidas a
+              colegiado em `fct_comissao_senador`: sao adesao aberta, nao assento.
+          - name: origem_da_classe
+            description: >
+              `catalogo`, `nome` ou `nenhuma`. Diz se o tipo veio da fonte ou foi
+              deduzido do nome oficial. `nenhuma` NAO entra na ficha — medido em
+              05/09/2026, 215 de 7.226 vinculos (3,0%), quase todos comissoes
+              temporarias encerradas entre 1984 e 2013 cujo nome nao diz o tipo.
+          - name: papel
+            description: >
+              Titular, Suplente ou Nato — so' isso. A rota do Senado NAO devolve
+              presidencia nem relatoria, ao contrario da Camara, entao a ficha de
+              senador nao afirma quem presidiu um colegiado.
       - name: proposicoes
         description: >
           Proposicoes da legislatura 2023-2026 em que um deputado e PROPONENTE.

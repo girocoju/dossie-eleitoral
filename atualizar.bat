@@ -270,6 +270,13 @@ call :passo "Emendas parlamentares" tolerante || goto :abortar
 set "CMD="%PY%" -m ingest.comissoes load"
 call :passo "Comissoes da Camara" tolerante || goto :abortar
 
+rem Comissoes do Senado (F-29, fecha a L-28). Uma requisicao por senador
+rem (2.594 no historico) mais o catalogo: cerca de dez minutos. O catalogo
+rem so' lista colegiado em atividade, e o tipo do que ja' encerrou e' lido do
+rem nome oficial por extenso, nunca da sigla (ADR-048).
+set "CMD="%PY%" -m ingest.comissoes_senado load"
+call :passo "Comissoes do Senado" tolerante || goto :abortar
+
 set "CMD="%PY%" -m ingest.plenario load --ano-inicio 2025 --ano-fim 2026"
 call :passo "Votos e presenca em plenario" tolerante || goto :abortar
 

@@ -274,6 +274,7 @@ class Candidato:
     mandatos: list[dict] = field(default_factory=list)
     exercicio: dict | None = None
     comissoes: list[dict] = field(default_factory=list)
+    comissoes_senado: list[dict] = field(default_factory=list)
     emendas: list[dict] = field(default_factory=list)
 
     @property
@@ -518,6 +519,7 @@ def carregar_fichas(cliente, cargos: tuple[int, ...],
     _anexar_mandatos(cliente, ids)
     _anexar_exercicio(cliente, ids)
     _anexar_comissoes(cliente, ids)
+    _anexar_comissoes_senado(cliente, ids)
     _anexar_emendas(cliente, ids)
     _anexar_data_do_dado(cliente, {c.sk: c for c in saida})
     _anexar_planos(cliente, {c.sk: c for c in saida})
@@ -1053,6 +1055,52 @@ def _anexar_comissoes(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
             })
             n += 1
     log.info("%d assentos em comissao anexados", n)
+
+
+def _anexar_comissoes_senado(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:
+    """Onde o senador sentou, com que papel (F-29, fecha a L-28).
+
+    Duas diferencas em relacao a' Camara, e as duas aparecem na tela:
+
+    A IDENTIDADE E' INFERIDA. O Senado nao publica CPF, entao a ligacao e' por
+    nome + nascimento — o mesmo criterio que o bloco de atividade legislativa do
+    Senado ja' usa desde a F-22 (ADR-034). `casamento_confiavel` viaja junto para
+    que a ressalva possa ser escrita ao lado do dado.
+
+    O PAPEL E' MAIS POBRE. A rota do Senado devolve so' Titular, Suplente e Nato:
+    nao ha' Presidente nem Relator. A ficha de senador NAO afirma quem presidiu um
+    colegiado, e nao ha' Mesa Diretora nenhuma no dado (L-30).
+    """
+    if not por_pessoa:
+        return
+    p = cliente.project
+    try:
+        linhas = list(cliente.query(f"""
+            select id_pessoa, classe_colegiado, sigla_colegiado, nome_colegiado,
+                   tipo_colegiado, papel_principal, qt_periodos, em_curso,
+                   origem_da_classe, casamento_confiavel,
+                   extract(year from primeiro_inicio) as a1,
+                   extract(year from ultimo_fim)      as a2
+            from `{p}.marts.fct_comissao_senador`
+            where {_filtro(por_pessoa)}
+            order by em_curso desc, ultimo_fim desc, sigla_colegiado
+        """).result())
+    except Exception as exc:  # noqa: BLE001 — sem o mart a ficha sai sem o bloco
+        log.warning("fct_comissao_senador indisponivel (%s)", str(exc)[:90])
+        return
+    n = 0
+    for r in linhas:
+        for c in por_pessoa.get(r.id_pessoa, []):
+            c.comissoes_senado.append({
+                "classe": r.classe_colegiado, "sigla": r.sigla_colegiado,
+                "nome": r.nome_colegiado, "tipo": r.tipo_colegiado,
+                "papel": r.papel_principal, "vezes": r.qt_periodos,
+                "em_curso": bool(r.em_curso), "a1": r.a1, "a2": r.a2,
+                "deduzido": r.origem_da_classe == "nome",
+                "confiavel": bool(r.casamento_confiavel),
+            })
+            n += 1
+    log.info("%d assentos em colegiado do Senado anexados", n)
 
 
 def _anexar_atividade_senado(cliente, por_pessoa: dict[str, list[Candidato]]) -> None:

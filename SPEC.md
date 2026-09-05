@@ -255,6 +255,46 @@ registrados depois da última publicação em lote do TSE (L-23).
 
 ---
 
+**F-29 — Comissões no Senado** · P1 · **Implementada em 05/09/2026**
+
+> Ver [ADR-048](docs/adr/ADR-048-comissoes-do-senado.md). Fecha a
+> [L-28](docs/LACUNAS.md), abre a [L-30](docs/LACUNAS.md).
+
+**Por que entra.** A ficha de deputado dizia onde a pessoa sentou desde a F-26. A
+de senador, não — e a L-28 justificava a diferença com um critério de identidade
+que o próprio site não usava: o bloco de atividade legislativa do Senado já
+estava no ar com a mesma identidade inferida e uma ressalva na tela.
+
+**Alcance.** 51 fichas de 2026. Fonte: `/parlamentar/{codigo}/comissoes` da API
+do Senado, 7.226 vínculos, dos quais 5.514 em colegiado que a ficha exibe.
+
+**A identidade é inferida, e a tela diz.** O Senado não publica CPF; a ligação é
+por nome + data de nascimento — forte, não certa. É o mesmo critério da F-22
+(ADR-034), e a ressalva fica escrita no topo do bloco em vez de o bloco não
+existir.
+
+**O catálogo só cobre o presente.** 292 colegiados citados pelos senadores não
+estavam nele — 21% dos vínculos, e justamente os de maior peso público: CPMI do
+INSS, CPI da Pandemia, Comissão Representativa do Congresso. Não há rota que
+resolva o encerrado. A natureza desses foi lida da **forma oficial do nome por
+extenso**, nunca da sigla, e `origem_da_classe` carrega a procedência até a tela.
+Os 215 vínculos (3,0%) que nem assim deram para determinar ficaram de fora.
+
+**O que a fonte não dá:** presidência, relatoria e Mesa Diretora — zero em 7.226
+vínculos. A ficha de senador **não afirma quem presidiu um colegiado**, e diz na
+tela que não afirma. Davi Alcolumbre preside o Senado e a ficha dele mostra
+apenas o Conselho de Ética ([L-30](docs/LACUNAS.md)).
+
+**O que fica de fora.** Frentes (796) e grupos parlamentares (701): são adesão
+aberta, não assento — mesma regra da Câmara.
+
+**Conferido:** contra o Regimento Interno do Senado, que fixa as cadeiras de cada
+comissão permanente. A CCJ bate exatamente (27 para 27) e nenhuma das cinco
+maiores ultrapassa o teto regimental — cadeira vaga existe, cadeira inventada
+não.
+
+---
+
 **F-28 — Relatório analítico em PDF na home** · P2 · **Implementada em 05/09/2026**
 
 **Por que entra.** A ficha responde sobre *uma* pessoa. Quem chega querendo a
@@ -637,6 +677,7 @@ dossie-eleitoral/
 | ADR-022 | Fonte indisponivel nao derruba a carga diaria | Timeout de API publica e' instabilidade; 404 e' fonte que mudou. Tratar os dois igual faria a serie parar de atualizar em silencio ou o job morrer a cada blip | Aceita |
 | ADR-023 | Resultado apurado dos votos, onde o TSE nao publica | O `COALESCE(...,FALSE)` transformava ausencia em "nao eleito" e publicou que Lula perdeu em 2006; tres estados, e apuracao aritmetica so' para cargo majoritario | Aceita |
 
+| ADR-048 | Comissões do Senado, com identidade inferida e assumida | A L-28 exigia CPF para exibir comissão de senador, enquanto o bloco de atividade legislativa do Senado já estava no ar com a mesma identidade inferida e uma ressalva na tela — o critério mais duro não era prudência, era um bloco a menos por uma regra que o projeto não tinha | Aceita |
 | ADR-047 | Um publicador por vez | O workflow publicava a cada push e o `atualizar.bat` publica da máquina: nove pushes numa noite produziram nove publicações canceladas no meio do envio, e foi isso que encheu o servidor de arquivos ocultos | Aceita |
 | ADR-046 | Emendas: uma linha por ano, e nenhum total | O Portal ignora o ano no endereço e devolve sempre o mesmo arquivo — a primeira carga somou treze cópias; e um total de carreira seria um número grande sem significado, porque o ano é o que dá escala à cifra | Aceita |
 | ADR-045 | Resíduo de envio interrompido não mata a publicação | O servidor deixa um oculto `.in.<nome>.` quando a transferência morre, e o 550 seguinte derrubou uma publicação depois de 6.200 arquivos | Aceita |

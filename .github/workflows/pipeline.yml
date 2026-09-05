@@ -324,6 +324,14 @@ jobs:
         if: steps.cred.outputs.temos == 'true'
         run: carga.sh "Comissoes (F-26)" ingest.comissoes load
 
+      # Uma requisicao por senador (2.594) mais o catalogo: ~10 min. O catalogo
+      # do Senado so' lista colegiado EM ATIVIDADE, e nao ha' rota que devolva o
+      # tipo do que ja' encerrou — ele e' lido do nome oficial por extenso,
+      # nunca da sigla (ADR-048).
+      - name: Comissoes do Senado (F-29)
+        if: steps.cred.outputs.temos == 'true'
+        run: carga.sh "Comissoes Senado (F-29)" ingest.comissoes_senado load
+
       # Votos e presenca do ano corrente. Os anos historicos (2003-2025) sao
       # carga separada e manual: ano encerrado nao muda, e `load_intervalo`
       # substitui APENAS a particao do ano, entao o diario nao os apaga.

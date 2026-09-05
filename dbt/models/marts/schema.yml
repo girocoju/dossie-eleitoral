@@ -588,6 +588,55 @@ models:
           todo dia.
         tests: [not_null]
 
+  - name: fct_comissao_senador
+    description: >
+      Onde cada senador sentou, com que papel e por quanto tempo. Espelha
+      `fct_comissao_deputado`, com duas diferencas que a tela precisa dizer.
+      A identidade e' INFERIDA: o Senado nao publica CPF, entao o filtro e'
+      `id_pessoa is not null` — casamento por nome + nascimento, o mesmo criterio
+      que `fct_atividade_senado` ja' usa em producao (ADR-034). `casamento_confiavel`
+      e `metodo_id_pessoa` seguem ate' o fim para a ressalva na ficha.
+      O papel e' mais pobre: a rota do Senado devolve so' Titular, Suplente e
+      Nato. A ficha de senador NAO afirma quem presidiu um colegiado.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [id_pessoa, codigo_colegiado]
+    columns:
+      - name: id_pessoa
+        tests: [not_null]
+      - name: classe_colegiado
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [mesa, permanente, temporaria, conselho, mista]
+      - name: origem_da_classe
+        description: >
+          `catalogo` quando o tipo veio do `CodigoTipoColegiado` da fonte, `nome`
+          quando foi deduzido da forma oficial escrita por extenso. O catalogo do
+          Senado so' cobre colegiado em atividade, e o que ficava de fora era
+          justamente o de maior peso publico — CPMI do INSS, CPI da Pandemia,
+          Comissao Representativa do Congresso. Ver ADR-048.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [catalogo, nome]
+      - name: papel_principal
+        description: >
+          O papel de maior peso pela hierarquia formal (Titular > Nato >
+          Suplente). Nao e' juizo sobre a pessoa.
+        tests: [not_null]
+      - name: qt_periodos
+        description: "Quantas vezes a pessoa foi designada para aquele colegiado."
+        tests: [not_null]
+      - name: em_curso
+        description: >
+          Ao menos um periodo sem data de fim. Preencher com a data de hoje faria
+          a tela dizer que terminou hoje, todo dia.
+        tests: [not_null]
+
   - name: fct_bem_candidatura
     description: >
       Bens declarados por candidatura e TIPO, agrupados pela tabela oficial de

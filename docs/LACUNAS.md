@@ -689,6 +689,31 @@ outra coluna naquele ano, como ja' aconteceu com o layout de candidaturas (L-01)
 
 ## L-28 · Comissões do Senado não têm em quem aparecer
 
+**Situacao:** FECHADA em 05/09/2026 · ADR-048 · F-29
+
+**Por que ela estava errada.** A premissa desta lacuna era que exibir comissao de
+senador exigiria `casamento_confiavel`, e que sem CPF o bloco "nao teria em quem
+aparecer". A premissa nao se sustentou: o bloco de **atividade legislativa do
+Senado** ja' estava no ar desde a F-22 com exatamente a mesma identidade inferida
+e uma ressalva na tela (ADR-034), e aparecia em 50 fichas de 2026.
+
+Ou seja, o projeto ja' tinha decidido como tratar identidade inferida no Senado.
+Esta lacuna aplicava a comissao um criterio mais duro que o que o proprio site
+usava duas secoes acima — e o custo disso nao era prudencia, era um bloco a menos
+por uma regra que nao existia.
+
+Fechada com `fct_comissao_senador`: filtro `id_pessoa is not null`, com
+`casamento_confiavel` e `metodo_id_pessoa` viajando ate' a tela, e a ressalva
+escrita no topo do bloco. **51 fichas de 2026** passaram a mostrar o bloco.
+
+O que a L-28 acertou continua valendo e virou ressalva visivel em vez de omissao:
+a identidade e' por nome + nascimento, forte e nao certa, e quem le' precisa
+saber disso.
+
+Duas coisas que a fonte nao da' viraram a **L-30**, aberta no lugar.
+
+<details><summary>Registro original, de 04/09/2026</summary>
+
 **Situacao:** ABERTA · registrada em 04/09/2026
 
 **O que falta:** o bloco de comissoes (F-26) cobre so' a Camara. A API do Senado
@@ -718,6 +743,8 @@ LGPD), o casamento passa a ser confiavel e o bloco vem junto.
 **O que NAO fazer:** exibir com casamento por nome. Homonimia com mesma data de
 nascimento e' improvavel, nao impossivel, e o custo do erro aqui e' atribuir a
 uma pessoa o assento de outra.
+
+</details>
 
 ---
 
@@ -751,3 +778,52 @@ em bloco. Fechar exigiria outra fonte, com outro casamento de identidade.
 
 **O que NAO fazer:** distribuir o valor sem autor entre os autores conhecidos,
 por rateio ou por qualquer criterio. Seria inventar autoria de dinheiro publico.
+
+---
+
+## L-30 · O Senado não publica presidência de comissão, nem a Mesa Diretora
+
+**Situacao:** ABERTA · registrada em 05/09/2026 · **nao e' lacuna deste projeto**
+
+**O que falta:** duas coisas que a ficha de deputado tem e a de senador nao pode
+ter, porque a fonte nao as devolve.
+
+**1. Nao ha' papel de comando.** A rota `/parlamentar/{codigo}/comissoes` devolve
+tres papeis, e so' tres. Medido em 05/09/2026 sobre 7.226 vinculos:
+
+| papel | vinculos |
+|---|---|
+| Titular | 4.708 |
+| Suplente | 2.516 |
+| Nato | 2 |
+| **Presidente, Vice, Relator** | **0** |
+
+Na Camara, `/deputados/{id}/orgaos` traz o `titulo` e por isso a ficha diz quem
+presidiu a CCJC. No Senado esse dado nao existe por este caminho.
+
+**2. Nao ha' Mesa Diretora.** Nenhum dos 7.226 vinculos tem classe `mesa` — a
+Mesa nao e' "comissao" no modelo de dados do Senado. O efeito e' concreto e
+visivel: **Davi Alcolumbre preside o Senado, e a ficha dele mostra apenas o
+Conselho de Etica.** Nao ha' rota aberta que devolva a composicao da Mesa:
+`composicao/mesa`, `plenario/lista/mesa`, `composicaoMesa` e `senador/lista/mesa`
+respondem vazio (135 a 145 caracteres).
+
+**Impacto:** a ficha de senador tem uma tabela de assentos sem hierarquia. Um
+leitor que compare as duas casas lado a lado pode concluir que o senador nunca
+presidiu nada — quando o que houve foi silencio da fonte, nao ausencia do fato.
+
+**Como esta' tratado:** o bloco de comissoes no Senado diz, com todas as letras,
+que presidencia e relatoria nao aparecem e que isso nao significa que nao houve,
+e cita esta lacuna com link. A alternativa — deduzir presidencia de outra rota,
+ou herdar do titulo do parlamentar — inventaria o dado (Regra 5).
+
+**Como fechar:** as atas de instalacao de cada comissao trazem a eleicao do
+presidente, e a pagina publica de cada colegiado exibe a Mesa. As duas exigiriam
+raspagem de HTML renderizado por JavaScript — a pagina
+`legis.senado.leg.br/comissoes/comissao?codcol=34` volta com 57 KB de casca e a
+composicao carregada depois. Fica fora do custo quase-zero do projeto por ora.
+
+**O que NAO fazer:** preencher o papel com "Titular" onde a pessoa presidiu, ou o
+contrario. E nao inferir a Mesa a partir do cargo declarado no perfil do senador:
+o cargo e' do presente e o assento tem periodo, e cruza-los produziria a
+afirmacao de que ele presidiu a Casa durante todos os mandatos.
