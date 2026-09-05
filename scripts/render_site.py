@@ -1944,21 +1944,43 @@ ANALISE_PDF = "analise-2026.pdf"
 ANALISE_ORIGEM = Path(__file__).resolve().parents[1] / "Dossie-Eleitoral-2026-analise.pdf"
 
 
+def _paginas_do_pdf(caminho: Path) -> int | None:
+    """Quantas paginas o PDF tem, lidas DELE.
+
+    O numero estava escrito na chamada da home. O relatorio cresceu de 27 para
+    29 paginas e a home seguiu anunciando 27 — do mesmo jeito silencioso com que
+    os numeros dentro do proprio relatorio envelheceram.
+
+    Devolve None se nao der para contar; nesse caso a frase sai sem o numero, que
+    e' melhor que sair com o numero errado (Regra 5).
+    """
+    try:
+        bruto = caminho.read_bytes()
+    except OSError:
+        return None
+    n = len(re.findall(rb"/Type\s*/Page[^s]", bruto))
+    return n or None
+
+
 def _bloco_analise() -> str:
     """Chamada para o relatorio analitico. Vazio se o PDF nao existe."""
     if not ANALISE_ORIGEM.exists():
         return ""
-    mb = ANALISE_ORIGEM.stat().st_size / 1e6
+    # Virgula decimal: o documento e' em portugues, e "0.5 MB" e' separador de
+    # outra lingua na home de um site brasileiro.
+    mb = f"{ANALISE_ORIGEM.stat().st_size / 1e6:.1f}".replace(".", ",")
+    _n_pag = _paginas_do_pdf(ANALISE_ORIGEM)
+    _qt_pag = f" de {_n_pag} páginas" if _n_pag else ""
     return f"""
 <div class="analise">
   <div>
     <h2 style="margin:0 0 6px;border:0;padding:0">O retrato das candidaturas de 2026</h2>
-    <p style="margin:0 0 10px">Um relatório de 27 páginas com a leitura agregada
+    <p style="margin:0 0 10px">Um relatório{_qt_pag} com a leitura agregada
       dos mesmos dados que estão nas fichas: quem se candidata, quanto declara,
       de onde vem o dinheiro de campanha, para onde vão as emendas — e uma seção
       sobre <b>o que as fontes oficiais não entregam</b>.</p>
     <p style="margin:0;font-size:12.5px;color:var(--ink-3)">
-      PDF, {mb:.1f} MB · gráficos e tabelas · mesmas fontes, mesma data de
+      PDF, {mb} MB · gráficos e tabelas · mesmas fontes, mesma data de
       extração</p>
   </div>
   <a class="cta" href="{BASE_URL}/{ANALISE_PDF}" download>Baixar o relatório &darr;</a>

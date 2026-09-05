@@ -262,3 +262,39 @@ def test_o_link_do_relatorio_usa_o_endereco_publico(monkeypatch, tmp_path):
     falso.write_bytes(b"%PDF-1.4")
     monkeypatch.setattr(render_site, "ANALISE_ORIGEM", falso)
     assert f"{render_site.BASE_URL}/{render_site.ANALISE_PDF}" in render_site._bloco_analise()
+
+
+def test_a_chamada_do_relatorio_conta_as_paginas_do_arquivo(monkeypatch, tmp_path):
+    """O numero estava escrito na home. O relatorio cresceu de 27 para 29 paginas
+    e a home seguiu anunciando 27 — silenciosamente, que e' como todo numero
+    escrito a mao envelhece."""
+    from scripts import render_site
+
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n/Type /Page\n/Type /Page\n/Type /Page\n%%EOF")
+    monkeypatch.setattr(render_site, "ANALISE_ORIGEM", pdf)
+    assert "de 3 páginas" in render_site._bloco_analise()
+
+
+def test_sem_conseguir_contar_a_frase_sai_sem_numero(monkeypatch, tmp_path):
+    """Regra 5: melhor a frase sem o numero que a frase com o numero errado."""
+    from scripts import render_site
+
+    pdf = tmp_path / "b.pdf"
+    pdf.write_bytes(b"%PDF-1.4 nada aqui parece uma pagina %%EOF")
+    monkeypatch.setattr(render_site, "ANALISE_ORIGEM", pdf)
+    html = render_site._bloco_analise()
+    assert "Um relatório com a leitura" in html
+    assert "páginas" not in html
+
+
+def test_o_tamanho_usa_virgula_decimal(monkeypatch, tmp_path):
+    """"0.5 MB" e' separador de outra lingua na home de um site brasileiro."""
+    from scripts import render_site
+
+    pdf = tmp_path / "c.pdf"
+    pdf.write_bytes(b"%PDF-1.4" + b"0" * 500_000)
+    monkeypatch.setattr(render_site, "ANALISE_ORIGEM", pdf)
+    html = render_site._bloco_analise()
+    assert "0,5 MB" in html
+    assert "0.5 MB" not in html
