@@ -180,6 +180,7 @@ FDES = D["fonte_desfecho"][0]
 FMAN = D["fonte_fim_mandato"][0]
 FIDE = D["fonte_identidade"][0]
 FMUD = D["fonte_mudancas"][0]
+FFIN = D["fonte_financiamento"][0]
 _BENS = {int(r["ano"]): r for r in D["fonte_bens"]}
 B06 = _BENS[2006]
 # Quanto o resto dos anos zera, para dar escala ao numero de 2006.
@@ -272,7 +273,7 @@ SUMARIO = [
      "Média ou mediana, cinco limites que mudam a leitura, e o que este "
      "levantamento deliberadamente não faz."),
     ("15", "O que as fontes oficiais não entregam",
-     "Vinte e três incongruências encontradas nas fontes ao longo do "
+     "Vinte e quatro incongruências encontradas nas fontes ao longo do "
      "projeto — o que falta, o que engana, e o que se faz com isso."),
     ("16", "Fontes",
      "Cada número, sua origem exata, e como refazer a conta."),
@@ -1222,6 +1223,15 @@ pag(f"""
         ("NEUMARA" para "NEMAURA", "CAPITÃO RODOLDO" para "CAPITÃO RODOLFO").
         Quem guardou o nome antigo passa a mostrar a grafia que a própria pessoa
         pediu para corrigir, e o portal não avisa que mudou</td></tr>
+    <tr><td><b>CPF no campo do nome do doador</b><br>
+        <span class="s">TSE · prestação de contas</span></td>
+        <td>Quem preenche a prestação às vezes escreve o <b>CPF onde vai o
+        nome</b>, e o arquivo sai publicado assim. Nesta extração:
+        {num(FFIN["nome_era_cpf"])} em {num(FFIN["lancamentos"])} lançamentos —
+        CPF válido, de pessoa física.
+        Não é a coluna de CPF vazando: é o número num campo que ninguém protege,
+        porque ninguém espera encontrá-lo ali. Este site apaga o nome e mantém a
+        doação; o valor é interesse público, o CPF não</td></tr>
     <tr><td><b>O firewall recusa requisição bem-formada</b><br>
         <span class="s">TSE</span></td>
         <td>Requisições sem o conjunto completo de cabeçalhos de navegador são

@@ -47,7 +47,11 @@ select
     -- O nome vem do maior lancamento, nao de `any_value`: se a mesma identidade
     -- aparece com grafias diferentes, a que acompanha o maior valor e' a que o
     -- leitor tem mais chance de reconhecer.
-    array_agg(nome_doador order by valor desc limit 1)[safe_offset(0)] as nome_doador,
+    -- `ignore nulls` NAO e' detalhe: `array_agg` do BigQuery lanca erro se um
+    -- elemento for nulo, e o nome fica nulo quando a fonte trouxe um CPF no
+    -- lugar dele (ver `stg_tse__financiamento`). Sem isto o mart quebraria
+    -- por causa de UMA linha em 82.710.
+    array_agg(nome_doador ignore nulls order by valor desc limit 1)[safe_offset(0)] as nome_doador,
 
     any_value(doador_tipo)                    as doador_tipo,
     -- Fica NULL quando pessoa fisica. O hash NAO vai junto: ele serve para

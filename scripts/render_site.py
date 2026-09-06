@@ -2048,6 +2048,15 @@ $("q").addEventListener("input", () => {{
   clearTimeout(timer);
   timer = setTimeout(buscar, 130);
 }});
+
+// `?q=` no endereco: uma busca vira link. Serve a quem quer mandar "olha os
+// candidatos com esse sobrenome" sem pedir que o outro digite, e e' o que
+// permite capturar a busca em funcionamento para material de divulgacao.
+//
+// O termo NAO e' interpretado como HTML em lugar nenhum — ele so' entra no
+// `value` do campo, e o resto do caminho e' o mesmo de quem digita.
+const inicial = new URLSearchParams(location.search).get("q");
+if (inicial) {{ $("q").value = inicial; buscar(); }}
 </script>"""
 
 

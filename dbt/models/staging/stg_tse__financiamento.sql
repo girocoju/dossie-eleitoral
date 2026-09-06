@@ -37,7 +37,31 @@ select
     {{ limpa('especie') }}             as especie_recurso,
 
     -- ── doador ───────────────────────────────────────────────────────────────
-    {{ limpa('nome_doador') }}         as nome_doador,
+    /*
+      ── CPF DIGITADO NO CAMPO DO NOME ──
+
+      Quem preenche a prestacao de contas as vezes escreve o CPF onde vai o
+      nome. O TSE publica assim. Medido em 06/09/2026: 1 linha entre 82.710.
+
+      A ingestao hasheia a COLUNA de CPF (ADR-020), mas nao tinha como saber que
+      o numero viria noutro campo. Este `case` cobre o buraco: nome com a forma
+      exata de CPF vira NULL, e `nome_era_cpf` registra que isso aconteceu.
+
+      A doacao NAO e' descartada — valor, data e candidatura continuam, porque
+      sao fato de interesse publico. O que sai e' so' o identificador da pessoa
+      fisica, que o projeto nunca publica.
+
+      Nao ha' validacao de digito verificador aqui de proposito. Onze digitos no
+      lugar do nome ja' e' motivo suficiente para nao publicar: se for CPF, e'
+      dado pessoal; se nao for, e' lixo que nao ajuda ninguem a identificar o
+      doador. Nos dois casos a resposta certa e' a mesma.
+    */
+    case
+        when regexp_contains({{ limpa('nome_doador') }}, r'^\d{11}$') then null
+        else {{ limpa('nome_doador') }}
+    end                                as nome_doador,
+    regexp_contains({{ limpa('nome_doador') }}, r'^\d{11}$')
+                                       as nome_era_cpf,
     {{ limpa('doador_cnpj') }}         as doador_cnpj,
     {{ limpa('doador_cpf_hash') }}     as doador_cpf_hash,
     doador_tipo,

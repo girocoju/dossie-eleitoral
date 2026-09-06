@@ -401,7 +401,10 @@ def carregar_doadores(cliente) -> list[list]:
         ficha = (f"candidato/{slug(r.nome_candidato or '')}-{r.sq_candidato}"
                  if r.cod_cargo in CARGOS and r.nome_candidato else "")
         linhas.append([
-            r.nome_doador or "",
+            # Travessao, e nao vazio: celula em branco numa tabela de doadores
+            # parece defeito da pagina. O nome falta quando a fonte poe um CPF
+            # no lugar dele, e ai' o dado nao e' publicavel.
+            r.nome_doador or "—",
             "J" if r.doador_tipo == "juridica" else "F",
             r.doador_cnpj or "",
             r.doador_uf or "",

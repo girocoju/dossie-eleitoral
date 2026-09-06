@@ -627,6 +627,12 @@ def coletar() -> dict[str, list[dict]]:
     # O TSE publica apenas o ESTADO ATUAL, sem historico. Este mart existe
     # porque o projeto tira uma foto diaria — e' a unica forma de saber que algo
     # mudou, e o que mudou.
+    # CPF digitado no campo do NOME do doador (ADR-051). O numero e' pequeno e
+    # muda a cada carga — escrito no texto, envelheceria como os outros.
+    q("fonte_financiamento", f"""
+      select count(*) lancamentos, countif(nome_era_cpf) nome_era_cpf
+      from `{p}.stg.stg_tse__financiamento`""")
+
     q("fonte_mudancas", f"""
       select count(*) mudancas,
              count(distinct sq_candidato) candidaturas,

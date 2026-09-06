@@ -7,6 +7,7 @@ rem  Uso:  publicar.bat              publica o que esta' em site\
 rem        publicar.bat --gerar      gera o site antes de publicar
 rem        publicar.bat --completo   reenvia TUDO, inclusive o que nao mudou
 rem        publicar.bat --seco       so' lista o que subiria; nao conecta
+rem        publicar.bat --forcar     ignora trava de publicacao anterior
 rem
 rem  O `atualizar.bat` ja' publica no fim. Este existe para as vezes em que o
 rem  lake nao mudou e so' o SITE mudou - e para acompanhar uma publicacao longa
@@ -25,6 +26,13 @@ rem  metade, e' seguro rodar de novo.
 rem
 rem  `--completo` existe para quando servidor e manifesto discordarem - alguem
 rem  apagou um arquivo por FTP, por exemplo. Reenviar e' sempre seguro.
+rem
+rem  `--forcar` ignora a trava do ADR-047, que existe para impedir duas
+rem  publicacoes simultaneas na mesma conta FTP. Use quando uma publicacao
+rem  ANTERIOR morreu e deixou a trava para tras - janela fechada, maquina
+rem  reiniciada, processo interrompido. NAO use se outra publicacao pode
+rem  estar rodando agora: duas ao mesmo tempo escrevem os mesmos caminhos e
+rem  foi assim que o servidor encheu de arquivos ocultos em 04/09/2026.
 rem
 rem  QUANTO TEMPO DEMORA
 rem
