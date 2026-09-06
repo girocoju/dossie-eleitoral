@@ -32,6 +32,7 @@ import subprocess
 import tempfile
 import time
 from datetime import UTC, datetime
+from html import escape as _escapar
 from pathlib import Path
 
 from ingest.common.log import get_logger
@@ -86,6 +87,17 @@ def mi(v):
 
 def bi(v):
     return f"R$ {_n(float(v) / 1e9, 2)} bi"
+
+
+def esc_nome(t):
+    """Nome vindo do cadastro entra no HTML escapado.
+
+    Nenhum nome do TSE tem '<' hoje, e depender disso e' que e' o erro.
+
+    A funcao e' importada POR NOME porque `html` vira uma variavel no fim deste
+    arquivo, onde o documento inteiro e' montado. Guardado como `html.escape`,
+    o escape deixaria de existir exatamente ali."""
+    return _escapar(str(t))
 
 
 def razao(v):
@@ -242,30 +254,33 @@ SUMARIO = [
     ("8", "A emenda que não diz para quê",
      "A transferência especial sai de 6,6% para 33,7% das emendas individuais. "
      "E os 17% que a fonte não atribui a ninguém."),
-    ("9", "O que os parlamentares em exercício produzem",
+    ("9", "O Senado, que esta eleição renova em dois terços",
+     "Duas cadeiras por estado, o cargo menos diverso da eleição e 672 "
+     "candidaturas em que ninguém vota."),
+    ("10", "O que os parlamentares em exercício produzem",
      "Proposições por natureza — que não podem ser somadas — e assentos em "
      "comissão."),
-    ("10", "As trocas de cargo durante o registro",
+    ("11", "As trocas de cargo durante o registro",
      "Pessoas com duas candidaturas no pacote do TSE, e por que isso não é "
      "contradição nem erro."),
-    ("11", "Partidos e federações",
+    ("12", "Partidos e federações",
      "Tamanho das listas, o peso das federações e a única legenda do país com "
      "maioria feminina."),
-    ("12", "Situação do registro",
+    ("13", "Situação do registro",
      "Onde cada pedido está no rito, e por que 21% ainda aguardam."),
-    ("13", "Método, limites e o que não está aqui",
+    ("14", "Método, limites e o que não está aqui",
      "Média ou mediana, cinco limites que mudam a leitura, e o que este "
      "levantamento deliberadamente não faz."),
-    ("14", "O que as fontes oficiais não entregam",
+    ("15", "O que as fontes oficiais não entregam",
      "Vinte e três incongruências encontradas nas fontes ao longo do "
      "projeto — o que falta, o que engana, e o que se faz com isso."),
-    ("15", "Fontes",
+    ("16", "Fontes",
      "Cada número, sua origem exata, e como refazer a conta."),
 ]
 
 pag("""
 <h2>Índice</h2>
-<p>Este documento tem 15 seções. As três primeiras descrevem <b>quem</b> se
+<p>Este documento tem 16 seções. As três primeiras descrevem <b>quem</b> se
   candidata; da quarta à oitava, <b>quanto</b> — dinheiro de campanha, patrimônio
   e emendas; a nona e a décima, <b>o que a pessoa fez</b>; as últimas, os
   partidos, o método, os limites das fontes e as fontes.</p>
@@ -679,6 +694,109 @@ pag(f"""
   autoria a fonte oficial não revela. Qualquer soma "por parlamentar" no Brasil,
   inclusive esta, exclui esse bloco por impossibilidade.</p>""")
 
+# ══ 8c. O SENADO ══════════════════════════════════════════════════════
+# O numero de vagas nao e' suposto: o TSE publica. 2022 traz 27 (uma por estado)
+# e 2026 traz 54 (duas) — e' o que sustenta dizer que o eleitor vota em DOIS.
+SVAGAS = {int(r["ano"]): r for r in D["senado_vagas"]}
+SPERF = {int(r["cod_cargo"]): r for r in D["senado_perfil"]}
+SESTR = {int(r["cod_cargo"]): r for r in D["senado_estreantes"]}
+SINC = {r["cargo"]: int(r["senadores"]) for r in D["senado_incumbentes"]}
+SUF = D["senado_por_uf"]
+V26 = int(SVAGAS[2026]["vagas"])
+_ROT_UF = UF_NOME.get(SUF[0]["sg_uf"], SUF[0]["sg_uf"])
+N_SEN = int(SPERF[5]["n"])
+
+
+def _pc(cod, campo):
+    """Percentual de um recorte dentro do cargo."""
+    r = SPERF[cod]
+    return 100 * int(r[campo]) / int(r["n"])
+
+
+def _estr(cod):
+    r = SESTR[cod]
+    return 100 * int(r["estreantes"]) / int(r["n"])
+
+
+# A tabela compara o Senado com as duas casas proporcionais e com as duas
+# suplencias — e' o contraste que faz a secao.
+_ROT = {5: "Senador", 6: "Deputado Federal", 7: "Deputado Estadual",
+        9: "1º Suplente", 10: "2º Suplente"}
+_linhas_perfil = "".join(
+    f"<tr><td>{_ROT[c]}</td>"
+    f"<td class='num'>{num(SPERF[c]['n'])}</td>"
+    f"<td class='num'>{pct(_pc(c, 'mulheres'))}</td>"
+    f"<td class='num'>{pct(_pc(c, 'negros'))}</td>"
+    f"<td class='num'>{_n(float(SPERF[c]['idade_media']), 1)}</td>"
+    f"<td class='num'>{rs(float(SPERF[c]['mediana_bens'] or 0))}</td>"
+    f"<td class='num'>{pct(_estr(c))}</td></tr>"
+    for c in (5, 9, 10, 6, 7))
+
+# Senador em exercicio concorrendo a SUPLENTE de outro. Sao nominais de
+# proposito: o numero parece erro de identidade, e so' o nome permite conferir.
+_supl = " · ".join(f"<b>{esc_nome(r['nome'])}</b> ({esc_nome(r['uf_mandato'])})"
+                   for r in D["senado_incumbente_suplente"])
+
+pag(f"""
+<h2>9 · O Senado, que esta eleição renova em dois terços</h2>
+<p class="destaque"><b>Nesta eleição o voto para senador é duplo.</b> São
+  {num(V26)} das 81 cadeiras em disputa — dois terços da Casa, duas por estado.
+  Em {2022}, para efeito de comparação, foram {num(SVAGAS[2022]["vagas"])}: uma
+  por estado. O número de vagas é publicado pelo próprio TSE, não é estimativa
+  nossa.</p>
+<p>{num(N_SEN)} candidaturas disputam essas {num(V26)} cadeiras —
+  <b>{_n(N_SEN / V26, 1)} por vaga</b>. A disputa mais concorrida do país está no
+  {_ROT_UF} com {num(SUF[0]["titulares"])} nomes para duas cadeiras.</p>
+
+<h3>O Senado é o cargo menos diverso e o mais velho</h3>
+<div class="rolagem"><table class="t">
+  <thead><tr><th>Cargo</th><th class="num">Candidaturas</th>
+  <th class="num">Mulheres</th><th class="num">Pretos e pardos</th>
+  <th class="num">Idade média</th><th class="num">Patrimônio mediano</th>
+  <th class="num">Estreantes</th></tr></thead>
+  <tbody>{_linhas_perfil}</tbody>
+</table></div>
+<p class="obs">O Senado tem <b>{pct(_pc(5, "mulheres"))} de mulheres</b> contra
+  {pct(_pc(6, "mulheres"))} na Câmara, e {pct(_pc(5, "negros"))} de pessoas
+  pretas ou pardas contra {pct(_pc(6, "negros"))}. A explicação mais direta é
+  que <b>a cota de 30% por gênero não alcança cargo majoritário</b> — ela vale
+  para as listas proporcionais. Onde não há cota, a proporção cai.</p>
+<p class="obs">O patrimônio mediano de quem disputa o Senado é
+  <b>{_n(float(SPERF[5]["mediana_bens"]) / float(SPERF[6]["mediana_bens"]), 1)}
+  vezes</b> o de quem disputa a Câmara.</p>
+
+<h3>E há {num(int(SPERF[9]["n"]) + int(SPERF[10]["n"]))} candidaturas em que
+  ninguém vota</h3>
+<p>Cada chapa ao Senado leva um titular e <b>dois suplentes</b>. O eleitor digita
+  o número do titular; os suplentes vão junto, sem aparecer na urna. Se a cadeira
+  vagar — por renúncia, morte, cassação ou por o titular virar ministro — é o
+  suplente que assume, com mandato completo.</p>
+<p class="aviso"><b>O contraste está na linha de estreantes da tabela acima.</b>
+  O Senado é o campo mais experiente da eleição: só {pct(_estr(5))} nunca
+  concorreram a nada antes, contra {pct(_estr(6))} na Câmara. Entre os suplentes
+  a proporção inverte — <b>{pct(_estr(9))} e {pct(_estr(10))}</b> são estreantes.
+  Quem pode herdar uma cadeira no Senado é, em regra, quem nunca disputou uma
+  eleição.</p>
+<p class="obs">Nada disso é irregularidade: é o desenho constitucional da
+  suplência. Está aqui porque é a informação menos visível de toda a eleição —
+  não há propaganda, debate nem pesquisa sobre suplente, e ele entra no mesmo
+  voto.</p>
+
+<h3>Onde estão os 81 senadores de hoje</h3>
+<div class="escada">
+  <div><b>{num(SINC.get("5", 0))}</b><span>disputam a reeleição</span></div>
+  <div><b>{num(SINC.get("3", 0))}</b><span>concorrem a governador</span></div>
+  <div><b>{num(SINC.get("nenhum", 0))}</b><span>não concorrem a nada</span></div>
+</div>
+<p class="obs">Os {num(SINC.get("3", 0))} que disputam governo do estado
+  concorrem cada um <b>no próprio estado</b>. Outros
+  {num(SINC.get("6", 0) + SINC.get("7", 0))} tentam uma cadeira de deputado,
+  federal ou estadual, e {num(SINC.get("1", 0))} concorre à Presidência.</p>
+<p class="destaque"><b>E {num(SINC.get("9", 0))} senadores em exercício
+  concorrem a suplente de outra pessoa</b>, todos no próprio estado:
+  {_supl}. Parece erro de identidade e não é — os nomes estão aqui justamente
+  para que se possa conferir.</p>""")
+
 # ══ 8b. ATIVIDADE LEGISLATIVA ══════════════════════════════════════════
 CLASSE = {"normativa": "Normativa (PL, PEC, MP)",
           "fiscalizacao": "Fiscalização",
@@ -705,7 +823,7 @@ CMD = sum(int(r["vinculos"]) for r in D["comissoes_senado_papel"]
           if r["origem"] == "cargos")
 
 pag(f"""
-<h2>9 · O que os parlamentares em exercício produzem</h2>
+<h2>10 · O que os parlamentares em exercício produzem</h2>
 <p>Este bloco só existe para quem já tem mandato e pôde ser ligado ao cadastro
   eleitoral: <b>{num(ALC["comissao_camara"])} candidaturas de 2026</b> na Câmara e
   <b>{num(ALC["comissao_senado"])}</b> no Senado. Para as demais, o campo não é
@@ -788,7 +906,7 @@ _sen = next((int(c["pessoas"]) for c in D["dupla_combinacao"]
              if c["combinacao"] == "5+6"), 0)
 
 pag(f"""
-<h2>10 · {num(DUP["total"])} trocas de cargo</h2>
+<h2>11 · {num(DUP["total"])} trocas de cargo</h2>
 <p>{num(DUP["total"])} pessoas aparecem em <b>duas candidaturas</b> no pacote de
   2026. Como a lei permite uma candidatura por pessoa por eleição, isso parece
   contradição — e não é.</p>
@@ -825,7 +943,7 @@ divf = [(f"{s} ({n})", v) for s, v, n in _div[:6]] + \
 _abaixo = [(s, v, n) for s, v, n in _div if v < 30]
 
 pag(f"""
-<h2>11 · Partidos e federações</h2>
+<h2>12 · Partidos e federações</h2>
 {barras(pt, titulo="Candidaturas por partido", rotulo=num, cor=ACENTO)}
 <p class="obs">Nenhum partido concentra mais de
   {pct(100 * int(D["partidos"][0]["n"]) / TOTAL, 0)} das candidaturas. O
@@ -866,12 +984,12 @@ CORES_SIT = {"Deferido": OK, "Aguardando Julgamento": ALERTA,
              "Pendente De Julgamento": ALERTA}
 
 pag(f"""
-<h2>12 · Situação do registro</h2>
+<h2>13 · Situação do registro</h2>
 {barras(sit, titulo="Situação no TSE", rotulo=num, cores=CORES_SIT)}
 <p class="obs">Três em cada quatro registros estão deferidos e 21% ainda
   aguardam julgamento — o calendário de registro não terminou. As 470 renúncias
   incluem as trocas de cargo da seção anterior.</p>
-<h2>13 · Método, limites e o que não está aqui</h2>
+<h2>14 · Método, limites e o que não está aqui</h2>
 <h3>Média ou mediana: por que este relatório mostra as duas</h3>
 <p>A <b>média</b> soma tudo e divide pelo número de casos. É a medida que a maior
   parte das pessoas conhece, e é a certa quando se quer saber o total ou quando os
@@ -932,7 +1050,7 @@ pag(f"""
 
 # ══ 14. O QUE AS FONTES NÃO ENTREGAM ══════════════════════════════════
 pag(f"""
-<h2>14 · O que as fontes oficiais não entregam</h2>
+<h2>15 · O que as fontes oficiais não entregam</h2>
 <p>Esta seção existe porque quase nenhum trabalho sobre dados eleitorais a
   publica. Ela lista o que as fontes <b>não</b> fornecem, o que fornecem de forma
   inconsistente, e o que fornecem de um jeito que induz ao erro se lido
@@ -1130,7 +1248,7 @@ pag(f"""
 
 # ══ 14. FONTES ════════════════════════════════════════════════════════
 pag(f"""
-<h2>15 · Fontes</h2>
+<h2>16 · Fontes</h2>
 <p>Todo número deste relatório vem de fonte pública, sem intermediário. Abaixo,
   a origem exata de cada bloco e o endereço para refazer a conta.</p>
 

@@ -298,3 +298,55 @@ def test_o_tamanho_usa_virgula_decimal(monkeypatch, tmp_path):
     html = render_site._bloco_analise()
     assert "0,5 MB" in html
     assert "0.5 MB" not in html
+
+
+# ── o voto duplo para senador, na home ────────────────────────────────────
+
+def test_a_home_explica_que_o_voto_para_senador_e_duplo():
+    """O Senado renova por tercos alternados: em 2022 foi UMA cadeira por estado,
+    em 2026 sao DUAS. Quem votou na eleicao passada aprendeu um numero que nao
+    vale para esta, e a urna nao avisa antes — o eleitor descobre quando a tela
+    pede o segundo voto."""
+    from scripts.render_site import _bloco_senado
+
+    html = _bloco_senado(54, 2)
+    assert "dois</b> senadores" in html
+    assert "54 das 81" in html
+    assert "duas vezes seguidas" in html
+
+
+def test_a_home_avisa_que_o_voto_leva_dois_suplentes_junto():
+    """O eleitor digita o numero do titular e elege tres pessoas."""
+    from scripts.render_site import _bloco_senado
+
+    assert "dois suplentes" in _bloco_senado(54, 2)
+
+
+def test_sem_o_dado_do_tse_o_bloco_nao_afirma_nada():
+    """Dizer "dois" de cabeca seria o tipo de afirmacao que este projeto nao faz.
+    O numero vem do TSE ou o bloco nao aparece (Regra 5)."""
+    from scripts.render_site import _bloco_senado
+
+    assert _bloco_senado(None, None) == ""
+    assert _bloco_senado(54, None) == ""
+
+
+def test_vaga_por_estado_so_e_afirmada_quando_a_divisao_fecha():
+    """Em 2018 o TSE publicou 56 vagas para 27 estados — havia eleicao
+    suplementar no meio. "2,07 por estado" nao e' frase que se escreva numa
+    home, entao nesse caso o bloco nao sai."""
+    from scripts.gerar_site import vagas_de_senador
+
+    class _Falso:
+        project = "x"
+
+        def __init__(self, vagas, ues):
+            self._v, self._u = vagas, ues
+
+        def query(self, _sql):
+            linhas = [type("L", (), {"vagas": self._v, "ues": self._u})()]
+            return type("J", (), {"result": lambda _s: linhas})()
+
+    assert vagas_de_senador(_Falso(54, 27)) == (54, 2)
+    assert vagas_de_senador(_Falso(56, 27)) == (56, None)
+    assert vagas_de_senador(_Falso(None, 27)) == (None, None)

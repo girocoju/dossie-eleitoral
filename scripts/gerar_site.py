@@ -529,6 +529,35 @@ def carregar_fichas(cliente, cargos: tuple[int, ...],
     return saida
 
 
+def vagas_de_senador(cliente, ano: int = 2026) -> tuple[int | None, int | None]:
+    """Quantas cadeiras de senador estao em disputa, e quantas por estado.
+
+    O Senado renova por tercos alternados — em 2022 foi UMA por estado, em 2026
+    sao DUAS. Quem votou na eleicao passada aprendeu um numero que nao vale para
+    esta, e a urna nao avisa antes.
+
+    O numero vem do TSE, do mesmo pacote que alimenta o resto do site. Devolve
+    (None, None) se o dado nao estiver la': o bloco da home some, em vez de o
+    site afirmar "dois" de cabeca (Regra 5).
+    """
+    try:
+        linhas = list(cliente.query(f"""
+            select sum(qt_vagas) vagas, count(distinct sg_ue) ues
+            from `{cliente.project}.stg.stg_tse__vagas`
+            where cod_cargo = 5 and ano_eleicao = {ano}
+        """).result())
+    except Exception as exc:  # noqa: BLE001 — sem o dado, o bloco nao aparece
+        log.warning("stg_tse__vagas indisponivel (%s)", str(exc)[:80])
+        return (None, None)
+    if not linhas or not linhas[0].vagas or not linhas[0].ues:
+        return (None, None)
+    total, ues = int(linhas[0].vagas), int(linhas[0].ues)
+    # So' afirma "N por estado" quando a divisao e' exata. Em 2018 o TSE publicou
+    # 56 vagas para 27 estados — havia eleicao suplementar no meio, e "2,07 por
+    # estado" nao e' frase que se escreva numa home.
+    return (total, total // ues if total % ues == 0 else None)
+
+
 def quantas_trocas_de_nome(cliente) -> int | None:
     """Quantas candidaturas tiveram o nome de urna alterado depois de publicadas.
 
@@ -1459,10 +1488,12 @@ def main(argv: list[str] | None = None) -> int:
     doadores = carregar_doadores(cliente)
     catalogo = catalogo_indicadores(cliente)
     trocas_de_nome = quantas_trocas_de_nome(cliente)
+    senado_vagas, senado_por_uf = vagas_de_senador(cliente)
 
     destino = Path(args.saida)
     escrever_site(destino, fichas, proporcionais, quando, catalogo, doadores,
-                  trocas_de_nome=trocas_de_nome)
+                  trocas_de_nome=trocas_de_nome,
+                  senado_vagas=senado_vagas, senado_por_uf=senado_por_uf)
     n = sum(1 for _ in destino.rglob("*.html"))
     log.info("site em %s — %d paginas HTML", destino.resolve(), n)
     return 0

@@ -2123,8 +2123,44 @@ def _bloco_analise() -> str:
 </div>"""
 
 
+def _bloco_senado(vagas: int | None, por_uf: int | None) -> str:
+    """Quantos senadores se elege nesta eleicao, e por que sao dois.
+
+    O Senado renova por tercos alternados: em 2022 foi UMA cadeira por estado, em
+    2026 sao DUAS. Quem votou na eleicao passada aprendeu um numero que nao vale
+    para esta, e nao ha' nada na urna que avise antes — o eleitor descobre quando
+    a tela pede o segundo voto.
+
+    O numero de vagas nao e' suposto: vem do proprio TSE, do mesmo pacote que
+    alimenta o resto do site. Sem ele, o bloco nao aparece — dizer "dois" de
+    cabeca seria o tipo de afirmacao que este projeto nao faz (Regra 5).
+    """
+    if not vagas or not por_uf:
+        return ""
+    return f"""
+<section class="bloco" style="margin:26px 0">
+  <h2 style="font-family:inherit;font-size:19px;letter-spacing:0;text-transform:none;
+    color:var(--ink);border:0;padding:0;margin:0 0 8px">
+    Nesta eleição você vota em <b>dois</b> senadores</h2>
+  <p style="margin:0 0 10px;max-width:var(--medida)">O Senado se renova por partes:
+    a cada quatro anos o país troca <b>um terço</b> ou <b>dois terços</b> das
+    cadeiras, alternando. Em 2022 foi um terço — uma vaga por estado. Em 2026 são
+    <b>dois terços</b>: {por_uf} vagas por estado, {vagas} das 81 cadeiras.</p>
+  <p style="margin:0 0 10px;max-width:var(--medida)">Na urna, o cargo de senador
+    aparece <b>duas vezes seguidas</b>. São dois votos independentes, em dois
+    candidatos diferentes — não é repetição nem erro da máquina.</p>
+  <p class="aviso" style="margin:0"><b>E cada senador vem com dois suplentes.</b>
+    Você digita o número do titular; os suplentes entram junto, sem aparecer na
+    tela. Se a cadeira vagar — renúncia, morte, cassação, ou o titular virar
+    ministro — é o suplente que assume, com mandato completo. Eles têm ficha
+    aqui: <a href="{BASE_URL}/senador/">veja quem concorre ao Senado</a>.</p>
+</section>"""
+
+
 def _home(majoritarios: list[Candidato], prop: dict[str, list[dict]], quando: str,
-          prefixos: list[str] | None = None, total_fichas: int = 0) -> str:
+          prefixos: list[str] | None = None, total_fichas: int = 0,
+          senado_vagas: int | None = None,
+          senado_por_uf: int | None = None) -> str:
     linhas = []
     for cod, (chave, nome, _) in CARGOS.items():
         n = sum(1 for c in majoritarios if c.cod_cargo == cod)
@@ -2144,6 +2180,7 @@ ranking e sem cor de partido — o que está aqui é registro público, não ava
 Onde o dado não existe, o site diz que não existe — nunca preenche a lacuna.</p>
 <h2 style="margin:28px 0 10px">Procurar uma candidatura</h2>
 {busca}
+{_bloco_senado(senado_vagas, senado_por_uf)}
 {_bloco_analise()}
 <h2 style="margin:28px 0 10px">Por cargo</h2>
 <ul style="line-height:2;padding-left:20px">{''.join(linhas)}</ul>
@@ -3006,7 +3043,9 @@ def _redirecionar_enderecos_antigos(destino: Path, fichas: list[Candidato]) -> i
 def escrever_site(destino: Path, fichas: list[Candidato],
                   proporcionais: dict[str, list[dict]], quando: str,
                   catalogo: list[dict], doadores: list[list] | None = None,
-                  trocas_de_nome: int | None = None) -> None:
+                  trocas_de_nome: int | None = None,
+                  senado_vagas: int | None = None,
+                  senado_por_uf: int | None = None) -> None:
     """Grava o site inteiro.
 
     `fichas` sao TODAS as candidaturas com pagina propria — os cinco cargos
@@ -3037,7 +3076,9 @@ def escrever_site(destino: Path, fichas: list[Candidato],
         log.info("relatorio analitico incluido (%.1f MB)",
                  ANALISE_ORIGEM.stat().st_size / 1e6)
     grava("index.html", _home(majoritarios, proporcionais, quando,
-                              prefixos=sorted(indice), total_fichas=len(fichas)))
+                              prefixos=sorted(indice), total_fichas=len(fichas),
+                              senado_vagas=senado_vagas,
+                              senado_por_uf=senado_por_uf))
 
     for cod, (chave, nome, _) in CARGOS.items():
         do_cargo = [c for c in majoritarios if c.cod_cargo == cod]

@@ -636,6 +636,71 @@ def coletar() -> dict[str, list[dict]]:
              countif(mudou_coligacao) coligacao
       from `{p}.marts.fct_mudanca_candidatura`""")
 
+    # ── o Senado, que 2026 renova em dois tercos ─────────────────────────
+    # O numero de vagas nao e' suposto: o TSE publica. 2018 traz 56, 2022 traz
+    # 27 (uma por estado) e 2026 traz 54 (duas). E' o que sustenta dizer que o
+    # eleitor vota em DOIS senadores nesta eleicao.
+    q("senado_vagas", f"""
+      select ano_eleicao ano, sum(qt_vagas) vagas, count(distinct sg_ue) ues
+      from `{p}.stg.stg_tse__vagas`
+      where cod_cargo = 5 and ano_eleicao >= 2014
+      group by 1 order by 1""")
+
+    q("senado_por_uf", f"""
+      select d.sg_uf, count(*) titulares
+      {BASE} and d.cod_cargo = 5
+      group by 1 order by titulares desc""")
+
+    # Perfil comparado. O Senado nao tem cota de genero — ela vale so' para as
+    # listas proporcionais — e o efeito aparece aqui.
+    q("senado_perfil", f"""
+      select d.cod_cargo,
+             count(*) n,
+             countif(d.genero = 'FEMININO') mulheres,
+             countif(d.cor_raca in ('PRETA','PARDA')) negros,
+             avg(d.idade_na_posse_valida) idade_media,
+             countif(f.declarou_algum_bem) com_bem,
+             approx_quantiles(if(f.declarou_algum_bem,
+                                 f.total_bens_declarados, null), 100)[offset(50)] mediana_bens
+      {BASE} and d.cod_cargo in (5, 6, 7, 9, 10)
+      group by 1 order by 1""")
+
+    # Estreantes: quem nunca apareceu no cadastro em eleicao anterior. E' o
+    # contraste entre o titular e o suplente que faz a secao.
+    q("senado_estreantes", f"""
+      select d.cod_cargo, count(*) n,
+             countif(d.id_pessoa not in (
+               select distinct id_pessoa from `{p}.marts.dim_candidato`
+               where ano_eleicao < 2026 and id_pessoa is not null)) estreantes
+      {BASE} and d.cod_cargo in (5, 6, 7, 9, 10) and d.id_pessoa is not null
+      group by 1 order by 1""")
+
+    # Onde estao os 81 senadores em exercicio nesta eleicao.
+    q("senado_incumbentes", f"""
+      with cand as (
+        select distinct d.id_pessoa, d.cod_cargo
+        {BASE} and d.id_pessoa is not null)
+      select coalesce(cast(k.cod_cargo as string), 'nenhum') cargo,
+             count(distinct p.id_pessoa) senadores
+      from `{p}.marts.dim_parlamentar` p
+      left join cand k using (id_pessoa)
+      where p.casa = 'senado' and p.em_exercicio and p.id_pessoa is not null
+      group by 1 order by senadores desc""")
+
+    # Os quatro senadores em exercicio que concorrem a SUPLENTE de outro. Sao
+    # nominais de proposito: e' o tipo de numero que parece erro de identidade,
+    # e mostrar quem sao e' o que permite a quem le' conferir.
+    q("senado_incumbente_suplente", f"""
+      with cand as (
+        select distinct d.id_pessoa, d.cod_cargo, d.sg_uf, d.sigla_partido
+        {BASE} and d.id_pessoa is not null)
+      select p.nome_parlamentar nome, p.sg_uf uf_mandato,
+             k.sg_uf uf_candidatura, k.sigla_partido partido
+      from `{p}.marts.dim_parlamentar` p
+      join cand k using (id_pessoa)
+      where p.casa = 'senado' and p.em_exercicio and k.cod_cargo = 9
+      order by 1""")
+
     q("emendas_salto_tipo", f"""
       select ano_emenda ano, tipo, sum(vl_empenhado) emp
       from `{p}.marts.fct_emenda_autor`
