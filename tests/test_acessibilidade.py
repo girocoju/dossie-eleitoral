@@ -161,3 +161,40 @@ def test_a_area_que_rola_tem_altura_relativa_a_janela():
     inteira num celular deitado."""
     bloco = CSS[CSS.index(".rolagem{"):CSS.index("table{")]
     assert "vh" in bloco
+
+
+# ── cartao de compartilhamento ────────────────────────────────────────────
+
+def test_o_link_compartilhado_leva_imagem():
+    """Ate' 05/09/2026 o site nao tinha `og:image` nenhum, e todo link colado no
+    WhatsApp ia sem imagem. Nao era imagem errada: era ausencia."""
+    from scripts import render_site
+
+    html = render_site._pagina("Teste", "descrição", "<p>corpo</p>", "01/01/2026",
+                               canonical="https://exemplo/")
+    assert 'property="og:image"' in html
+    assert 'property="og:image:width" content="1200"' in html
+    assert 'property="og:image:height" content="630"' in html
+    assert 'name="twitter:card" content="summary_large_image"' in html
+
+
+def test_o_cartao_carrega_impressao_digital_no_endereco():
+    """O WhatsApp guarda o cartao em cache por semanas e so' rebusca quando o
+    ENDERECO muda. Cartao novo com endereco velho nao chega a ninguem."""
+    from scripts import render_site
+
+    html = render_site._pagina("Teste", "d", "<p>c</p>", "01/01/2026",
+                               canonical="https://exemplo/")
+    assert f"{render_site.CARTAO_ARQUIVO}?v={render_site.CARTAO_VERSAO}" in html
+    assert len(render_site.CARTAO_VERSAO) == 8
+
+
+def test_sem_o_arquivo_o_site_nao_aponta_para_imagem_quebrada(monkeypatch):
+    """Melhor link sem imagem que link apontando para um 404 — e' o mesmo
+    criterio do bloco do relatorio em PDF na home."""
+    from scripts import render_site
+
+    monkeypatch.setattr(render_site, "CARTAO_VERSAO", "")
+    html = render_site._pagina("Teste", "d", "<p>c</p>", "01/01/2026",
+                               canonical="https://exemplo/")
+    assert "og:image" not in html

@@ -179,6 +179,21 @@ CSS = (Path(__file__).parent / "dossie.css").read_text(encoding="utf-8")
 CSS_VERSAO = hashlib.sha256(CSS.encode("utf-8")).hexdigest()[:8]
 CSS_ARQUIVO = "dossie.css"
 
+# Cartao de compartilhamento (Open Graph). Sem ele o link vai SEM IMAGEM no
+# WhatsApp, no LinkedIn e no X — que era o caso ate' 05/09/2026.
+#
+# A impressao digital no endereco existe pelo mesmo motivo da folha de estilo, e
+# aqui pesa mais: o WhatsApp guarda o cartao em cache por semanas e so' rebusca
+# quando o ENDERECO muda. Cartao novo com endereco velho nao chega a ninguem.
+CARTAO_ARQUIVO = "og-dossie-eleitoral.png"
+CARTAO_ORIGEM = Path(__file__).resolve().parents[1] / CARTAO_ARQUIVO
+try:
+    CARTAO_VERSAO = hashlib.sha256(CARTAO_ORIGEM.read_bytes()).hexdigest()[:8]
+except OSError:
+    # Sem o arquivo, as etiquetas de imagem simplesmente nao saem: melhor link
+    # sem imagem que link apontando para uma imagem que devolve 404.
+    CARTAO_VERSAO = ""
+
 
 
 def _acessivel(html: str) -> str:
@@ -221,6 +236,20 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
     marca = "Dossiê Eleitoral"
     titulo_aba = titulo if titulo.startswith(marca) else f"{titulo} — {marca}"
 
+    # Um cartao para o site inteiro, e nao um por ficha. Um por candidato seria
+    # mais informativo e traria dois problemas: a foto de urna e' 3x4 contra o
+    # 1,91x1 do cartao, entao o corte deforma o rosto; e rosto de pessoa como
+    # cartao de link se le' como divulgacao dela, que e' o que a Constituicao do
+    # projeto evita. O cartao diz o que o SITE e'; a ficha diz o resto.
+    _cartao = (f'\n<meta property="og:image" '
+               f'content="{BASE_URL}/{CARTAO_ARQUIVO}?v={CARTAO_VERSAO}">'
+               f'\n<meta property="og:image:width" content="1200">'
+               f'\n<meta property="og:image:height" content="630">'
+               f'\n<meta property="og:image:alt" content="Dossiê Eleitoral 2026 — '
+               f'o que cada candidatura declarou ao TSE">'
+               f'\n<meta name="twitter:card" content="summary_large_image">'
+               ) if CARTAO_VERSAO else ""
+
     def _item(slug: str, rotulo: str) -> str:
         """Um link da barra.
 
@@ -250,6 +279,7 @@ def _pagina(titulo: str, descricao: str, corpo: str, quando: str,
 <meta property="og:description" content="{e(descricao)}">
 <meta property="og:url" content="{e(canonical)}">
 <meta property="og:site_name" content="Data Duba Intelligence">
+<meta property="og:locale" content="pt_BR">{_cartao}
 <link rel="stylesheet" href="{BASE_URL}/{CSS_ARQUIVO}?v={CSS_VERSAO}">
 </head>
 <body>
@@ -3002,6 +3032,8 @@ def escrever_site(destino: Path, fichas: list[Candidato],
     if ANALISE_ORIGEM.exists():
         # `write_bytes` e nao `grava`: e' binario. A pasta ja' existe.
         (destino / ANALISE_PDF).write_bytes(ANALISE_ORIGEM.read_bytes())
+    if CARTAO_VERSAO:
+        (destino / CARTAO_ARQUIVO).write_bytes(CARTAO_ORIGEM.read_bytes())
         log.info("relatorio analitico incluido (%.1f MB)",
                  ANALISE_ORIGEM.stat().st_size / 1e6)
     grava("index.html", _home(majoritarios, proporcionais, quando,
